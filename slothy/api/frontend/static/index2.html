@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block header %}
+<h1>{{ title }}</h1>
+{% endblock %}
+
+{% block content %}
+<ul>
+  {% for name, item in items %}
+  <li>{{ name|bold }}: {{ item }}</li>
+  {% endfor %}
+</ul>
+
+<h2>Usuários</h2>
+
+{{ usuario.data.data.Nome }}
+
+{% for usuario in usuarios.data.data %}
+  <p>{{ usuario.nome }}</p>
+{% endfor %}
+
+{% endblock %}

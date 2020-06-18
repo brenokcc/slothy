@@ -1,0 +1,15 @@
+<html>
+<head>
+    <script src="/static/jquery-3.5.1.min.js"></script>
+    <script src="/static/nunjucks.js"></script>
+    <script src="/static/api.js"></script>
+</head>
+<body>
+</body>
+
+<script>
+    var api = Api('localhost', 8000);
+    api.template = '{{ template }}';
+</script>
+<script src="{{ src }}"></script>
+</html>
