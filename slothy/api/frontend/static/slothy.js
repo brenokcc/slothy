@@ -42,16 +42,59 @@ function Endpoint(client){
     this.client = client;
     this.data = []
     this.tokens = []
-    this.append = function(token){this.tokens.push(token)}
+    this.lazy = false;
+    this.clone = function(){
+        var endpoint = new Endpoint()
+        endpoint.template = this.template
+        endpoint.client = this.client;
+        endpoint.data = this.data;
+        endpoint.lazy = this.lazy;
+        endpoint.tokens = this.tokens.slice(0);
+        return endpoint
+    }
     this.getUrl = function(){
         if(this.tokens.length>0) var url = '/api/'+this.tokens.join('/')+'/';
         else var url = '';
         this.tokens = []
         return url;
      }
-    this.all = function(){return this.client.get(this.getUrl())}
+    this.login = function(username, password){
+        var response = this.post('/api/login/', {username: username, password: password})
+        this.client.token = response.data.token
+        return response;
+    }
+    this.logout = function(){
+        var response = this.get('/api/logout');
+        if(response.error==null && response.exception==null){
+            this.client.token = null;
+        }
+    }
+    this.user = function(){this.get('/api/user')}
+    this.all = function(){
+        var client = this.client;
+        var url = this.getUrl();
+        var response = function(){
+            return client.get(url);
+        }
+        if(this.lazy){
+            return response;
+        } else{
+            return response();
+        }
+    }
     this.get = function(pk){return this.client.get(this.getUrl()+pk+'/', {})}
     this.add = function(data){return this.client.post(this.getUrl()+'add/', data);}
+    this.getData = function(){
+        var data = []
+        for(key in this.data){
+            if(typeof this.data[key] == 'function'){
+                data[key] = this.data[key]();
+            } else {
+                data[key] = this.data[key];
+            }
+        }
+        return data;
+    }
     this.render = function(template=null, inline=true){
         if(template==null){
             template = this.template;
@@ -59,14 +102,23 @@ function Endpoint(client){
         var env = nunjucks.configure('/static', { autoescape: false });
         env.addFilter('bold', bold);
         if(template){
-            var html = env.render(template, this.data);
+            var html = env.render(template, this.getData());
         } else {
-            var html = env.renderString(window.document.body.innerHTML, this.data);
+            var html = env.renderString(window.document.body.innerHTML, this.getData());
         }
         if(inline) window.document.body.innerHTML = html;
         return html;
     }
-    this.context = function(data){this.data = data}
+    this.reload = function(element){
+        var env = nunjucks.configure('/static', { autoescape: false });
+        var html = $('<div>'+env.getTemplate(this.template).tmplStr+'</div>').find(element).html();
+        html = env.renderString(html, this.getData());
+        $(document).find(element).html(html);
+    }
+    this.context = function(data){
+        data['api'] = this;
+        this.data = data;
+    }
 }
 
 function EndpointProxy(client, endpoint=null){
@@ -79,8 +131,9 @@ function EndpointProxy(client, endpoint=null){
             return endpoint.client[attr]
         }
         else{
-            endpoint.append(attr)
-            return EndpointProxy(client, endpoint)
+            var tmp = endpoint.clone();
+            tmp.tokens.push(attr);
+            return EndpointProxy(client, tmp);
         }
       },
       set(endpoint, attr, value){
@@ -89,18 +142,22 @@ function EndpointProxy(client, endpoint=null){
     });
 }
 
-function Response(url, response){
-    this.url = url;
-    this.data = response;
+function Response(response){
+    for(attr in response){
+        this[attr] = response[attr];
+    }
 }
 
 function ResponseProxy(client, response){
     return new Proxy(response, {
       get(response, attr) {
-        if(attr in response){
+        if(attr in response){ // getting a response attribute
             return response[attr]
         }
-        else{
+        if(attr in response.data){ // getting a response data attribute
+            return response.data[attr]
+        }
+        else{ // executing a function
             return function(data){
                 client.post(response.url+attr+'/', data)
             }
@@ -114,16 +171,10 @@ function Client (hostname='localhost', port=8000) {
     this.port = port;
     this.token = null;
 	this.request = function(method, url, data){
-	    return ResponseProxy(this, new Response(url, sync_request(method, 'http://'+this.hostname+':'+this.port+url, data, this.token)))
+	    return ResponseProxy(this, new Response(sync_request(method, 'http://'+this.hostname+':'+this.port+url, data, this.token)))
 	 }
 	this.get = function(url, data={}){return this.request('GET', url, data)}
 	this.post = function(url, data={}){return this.request('POST', url, data)}
-    this.login = function(username, password){
-        var response = this.post('/api/login/', {username: username, password: password})
-        this.client.token = response.data.token
-        return response;
-    }
-    this.logout = function(){this.get('/api/logout/')}
 }
 
 function Api(hostname='localhost', port=8000){
@@ -131,5 +182,7 @@ function Api(hostname='localhost', port=8000){
     return EndpointProxy(client)
 }
 
-if (typeof exports != 'undefined')
+if (typeof exports != 'undefined'){
     exports.Api = Api
+    exports.print = print
+}

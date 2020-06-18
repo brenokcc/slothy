@@ -1,12 +1,19 @@
+{% import "macros.html" as macros %}
 
 <h1>Great!! :D</h1>
 
 <h2>{{ title }}</h2>
 
-<ul>
-{% for usuario in usuarios.data.data %}
-  <li>{{ usuario.nome }}</li>
-{% endfor %}
-</ul>
+{{ api.backend.group.get(1).name }}
+
+
+<div id="usuarios">
+  <ul>
+  {% for usuario in usuarios %}
+    <li>{{ usuario.nome }}</li>
+  {% endfor %}
+  </ul>
+</div>
+<button onclick="api.reload('#usuarios')">Recarregar</button>
 
 <a href="/about">About</a>

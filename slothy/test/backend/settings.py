@@ -23,7 +23,7 @@ INSTALLED_APPS = (
     'django.contrib.auth',
     'rest_framework',
     'rest_framework.authtoken',
-    'slothy.api',
+    'slothy.api.backend',
     'app',
 )
 TEMPLATES = [

@@ -1,6 +1,8 @@
 
 if (typeof require != 'undefined')
-    Api = require('./api.js').Api
+    var slothy = require('./slothy.js')
+    Api = slothy.Api
+    print = slothy.print
 
 //sync_request('GET', 'http://localhost:8000/myapp/usuario/1/')
 
@@ -23,31 +25,21 @@ if (typeof require != 'undefined')
 //endpoint.myapp.usuario.get(1)
 //endpoint.api.group.all()
 
-app = Api('localhost', 8000)
-//app.login('bruno_ufrn_natal@yahoo.com.br', '123')
-//app.myapp.usuario.all()
-//u = app.myapp.usuario.get(2)
-//u.set_password({raw_password: '321'})
-//app.logout();
-//app.login('bruno_ufrn_natal@yahoo.com.br', '321')
-
-app.context({
-    title: 'Title',
-    items: {a: 1, b:2},
-    usuarios: app.myapp.usuario.all(),
-    usuario: app.myapp.usuario.get(2)
-})
-app.render('test.html', true);
+api = Api('localhost', 8000)
+user = api.app.usuario.add({nome: 'Carlos Breno Pereira Silva', email: 'brenokcc@yahoo.com.br'})
+api.app.usuario.all()
+user = api.app.usuario.get(user.id)
+user.change_password({raw_password: '123'})
+api.login(user.email, '123')
+api.user()
+api.logout()
+api.user()
+user.delete()
+api.app.usuario.all()
 
 
-//app.myapp.usuario.all()
-//app.myapp.usuario.all()
-//app.myapp.usuario.get(1)
-//app.api.group.all()
-//o = app.api.group.get(4)
-//o.x({z:4})
-//g = app.api.group.add({name: 'Superusuário', lookup: 'superuser'})
+api.backend.group.all()
 
-//app.myapp.usuario.add
-//app.myapp.usuario.all
+//api.app.usuario.add
+//api.app.usuario.all
 

@@ -34,21 +34,23 @@ class Api(APIView):
         return self.do(request, path, data)
 
     def do(self, request, path, data):
-        print(request.user)
-        response = {}
-        if path.startswith('user'):
+        print(request.user, path)
+        response = dict(message=None, exception=None, error=None, data=None, metadata=[], url='/api/{}'.format(path))
+        if path.startswith('user/'):
             if request.user.is_authenticated:
                 response.update(data=request.user.values())
             else:
                 response.update(data={})
-        elif path.startswith('login'):
+        elif path.startswith('login/'):
             user = authenticate(request, username=data['username'], password=data['password'])
             if user:
                 login(request, user)
-                response.update(message='Login realizado com sucesso', token=request.user.auth_token.key)
+                data = dict(token=request.user.auth_token.key)
+                response.update(message='Login realizado com sucesso', data=data)
             else:
-                response.update(message='Usuário não autenticado')
-        elif path.startswith('logout'):
+                data = dict(token=None)
+                response.update(message='Usuário não autenticado', data=data)
+        elif path.startswith('logout/'):
             logout(request)
             response.update(message='Logout realizado com sucesso')
         else:
@@ -63,7 +65,8 @@ class Api(APIView):
                         obj = model.objects.get(pk=tokens[2])
                         if tokens[3]:  # execute method
                             attr = getattr(obj, tokens[3])
-                            response.update(data=attr(**data) if callable(attr) else attr)
+                            data = attr(**data) if callable(attr) else attr
+                            response.update(data=data, message='Ação realizada com sucesso')
                         else:  # view
                             response.update(data=obj.values())
                 else:  # list

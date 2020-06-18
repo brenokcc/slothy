@@ -184,7 +184,7 @@ class QuerySetStatistic(object):
 
 class ValuesDict(UserDict):
 
-    def __init__(self, obj, *lookups):
+    def __init__(self, obj, *lookups, verbose_key=False):
         self.obj = obj
         self.lookups = lookups
         self.image_lookup = None
@@ -197,7 +197,7 @@ class ValuesDict(UserDict):
             if not isinstance(lookup, tuple):
                 lookup = lookup,
             for attr in lookup:
-                verbose_name = obj.get_verbose_name(attr)
+                verbose_name = obj.get_verbose_name(attr) if verbose_key else attr
                 value = obj.value(attr, serialized=True)
                 self[verbose_name] = value
                 keys.append(verbose_name)
@@ -582,8 +582,10 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
     def disable_nested_values(self):
         delattr(self, '_nestvalue')
 
-    def values(self, *lookups):
-        return ValuesDict(self, *lookups or self.get_metadata('list_display'))
+    def values(self, *lookups, verbose_key=False):
+        if not lookups:
+            lookups = list(self.get_metadata('list_display')) + ['id']
+        return ValuesDict(self, *lookups, verbose_key=verbose_key)
 
     @classmethod
     def get_field(cls, lookup):
@@ -698,9 +700,6 @@ class Group(Model):
     def __str__(self):
         return self.name
 
-    def x(self, z):
-        print(111, z)
-
 
 class AbstractUser(six.with_metaclass(ModelBase, base_user.AbstractBaseUser, Model)):
 
@@ -711,7 +710,7 @@ class AbstractUser(six.with_metaclass(ModelBase, base_user.AbstractBaseUser, Mod
     class Meta:
         abstract = True
 
-    def set_password(self, raw_password):
+    def change_password(self, raw_password):
         super().set_password(raw_password)
         super().save()
 
@@ -727,4 +726,4 @@ class AbstractUser(six.with_metaclass(ModelBase, base_user.AbstractBaseUser, Mod
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         token_model = apps.get_model('authtoken', 'Token')
-        print(token_model.objects.get_or_create(user=self))
+        token_model.objects.get_or_create(user=self)
