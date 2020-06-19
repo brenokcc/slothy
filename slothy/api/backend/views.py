@@ -61,7 +61,7 @@ class Api(APIView):
                     if tokens[2] == 'add':  # add
                         obj = model.objects.get_or_create(**data)[0]
                         response.update(message='Cadastro realizado com sucesso', data=obj.values())
-                    if tokens[2].isdigit():
+                    elif tokens[2].isdigit():
                         obj = model.objects.get(pk=tokens[2])
                         if tokens[3]:  # execute method
                             attr = getattr(obj, tokens[3])
@@ -69,6 +69,10 @@ class Api(APIView):
                             response.update(data=data, message='Ação realizada com sucesso')
                         else:  # view
                             response.update(data=obj.values())
+                    else:
+                        attr = getattr(model.objects, tokens[2])
+                        data = attr(**data) if callable(attr) else attr
+                        response.update(data=data)
                 else:  # list
                     response.update(data=list(model.objects.all().values()))
         response = Response(json.dumps(response, default=utils.custom_serialize))

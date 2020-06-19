@@ -37,8 +37,13 @@ function Client(hostname='localhost', port=8000) {
     this.hostname = hostname;
     this.port = port;
     this.token = null;
+    this.lazy = false;
 	this.request = function(method, url, data){
-	    return Response(this, sync_request(method, 'http://'+this.hostname+':'+this.port+url, data, this.token))
+	    var client = this;
+	    var response = function(){
+	        return Response(client, sync_request(method, 'http://'+client.hostname+':'+client.port+url, data, client.token))
+	    }
+        return this.lazy? response : response()
 	 }
 	this.get = function(url, data={}){return this.request('GET', url, data)}
 	this.post = function(url, data={}){return this.request('POST', url, data)}
@@ -55,7 +60,7 @@ function Response(client, response){
         }
         else{ // executing a function
             return function(data){
-                client.post(response.url+attr+'/', data)
+                return client.post(response.url+attr+'/', data)
             }
         }
       },
@@ -72,13 +77,11 @@ function Endpoint(client){
     this.client = client;
     this.data = []
     this.path = []
-    this.lazy = false;
     this.clone = function(){
         var endpoint = new Endpoint()
         endpoint.template = this.template
         endpoint.client = this.client;
         endpoint.data = this.data;
-        endpoint.lazy = this.lazy;
         endpoint.path = this.path.slice(0);
         return endpoint
     }
@@ -87,7 +90,10 @@ function Endpoint(client){
         else var url = '';
         this.path = []
         return url;
-     }
+    }
+    this.lazy = function(lazy=true){
+        this.client.lazy = lazy;
+    }
     this.login = function(username, password){
         var response = this.post('/api/login/', {username: username, password: password})
         this.client.token = response.data.token
@@ -100,18 +106,7 @@ function Endpoint(client){
         }
     }
     this.user = function(){this.get('/api/user')}
-    this.all = function(){
-        var client = this.client;
-        var url = this.getUrl();
-        var response = function(){
-            return client.get(url);
-        }
-        if(this.lazy){
-            return response;
-        } else{
-            return response();
-        }
-    }
+    this.all = function(){return this.client.get(this.getUrl())}
     this.get = function(pk){return this.client.get(this.getUrl()+pk+'/', {})}
     this.add = function(data){return this.client.post(this.getUrl()+'add/', data);}
     this.getData = function(){
@@ -163,7 +158,13 @@ function EndpointProxy(endpoint){
         else{
             var tmp = endpoint.clone();
             tmp.path.push(attr);
-            return EndpointProxy(tmp);
+            if(tmp.path.length>2){
+                return function(data){
+                    return tmp.client.post(this.getUrl()+attr+'/', data)
+                }
+            } else {
+                return EndpointProxy(tmp);
+            }
         }
       },
       set(endpoint, attr, value){

@@ -1,4 +1,4 @@
-api.lazy = true;
+api.lazy();
 api.context({
     title: 'That is working!! :)',
     items: {a: 1, b:2},

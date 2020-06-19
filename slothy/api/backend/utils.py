@@ -144,7 +144,7 @@ def custom_serialize(obj):
     elif isinstance(obj, datetime.date):
         return obj.strftime('%d/%m/%Y')
     elif isinstance(obj, QuerySet):
-        return dict(obj.values())
+        return list(obj.values())
     elif isinstance(obj, ValuesDict):
         return dict(obj)
     return obj
