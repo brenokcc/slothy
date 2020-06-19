@@ -33,15 +33,45 @@ if (typeof require == 'undefined'){ // browser
     }
 }
 
-function bold(x){
-	return '<b>'+x+'</b>';
+function Client(hostname='localhost', port=8000) {
+    this.hostname = hostname;
+    this.port = port;
+    this.token = null;
+	this.request = function(method, url, data){
+	    return Response(this, sync_request(method, 'http://'+this.hostname+':'+this.port+url, data, this.token))
+	 }
+	this.get = function(url, data={}){return this.request('GET', url, data)}
+	this.post = function(url, data={}){return this.request('POST', url, data)}
+}
+
+function Response(client, response){
+    return new Proxy(response, {
+      get(response, attr) {
+        if(attr in response){ // getting a response attribute
+            return response[attr]
+        }
+        if(attr in response.data){ // getting a response data attribute
+            return response.data[attr]
+        }
+        else{ // executing a function
+            return function(data){
+                client.post(response.url+attr+'/', data)
+            }
+        }
+      },
+    });
+}
+
+function Api(hostname='localhost', port=8000){
+    var client = new Client(hostname, port)
+    return EndpointProxy(new Endpoint(client))
 }
 
 function Endpoint(client){
     this.template = null;
     this.client = client;
     this.data = []
-    this.tokens = []
+    this.path = []
     this.lazy = false;
     this.clone = function(){
         var endpoint = new Endpoint()
@@ -49,13 +79,13 @@ function Endpoint(client){
         endpoint.client = this.client;
         endpoint.data = this.data;
         endpoint.lazy = this.lazy;
-        endpoint.tokens = this.tokens.slice(0);
+        endpoint.path = this.path.slice(0);
         return endpoint
     }
     this.getUrl = function(){
-        if(this.tokens.length>0) var url = '/api/'+this.tokens.join('/')+'/';
+        if(this.path.length>0) var url = '/api/'+this.path.join('/')+'/';
         else var url = '';
-        this.tokens = []
+        this.path = []
         return url;
      }
     this.login = function(username, password){
@@ -121,8 +151,8 @@ function Endpoint(client){
     }
 }
 
-function EndpointProxy(client, endpoint=null){
-    return new Proxy(endpoint||new Endpoint(client), {
+function EndpointProxy(endpoint){
+    return new Proxy(endpoint, {
       get(endpoint, attr) {
         if(attr in endpoint){
             return endpoint[attr]
@@ -132,8 +162,8 @@ function EndpointProxy(client, endpoint=null){
         }
         else{
             var tmp = endpoint.clone();
-            tmp.tokens.push(attr);
-            return EndpointProxy(client, tmp);
+            tmp.path.push(attr);
+            return EndpointProxy(tmp);
         }
       },
       set(endpoint, attr, value){
@@ -142,44 +172,8 @@ function EndpointProxy(client, endpoint=null){
     });
 }
 
-function Response(response){
-    for(attr in response){
-        this[attr] = response[attr];
-    }
-}
-
-function ResponseProxy(client, response){
-    return new Proxy(response, {
-      get(response, attr) {
-        if(attr in response){ // getting a response attribute
-            return response[attr]
-        }
-        if(attr in response.data){ // getting a response data attribute
-            return response.data[attr]
-        }
-        else{ // executing a function
-            return function(data){
-                client.post(response.url+attr+'/', data)
-            }
-        }
-      },
-    });
-}
-
-function Client (hostname='localhost', port=8000) {
-    this.hostname = hostname;
-    this.port = port;
-    this.token = null;
-	this.request = function(method, url, data){
-	    return ResponseProxy(this, new Response(sync_request(method, 'http://'+this.hostname+':'+this.port+url, data, this.token)))
-	 }
-	this.get = function(url, data={}){return this.request('GET', url, data)}
-	this.post = function(url, data={}){return this.request('POST', url, data)}
-}
-
-function Api(hostname='localhost', port=8000){
-    var client = new Client(hostname, port)
-    return EndpointProxy(client)
+function bold(x){
+	return '<b>'+x+'</b>';
 }
 
 if (typeof exports != 'undefined'){

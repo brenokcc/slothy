@@ -26,7 +26,7 @@ if (typeof require != 'undefined')
 //endpoint.api.group.all()
 
 api = Api('localhost', 8000)
-user = api.app.usuario.add({nome: 'Carlos Breno Pereira Silva', email: 'brenokcc@yahoo.com.br'})
+user = api.app.usuario.add({nome: 'Bruno José', email: 'bruno_ufrn_natal@yahoo.com.br'})
 api.app.usuario.all()
 user = api.app.usuario.get(user.id)
 user.change_password({raw_password: '123'})
@@ -36,7 +36,6 @@ api.logout()
 api.user()
 user.delete()
 api.app.usuario.all()
-
 
 api.backend.group.all()
 
