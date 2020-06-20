@@ -2,9 +2,20 @@
 
 ## Dependencies
 
+### Python
 - six
 - django
 - django_rest_framework
+
+### Nodejs
+- sync-request
+
+## Installation
+
+### Python
+
+> pip install slothy
+
 
 ## Creating a Project
 
@@ -24,3 +35,12 @@
 >cd < name >
 >
 >python manage.py runserver
+
+## Clients
+
+### Nodejs
+
+>npm install slothy-nodejs
+
+> node
+> var slothy = require('slothy-nodejs/slothy')

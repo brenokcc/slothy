@@ -1,0 +1,17 @@
+{
+  "name": "slothy-nodejs",
+  "version": "1.0.1",
+  "description": "Client for slothy framework",
+  "main": "slothy.js",
+  "scripts": {
+    "test": "api = Api('localhost', 8000)"
+  },
+  "keywords": [
+    "Slothy",
+    "Client",
+    "Api"
+  ],
+  "author": "Carlos Breno Pereira Silva",
+  "license": "ISC",
+  "dependencies" : { "sync-request" : "latest"}
+}

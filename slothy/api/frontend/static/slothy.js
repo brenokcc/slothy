@@ -77,6 +77,11 @@ function Endpoint(client){
     this.client = client;
     this.data = []
     this.path = []
+    this.execute = function(){
+        var path = window.document.location.pathname.substring(1) || 'index';
+        this.template = path+'.html';
+        $.getScript('/static/'+path+'.js');
+    }
     this.clone = function(){
         var endpoint = new Endpoint()
         endpoint.template = this.template
