@@ -32,12 +32,15 @@ class Api(APIView):
             data = {}
             for key in request.POST:
                 data[key] = request.POST[key]
+            if request.FILES:
+                for key in request.FILES:
+                    data[key] = request.FILES[key]
         else:  # nodejs
             data = json.loads(body or '{}')
         return self.do(request, path, data)
 
     def do(self, request, path, data):
-        print(request.user, path, request.headers)
+        # print(request.user, path, data.keys())
         response = dict(message=None, exception=None, error=None, data=None, metadata=[], url='/api/{}'.format(path))
         if path.startswith('user'):
             if request.user.is_authenticated:
@@ -53,8 +56,6 @@ class Api(APIView):
             else:
                 data = dict(token=None)
                 response.update(message='Usuário não autenticado', data=data)
-            print(data, 99999)
-
         elif path.startswith('logout'):
             logout(request)
             response.update(message='Logout realizado com sucesso')
@@ -82,6 +83,5 @@ class Api(APIView):
                     response.update(data=list(model.objects.all().values()))
         response = Response(json.dumps(response, default=utils.custom_serialize))
         response["Access-Control-Allow-Origin"] = "*"
-        print(111111)
         return response
 

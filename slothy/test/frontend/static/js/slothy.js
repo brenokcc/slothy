@@ -7,18 +7,22 @@ if (typeof require == 'undefined'){ // browser
     function sync_request(method, url, data, token){
         console.log(url);
         var headers = {}
-        var beforeSend = null;
         if(token) headers['Authorization'] = 'Token '+token;
         if(typeof window && $.cookie("token")) headers['Authorization'] = 'Token '+$.cookie("token");
         console.log(headers);
-        responseText = $.ajax({
+        var options = {
             type: method,
             url: url,
             headers: headers,
             data: data,
             dataType: 'json',
             async: false
-        }).responseText
+        }
+        if(data instanceof FormData){
+            options['processData'] = false;
+            options['contentType'] = false;
+        }
+        responseText = $.ajax(options).responseText
         print(JSON.parse(responseText))
         data = JSON.parse(JSON.parse(responseText));
         return data;
@@ -51,8 +55,12 @@ function Client(url='http://localhost:8000') {
 	    console.log(this.lazy);
         return this.lazy ? response : response()
 	 }
-	this.get = function(url, data={}){return this.request('GET', url, data)}
-	this.post = function(url, data={}){return this.request('POST', url, data)}
+	this.get = function(url, data={}){
+	    return this.request('GET', url, data)
+	}
+	this.post = function(url, data={}){
+	    return this.request('POST', url, data)
+	}
 }
 
 function Response(client, response){
@@ -167,9 +175,13 @@ function Endpoint(client){
 
           //process data
           var action = this.action;
-          var data = {};
-          var fdata = $(this).serializeArray();
-          for(var i=0; i<fdata.length; i++) data[fdata[i].name] = fdata[i].value;
+
+          //var data = {};
+          //var fdata = $(this).serializeArray();
+          //for(var i=0; i<fdata.length; i++) data[fdata[i].name] = fdata[i].value;
+
+	      var data = new FormData(this);
+
           var obj = window;
           var tokens = action.split('/').pop().split('.').reverse();
           while(tokens.length>1){

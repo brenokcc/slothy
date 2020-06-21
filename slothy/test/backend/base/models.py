@@ -11,6 +11,7 @@ class Usuario(models.AbstractUser):
     USERNAME_FIELD = 'email'
     email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255)
     nome = models.CharField(verbose_name='Nome', max_length=255)
+    foto = models.ImageField(verbose_name='Foto', null=True, blank=True, upload_to='fotos')
 
     class Meta:
         icon = 'fa-users'
