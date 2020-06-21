@@ -8,7 +8,7 @@ FOREIGNKEY_GROUP_FIELDS = collections.defaultdict(list)
 
 
 def m2m_signal(sender, **kwargs):
-    from slothy.api.backend.models import Group
+    from slothy.api.models import Group
     action = kwargs['action']
     instance = kwargs['instance']
     pks = kwargs['pk_set']
@@ -27,7 +27,7 @@ def m2m_signal(sender, **kwargs):
 
 def setup_signals():
     if hasattr(settings, 'AUTH_USER_MODEL'):
-        from slothy.api.backend.models import Group
+        from slothy.api.models import Group
         auth_user_model = apps.get_model(settings.AUTH_USER_MODEL)
         group_related_objects = [
             related_object for related_object in getattr(auth_user_model, '_meta').related_objects if
@@ -52,8 +52,8 @@ def pre_save(instance):
 
 
 def post_save(instance):
-    from slothy.api.backend.models import Group
-    from slothy.api.backend.models import AbstractUser
+    from slothy.api.models import Group
+    from slothy.api.models import AbstractUser
     if isinstance(instance, AbstractUser) or hasattr(instance, '__parent_foreignkey_field__'):
         group = Group.objects.get_or_create(
             name=instance.get_metadata('verbose_name'),
@@ -87,7 +87,7 @@ def post_save(instance):
 
 def pre_delete(instance):
     if hasattr(instance, '__parent_foreignkey_field__'):
-        from slothy.api.backend.models import Group
+        from slothy.api.models import Group
         group = Group.objects.get_or_create(
             name=instance.get_metadata('verbose_name'),
             lookup=instance.get_metadata('model_name')
@@ -98,7 +98,7 @@ def pre_delete(instance):
             user.groups.remove(group)
 
     if type(instance) in FOREIGNKEY_GROUP_FIELDS:
-        from slothy.api.backend.models import Group
+        from slothy.api.models import Group
         for field_name in FOREIGNKEY_GROUP_FIELDS[type(instance)]:
             field = instance.get_field(field_name)
             user = getattr(instance, field_name)
@@ -138,7 +138,7 @@ def post_new(cls):
 
 
 def custom_serialize(obj):
-    from slothy.api.backend.models import QuerySet, ValuesDict
+    from slothy.api.models import QuerySet, ValuesDict
     if isinstance(obj, datetime.datetime):
         return obj.strftime('%d/%m/%Y %H:%M')
     elif isinstance(obj, datetime.date):

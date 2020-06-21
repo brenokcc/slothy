@@ -4,8 +4,8 @@ from django.contrib.auth import base_user
 from django.db.models import query, base, manager, Sum, Count, Avg
 from django.db import models
 from django.db.models.fields import *
-from slothy.api.backend.utils import getattrr
-from slothy.api.backend import utils
+from slothy.api.utils import getattrr
+from slothy.api import utils
 import zlib
 import base64
 import _pickle as cpickle

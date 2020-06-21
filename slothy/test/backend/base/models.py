@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from slothy.api.backend import models
+from slothy.api import models
 
 
 class UsuarioManager(models.DefaultManager):

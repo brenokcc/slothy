@@ -3,7 +3,7 @@ from django.apps import apps
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
-from slothy.api.backend import utils
+from slothy.api import utils
 
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 
@@ -23,6 +23,9 @@ class Api(APIView):
             data[key] = key
         return self.do(request, path, data)
 
+    def options(self, request, path):
+        return self.do(request, path, {})
+
     def post(self, request, path):
         body = request.body
         if request.POST:  # browser
@@ -34,14 +37,14 @@ class Api(APIView):
         return self.do(request, path, data)
 
     def do(self, request, path, data):
-        print(request.user, path)
+        print(request.user, path, request.headers)
         response = dict(message=None, exception=None, error=None, data=None, metadata=[], url='/api/{}'.format(path))
-        if path.startswith('user/'):
+        if path.startswith('user'):
             if request.user.is_authenticated:
                 response.update(data=request.user.values())
             else:
-                response.update(data={})
-        elif path.startswith('login/'):
+                response.update(data={}, message='Nenhum usuário autenticado')
+        elif path.startswith('login'):
             user = authenticate(request, username=data['username'], password=data['password'])
             if user:
                 login(request, user)
@@ -50,7 +53,9 @@ class Api(APIView):
             else:
                 data = dict(token=None)
                 response.update(message='Usuário não autenticado', data=data)
-        elif path.startswith('logout/'):
+            print(data, 99999)
+
+        elif path.startswith('logout'):
             logout(request)
             response.update(message='Logout realizado com sucesso')
         else:
@@ -77,5 +82,6 @@ class Api(APIView):
                     response.update(data=list(model.objects.all().values()))
         response = Response(json.dumps(response, default=utils.custom_serialize))
         response["Access-Control-Allow-Origin"] = "*"
+        print(111111)
         return response
 

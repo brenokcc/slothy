@@ -6,9 +6,15 @@ function print(data){
 if (typeof require == 'undefined'){ // browser
     function sync_request(method, url, data, token){
         console.log(url);
+        var headers = {}
+        var beforeSend = null;
+        if(token) headers['Authorization'] = 'Token '+token;
+        if(typeof window && $.cookie("token")) headers['Authorization'] = 'Token '+$.cookie("token");
+        console.log(headers);
         responseText = $.ajax({
             type: method,
             url: url,
+            headers: headers,
             data: data,
             dataType: 'json',
             async: false
@@ -33,17 +39,17 @@ if (typeof require == 'undefined'){ // browser
     }
 }
 
-function Client(hostname='localhost', port=8000) {
-    this.hostname = hostname;
-    this.port = port;
+function Client(url='http://localhost:8000') {
+    this.url = url;
     this.token = null;
     this.lazy = false;
 	this.request = function(method, url, data){
 	    var client = this;
 	    var response = function(){
-	        return Response(client, sync_request(method, 'http://'+client.hostname+':'+client.port+url, data, client.token))
+	        return Response(client, sync_request(method, client.url+url, data, client.token))
 	    }
-        return this.lazy? response : response()
+	    console.log(this.lazy);
+        return this.lazy ? response : response()
 	 }
 	this.get = function(url, data={}){return this.request('GET', url, data)}
 	this.post = function(url, data={}){return this.request('POST', url, data)}
@@ -67,9 +73,9 @@ function Response(client, response){
     });
 }
 
-function Api(hostname='localhost', port=8000){
-    var client = new Client(hostname, port)
-    return EndpointProxy(new Endpoint(client))
+function App(url='http://localhost:8000'){
+    var client = new Client(url);
+    return EndpointProxy(new Endpoint(client));
 }
 
 function Endpoint(client){
@@ -78,9 +84,10 @@ function Endpoint(client){
     this.data = []
     this.path = []
     this.execute = function(){
+        var app = this;
         var path = window.document.location.pathname.substring(1) || 'index';
-        this.template = path+'.html';
-        $.getScript('/static/'+path+'.js');
+        app.template = path+'.html';
+        $.getScript('/'+path+'.js', function(){app.render()});
     }
     this.clone = function(){
         var endpoint = new Endpoint()
@@ -100,17 +107,22 @@ function Endpoint(client){
         this.client.lazy = lazy;
     }
     this.login = function(username, password){
-        var response = this.post('/api/login/', {username: username, password: password})
-        this.client.token = response.data.token
+        var response = this.client.post('/api/login', {username: username, password: password})
+        if(response.data){
+            this.client.token = response.data.token;
+            if(typeof window) $.cookie("token", this.client.token);
+        }
         return response;
     }
     this.logout = function(){
-        var response = this.get('/api/logout');
+        var response = this.client.get('/api/logout');
         if(response.error==null && response.exception==null){
             this.client.token = null;
+            if(typeof window) $.removeCookie("token");
         }
+        return response;
     }
-    this.user = function(){this.get('/api/user')}
+    this.user = function(){return this.client.post('/api/user', {})}
     this.all = function(){return this.client.get(this.getUrl())}
     this.get = function(pk){return this.client.get(this.getUrl()+pk+'/', {})}
     this.add = function(data){return this.client.post(this.getUrl()+'add/', data);}
@@ -129,24 +141,66 @@ function Endpoint(client){
         if(template==null){
             template = this.template;
         }
-        var env = nunjucks.configure('/static', { autoescape: false });
+        var env = nunjucks.configure(document.location.origin, { autoescape: false });
         env.addFilter('bold', bold);
         if(template){
             var html = env.render(template, this.getData());
         } else {
-            var html = env.renderString(window.document.body.innerHTML, this.getData());
+            var html = env.renderString($(window.document.body).html(), this.getData());
         }
-        if(inline) window.document.body.innerHTML = html;
+        if(inline) $(window.document.body).html(html);
+        this.initialize(window.document.body);
         return html;
     }
     this.reload = function(element){
-        var env = nunjucks.configure('/static', { autoescape: false });
+        var env = nunjucks.configure(document.location.origin, { autoescape: false });
         var html = $('<div>'+env.getTemplate(this.template).tmplStr+'</div>').find(element).html();
         html = env.renderString(html, this.getData());
         $(document).find(element).html(html);
+        this.initialize(element);
+    }
+    this.initialize = function(element){
+        var app = this;
+        app.client.lazy = false;
+        $(element).find("form").unbind("submit").submit(function( event2 ) {
+          event2.preventDefault();
+
+          //process data
+          var action = this.action;
+          var data = {};
+          var fdata = $(this).serializeArray();
+          for(var i=0; i<fdata.length; i++) data[fdata[i].name] = fdata[i].value;
+          var obj = window;
+          var tokens = action.split('/').pop().split('.').reverse();
+          while(tokens.length>1){
+            var token = tokens.pop();
+            console.log([obj, token]);
+            obj = obj[token];
+          }
+          var func = obj[tokens.pop()](data);
+
+          var path = $(this).data("redirect");
+          if(path){
+            app.redirect(path);
+          } else {
+              // reload elements
+              var rdata = $(this).data("reload");
+              if(rdata){
+                var elements = rdata.split(',');
+                for(var i=0; i<elements.length; i++){
+                    console.log(elements[i]);
+                    app.reload(elements[i]);
+                }
+              }
+          }
+
+        });
+    }
+    this.redirect = function(path){
+        document.location.href = path;
     }
     this.context = function(data){
-        data['api'] = this;
+        data['app'] = this;
         this.data = data;
     }
 }
@@ -156,9 +210,6 @@ function EndpointProxy(endpoint){
       get(endpoint, attr) {
         if(attr in endpoint){
             return endpoint[attr]
-        }
-        else if(attr in endpoint.client){
-            return endpoint.client[attr]
         }
         else{
             var tmp = endpoint.clone();
@@ -183,6 +234,6 @@ function bold(x){
 }
 
 if (typeof exports != 'undefined'){
-    exports.Api = Api
+    exports.App = App
     exports.print = print
 }

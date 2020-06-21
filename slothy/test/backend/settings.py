@@ -1,7 +1,7 @@
 import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEBUG = True
-ROOT_URLCONF = 'slothy.api.backend.urls'
+ROOT_URLCONF = 'slothy.api.urls'
 ALLOWED_HOSTS = '*'
 CORS_ORIGIN_ALLOW_ALL = True
 DATABASES = {
@@ -13,6 +13,7 @@ DATABASES = {
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
 ]
@@ -23,8 +24,9 @@ INSTALLED_APPS = (
     'django.contrib.auth',
     'rest_framework',
     'rest_framework.authtoken',
-    'slothy.api.backend',
-    'app',
+    'corsheaders',
+    'slothy.api',
+    'base',
 )
 TEMPLATES = [
     {
@@ -34,4 +36,4 @@ TEMPLATES = [
 ]
 STATIC_URL = '/static/'
 
-AUTH_USER_MODEL = 'app.usuario'
+AUTH_USER_MODEL = 'base.usuario'

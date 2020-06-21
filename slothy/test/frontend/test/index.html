@@ -1,0 +1,23 @@
+{% import "static/macros/macros.html" as macros %}
+
+<h1>Great!! :D</h1>
+
+<h2>{{ title }}</h2>
+
+
+<div id="usuarios">
+  <ul>
+  {% for usuario in usuarios %}
+    <li>{{ usuario.nome }}</li>
+  {% endfor %}
+  </ul>
+</div>
+<button onclick="app.reload('#usuarios')">Recarregar</button>
+
+<form id="form" action="app.base.usuario.add" data-reload="#usuarios" data-redirect2="/">
+  Nome <input type="text" name="nome">
+  E-mail <input type="text" name="email">
+  Foto <input type="file" name="foto">
+  <button type="submit">Cadastrar</button>
+</form>
+
