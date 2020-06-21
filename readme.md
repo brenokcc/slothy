@@ -6,6 +6,7 @@
 - six
 - django
 - django_rest_framework
+- django-cors-headers
 
 ### Nodejs
 - sync-request
@@ -34,7 +35,7 @@
 >
 >cd < name >
 >
->python manage.py runserver
+>python -m slothy server
 
 ## Clients
 
