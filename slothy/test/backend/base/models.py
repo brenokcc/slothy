@@ -1,8 +1,22 @@
 # -*- coding: utf-8 -*-
 from slothy.api import models
+from slothy.api.models.decorators import expose
 
 
 class UsuarioManager(models.DefaultManager):
+    @expose()
+    def add(self, **kwargs):
+        return super().create(**kwargs)
+
+    @expose()
+    def list(self):
+        return super().all()
+
+    @expose()
+    def delete(self):
+        return super().delete()
+
+    @expose('usuario')
     def ativos(self):
         return self.all()[0:1]
 
@@ -19,7 +33,19 @@ class Usuario(models.AbstractUser):
         verbose_name = 'Usuário'
         verbose_name_plural = 'Usuários'
         list_display = 'nome', 'email'
-        list_actions = 'alterar_senha',
 
     def __str__(self):
         return self.nome
+
+    @expose()
+    def delete(self):
+        super().delete()
+
+    @expose()
+    def atualizar_nome(self, nome):
+        self.nome = nome
+        self.save()
+
+    @expose()
+    def change_password(self, raw_password):
+        super().change_password(raw_password)

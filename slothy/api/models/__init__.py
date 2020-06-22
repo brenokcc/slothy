@@ -336,6 +336,9 @@ class QuerySet(query.QuerySet):
         clone._search_fields = self._search_fields
         return clone
 
+    def add(self, **kwargs):
+        self.model.objects.create(**kwargs)
+
     def count(self, x=None, y=None):
         return QuerySetStatistic(self, x, y=y) if x else super().count()
 
@@ -656,30 +659,29 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
 
     @classmethod
     def check_lookups(cls, user, lookups, groups_only=True):
-        if user.pk:
-            group_lookups = {}
-            if lookups is ():
-                lookups = user.get_metadata('model_name'),
-            for lookup_key in lookups or ():
-                if lookup_key.startswith('self'):  # self or self__<attr>
-                    if lookup_key == 'self':
-                        group_lookup = user.get_metadata('model_name')
-                    else:  # group
-                        field = cls.get_field(lookup_key[6:])
-                        group_lookup = field.related_model.get_metadata('model_name')
-                else:
-                    group_lookup = lookup_key
-                group_lookups[group_lookup] = lookup_key
+        group_lookups = {}
+        if lookups:
+            if user.pk:
+                for lookup_key in lookups or ():
+                    if lookup_key.startswith('self'):  # self or self__<attr>
+                        if lookup_key == 'self':
+                            group_lookup = user.get_metadata('model_name')
+                        else:  # group
+                            field = cls.get_field(lookup_key[6:])
+                            group_lookup = field.related_model.get_metadata('model_name')
+                    else:
+                        group_lookup = lookup_key
+                    group_lookups[group_lookup] = lookup_key
 
-            if user.pk and lookups is not None:
-                qs = user.groups.filter(lookup__in=group_lookups.keys())
-                checked_lookups = qs.values_list('lookup', flat=True)
-                return checked_lookups if groups_only else {
-                    group_lookup: group_lookups[group_lookup] for group_lookup in checked_lookups
-                }
+                    qs = user.groups.filter(lookup__in=group_lookups.keys())
+                    checked_lookups = qs.values_list('lookup', flat=True)
+                    return checked_lookups if groups_only else {
+                        group_lookup: group_lookups[group_lookup] for group_lookup in checked_lookups
+                    }
             else:
-                return group_lookups.keys() if groups_only else group_lookups
-        return True
+                return False if groups_only else group_lookups
+
+        return True if groups_only else group_lookups
 
 
 class Group(Model):

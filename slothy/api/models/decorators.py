@@ -1,6 +1,18 @@
 # -*- coding: utf-8 -*-
 
 
+def expose(*lookups):
+    def decorate(func):
+        metadata = getattr(func, '_metadata', {})
+        metadata.update(
+            lookups=lookups,
+        )
+        setattr(func, '_metadata', metadata)
+        return func
+
+    return decorate
+
+
 def meta(verbose_name, formatter=None, lookups=(), actions=(), **kwargs):
     def decorate(func):
         metadata = getattr(func, '_metadata', {})

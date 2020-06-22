@@ -188,3 +188,24 @@ def _getattr_rec(obj, attrs, request=None):
             value = attr
         return _getattr_rec(value, attrs, request=request) if attrs else value
     return None
+
+
+def apply(model, func, data, user):
+    if hasattr(func, '_metadata'):
+        metadata = getattr(func, '_metadata')
+    else:
+        manager_func = getattr(getattr(func.__self__, '_queryset_class'), func.__name__)
+        metadata = getattr(manager_func, '_metadata', {})
+    if 'lookups' in metadata:
+        if model.check_lookups(user, metadata['lookups']):
+            print(user, func, metadata['lookups'])
+            result = func(**data)
+            if hasattr(result, 'all'):
+                result = list(result.values())
+            if hasattr(result, 'pk'):
+                result = result.values()
+            return result
+        else:
+            raise BaseException('Permission denied')
+    else:
+        raise BaseException('This function is not exposed')

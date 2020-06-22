@@ -16,7 +16,6 @@ app.user()
 user.delete()
 app.base.usuario.all()
 
-app.api.group.all()
 
 //app.base.usuario.add
 //app.base.usuario.all

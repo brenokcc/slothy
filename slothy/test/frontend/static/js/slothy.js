@@ -50,7 +50,6 @@ function Client(url='http://localhost:8000') {
 	    var response = function(){
 	        return Response(client, sync_request(method, client.url+url, data, client.token))
 	    }
-	    console.log(this.lazy);
         return this.lazy ? response : response()
 	 }
 	this.get = function(url, data={}){

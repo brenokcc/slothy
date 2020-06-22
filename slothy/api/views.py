@@ -5,8 +5,8 @@ from django.apps import apps
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
-
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+from slothy.api.utils import apply
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
@@ -67,22 +67,29 @@ class Api(APIView):
                     model = apps.get_model(tokens[0], tokens[1])
                     if tokens[2]:
                         if tokens[2] == 'add':  # add
-                            obj = model.objects.get_or_create(**data)[0]
-                            response.update(message='Cadastro realizado com sucesso', data=obj.values())
-                        elif tokens[2].isdigit():
+                            func = model.objects.add
+                            data = apply(model, func, data, request.user)
+                            response.update(message='Cadastro realizado com sucesso', data=data)
+                        if tokens[2] == 'delete':  # delete
+                            func = model.objects.all().delete
+                            data = apply(model, func, data, request.user)
+                            response.update(message='Cadastro realizado com sucesso', data=data)
+                        elif tokens[2].isdigit():  # get or execute intance method
                             obj = model.objects.get(pk=tokens[2])
-                            if tokens[3]:  # execute method
-                                attr = getattr(obj, tokens[3])
-                                data = attr(**data) if callable(attr) else attr
+                            if tokens[3]:  # execute instance method
+                                func = getattr(obj, tokens[3])
+                                data = apply(model, func, data, request.user)
                                 response.update(data=data, message='Ação realizada com sucesso')
-                            else:  # view
+                            else:  # get instance
                                 response.update(data=obj.values())
-                        else:
-                            attr = getattr(model.objects, tokens[2])
-                            data = attr(**data) if callable(attr) else attr
+                        else:  # execute manager method
+                            func = getattr(model.objects, tokens[2])
+                            data = apply(model, func, data, request.user)
                             response.update(data=data)
                     else:  # list
-                        response.update(data=list(model.objects.all().values()))
+                        func = getattr(model.objects, 'list')
+                        data = apply(model, func, data, request.user)
+                        response.update(data=data)
         except BaseException as e:
             traceback.print_exc(file=sys.stdout)
             response.update(exception=str(e))
