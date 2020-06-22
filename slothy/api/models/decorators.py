@@ -79,11 +79,11 @@ def classaction(verbose_name, lookups=(), condition=None, message=None, category
     return decorate
 
 
-def param(field):
+def param(**kwargs):
     def decorate(func):
         metadata = getattr(func, '_metadata', {})
-        fields = metadata.get('fields', [])
-        fields.insert(0, field)
+        fields = metadata.get('fields', {})
+        fields.update(**kwargs)
         metadata.update(fields=fields)
         setattr(func, '_metadata', metadata)
         return func

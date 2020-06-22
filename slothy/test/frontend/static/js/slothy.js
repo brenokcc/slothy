@@ -120,11 +120,9 @@ function Endpoint(client){
         return response;
     }
     this.logout = function(){
+        this.client.token = null;
+        if(typeof window) $.removeCookie("token");
         var response = this.client.get('/api/logout');
-        if(response.error==null && response.exception==null){
-            this.client.token = null;
-            if(typeof window) $.removeCookie("token");
-        }
         return response;
     }
     this.user = function(){return this.client.post('/api/user', {})}

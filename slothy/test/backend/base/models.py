@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from slothy.api import models
-from slothy.api.models.decorators import expose
+from slothy.api.models.decorators import expose, param
 
 
 class UsuarioManager(models.DefaultManager):
@@ -42,10 +42,13 @@ class Usuario(models.AbstractUser):
         super().delete()
 
     @expose()
-    def atualizar_nome(self, nome):
+    @param(data_atualizacao=models.DateField())
+    def atualizar_nome(self, nome, data_atualizacao):
+        print(data_atualizacao)
         self.nome = nome
         self.save()
 
     @expose()
+    @param(raw_password=models.CharField())
     def change_password(self, raw_password):
         super().change_password(raw_password)

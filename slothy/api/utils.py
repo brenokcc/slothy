@@ -3,6 +3,7 @@ import collections
 from django.apps import apps
 from django.conf import settings
 from django.db.models import signals
+from django.core.exceptions import ValidationError
 
 FOREIGNKEY_GROUP_FIELDS = collections.defaultdict(list)
 
@@ -198,7 +199,18 @@ def apply(model, func, data, user):
         metadata = getattr(manager_func, '_metadata', {})
     if 'lookups' in metadata:
         if model.check_lookups(user, metadata['lookups']):
-            print(user, func, metadata['lookups'])
+            for name, value in data.items():
+                field = metadata.get('fields', {}).get(name) or model.get_field(name)
+                if field:
+                    try:
+                        form_field = data[name] = field.formfield()
+                        if form_field:
+                            data[name] = form_field.clean(value)
+                    except ValidationError as e:
+                        raise ValidationError({name: e.message})
+                else:
+                    raise BaseException('Type of "{}" is unknown')
+
             result = func(**data)
             if hasattr(result, 'all'):
                 result = list(result.values())

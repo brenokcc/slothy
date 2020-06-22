@@ -6,6 +6,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
+
+from slothy.api.models import ValidationError
 from slothy.api.utils import apply
 
 
@@ -70,10 +72,10 @@ class Api(APIView):
                             func = model.objects.add
                             data = apply(model, func, data, request.user)
                             response.update(message='Cadastro realizado com sucesso', data=data)
-                        if tokens[2] == 'delete':  # delete
+                        elif tokens[2] == 'delete':  # delete
                             func = model.objects.all().delete
                             data = apply(model, func, data, request.user)
-                            response.update(message='Cadastro realizado com sucesso', data=data)
+                            response.update(message='Exclusão realizada com sucesso', data=data)
                         elif tokens[2].isdigit():  # get or execute intance method
                             obj = model.objects.get(pk=tokens[2])
                             if tokens[3]:  # execute instance method
@@ -90,6 +92,11 @@ class Api(APIView):
                         func = getattr(model.objects, 'list')
                         data = apply(model, func, data, request.user)
                         response.update(data=data)
+        except ValidationError as e:
+            error = {}
+            for key, messages in e.message_dict.items():
+                error[key] = ', '.join(messages)
+            response.update(error=error)
         except BaseException as e:
             traceback.print_exc(file=sys.stdout)
             response.update(exception=str(e))
