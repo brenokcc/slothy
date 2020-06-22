@@ -9,7 +9,6 @@ if (typeof require == 'undefined'){ // browser
         var headers = {}
         if(token) headers['Authorization'] = 'Token '+token;
         if(typeof window && $.cookie("token")) headers['Authorization'] = 'Token '+$.cookie("token");
-        console.log(headers);
         var options = {
             type: method,
             url: url,
@@ -22,9 +21,8 @@ if (typeof require == 'undefined'){ // browser
             options['processData'] = false;
             options['contentType'] = false;
         }
-        responseText = $.ajax(options).responseText
-        print(JSON.parse(responseText))
-        data = JSON.parse(JSON.parse(responseText));
+        data = $.ajax(options).responseJSON;
+        print(data)
         return data;
     }
 } else { // nodejs
@@ -37,7 +35,7 @@ if (typeof require == 'undefined'){ // browser
         if(token) headers['Authorization'] = 'Token '+token
         if(method=='GET') url += '?'+querystring.stringify(data);
         var res = request(method, url, {headers:headers, json:data})
-        data = JSON.parse(JSON.parse(res.getBody('utf8')))
+        data = JSON.parse(res.getBody('utf8'))
         print(data)
         return data
     }

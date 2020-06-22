@@ -1,9 +1,10 @@
 import json
+import sys
+import traceback
 from django.apps import apps
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
-from slothy.api import utils
 
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 
@@ -42,46 +43,50 @@ class Api(APIView):
     def do(self, request, path, data):
         # print(request.user, path, data.keys())
         response = dict(message=None, exception=None, error=None, data=None, metadata=[], url='/api/{}'.format(path))
-        if path.startswith('user'):
-            if request.user.is_authenticated:
-                response.update(data=request.user.values())
+        try:
+            if path.startswith('user'):
+                if request.user.is_authenticated:
+                    response.update(data=request.user.values())
+                else:
+                    response.update(data={}, message='Nenhum usuário autenticado')
+            elif path.startswith('login'):
+                user = authenticate(request, username=data['username'], password=data['password'])
+                if user:
+                    login(request, user)
+                    data = dict(token=request.user.auth_token.key)
+                    response.update(message='Login realizado com sucesso', data=data)
+                else:
+                    data = dict(token=None)
+                    response.update(message='Usuário não autenticado', data=data)
+            elif path.startswith('logout'):
+                logout(request)
+                response.update(message='Logout realizado com sucesso')
             else:
-                response.update(data={}, message='Nenhum usuário autenticado')
-        elif path.startswith('login'):
-            user = authenticate(request, username=data['username'], password=data['password'])
-            if user:
-                login(request, user)
-                data = dict(token=request.user.auth_token.key)
-                response.update(message='Login realizado com sucesso', data=data)
-            else:
-                data = dict(token=None)
-                response.update(message='Usuário não autenticado', data=data)
-        elif path.startswith('logout'):
-            logout(request)
-            response.update(message='Logout realizado com sucesso')
-        else:
-            tokens = path.split('/')
-            if len(tokens) > 1:
-                model = apps.get_model(tokens[0], tokens[1])
-                if tokens[2]:
-                    if tokens[2] == 'add':  # add
-                        obj = model.objects.get_or_create(**data)[0]
-                        response.update(message='Cadastro realizado com sucesso', data=obj.values())
-                    elif tokens[2].isdigit():
-                        obj = model.objects.get(pk=tokens[2])
-                        if tokens[3]:  # execute method
-                            attr = getattr(obj, tokens[3])
+                tokens = path.split('/')
+                if len(tokens) > 1:
+                    model = apps.get_model(tokens[0], tokens[1])
+                    if tokens[2]:
+                        if tokens[2] == 'add':  # add
+                            obj = model.objects.get_or_create(**data)[0]
+                            response.update(message='Cadastro realizado com sucesso', data=obj.values())
+                        elif tokens[2].isdigit():
+                            obj = model.objects.get(pk=tokens[2])
+                            if tokens[3]:  # execute method
+                                attr = getattr(obj, tokens[3])
+                                data = attr(**data) if callable(attr) else attr
+                                response.update(data=data, message='Ação realizada com sucesso')
+                            else:  # view
+                                response.update(data=obj.values())
+                        else:
+                            attr = getattr(model.objects, tokens[2])
                             data = attr(**data) if callable(attr) else attr
-                            response.update(data=data, message='Ação realizada com sucesso')
-                        else:  # view
-                            response.update(data=obj.values())
-                    else:
-                        attr = getattr(model.objects, tokens[2])
-                        data = attr(**data) if callable(attr) else attr
-                        response.update(data=data)
-                else:  # list
-                    response.update(data=list(model.objects.all().values()))
-        response = Response(json.dumps(response, default=utils.custom_serialize))
+                            response.update(data=data)
+                    else:  # list
+                        response.update(data=list(model.objects.all().values()))
+        except BaseException as e:
+            traceback.print_exc(file=sys.stdout)
+            response.update(exception=str(e))
+        response = Response(response)
         response["Access-Control-Allow-Origin"] = "*"
         return response
 

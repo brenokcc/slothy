@@ -15,7 +15,7 @@ Thumbs.db
 .settings/*
 sqlite.db
 db.sqlite3
-media/*
+media
 dist/
 djangoplus.egg-info/
 */dist/
