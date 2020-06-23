@@ -91,10 +91,14 @@ class Api(APIView):
                                 else:
                                     func = getattr(obj, tokens[3])
                                     if len(tokens) > 4:
+                                        qs = func()
                                         if tokens[4] == 'add':
-                                            response.update(message='Adição realizada com sucesso')
+                                            data = apply(qs.model, qs.add, data, request.user)
+                                            response.update(message='Adição realizada com sucesso', data=data)
                                         elif tokens[4] == 'remove':
-                                            response.update(message='Removação realizada com sucesso')
+                                            qs.remove(0)
+                                            data = apply(qs.model, qs.remove, data['id'], request.user)
+                                            response.update(message='Removação realizada com sucesso', data=data)
                                     else:
                                         data = apply(model, func, data, request.user)
                                         response.update(data=data, message='Ação realizada com sucesso')

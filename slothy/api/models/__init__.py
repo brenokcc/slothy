@@ -201,6 +201,7 @@ class ValuesDict(UserDict):
             for attr in lookup:
                 verbose_name = obj.get_verbose_name(attr) if verbose_key else attr
                 value = obj.value(attr, serialized=True)
+                value = utils.custom_serialize(value)
                 self[verbose_name] = value
                 keys.append(verbose_name)
             self.nested_keys.append(keys)
@@ -347,7 +348,12 @@ class QuerySet(query.QuerySet):
                         return instance
                 else:
                     kwargs.update(**{field.name: obj})
-        return self.model.objects.create(**kwargs)
+        return self.model.objects.get_or_create(**kwargs)[0]
+
+    def remove(self, pk):
+        for field, known_related_objects in getattr(self, '_known_related_objects').items():
+            for obj in known_related_objects.values():
+                print(obj)
 
     def list(self):
         return super().all()

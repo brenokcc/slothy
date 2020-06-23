@@ -174,7 +174,11 @@ function Endpoint(client){
         var env = nunjucks.configure(document.location.origin, { autoescape: false });
         env.addFilter('bold', bold);
         if(template){
-            var html = env.render(template, this.getData());
+            try{
+                var html = env.render(template, this.getData());
+            } catch (e) {
+                if(e.message.indexOf('template not found')) throw e;
+            }
         } else {
             var html = env.renderString($(window.document.body).html(), this.getData());
         }

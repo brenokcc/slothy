@@ -148,6 +148,8 @@ def custom_serialize(obj):
         return list(obj.values())
     elif isinstance(obj, ValuesDict):
         return dict(obj)
+    if hasattr(obj, 'pk'):
+        return obj.values()
     return obj
 
 
@@ -220,12 +222,7 @@ def apply(model, func, data, user):
                 else:
                     raise BaseException('Type of "{}" is unknown')
 
-            result = func(**data)
-            if hasattr(result, 'all'):
-                result = list(result.values())
-            if hasattr(result, 'pk'):
-                result = result.values()
-            return result
+            return custom_serialize(func(**data))
         else:
             raise BaseException('Permission denied')
     else:

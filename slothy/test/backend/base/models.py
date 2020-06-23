@@ -74,7 +74,7 @@ class Estado(models.Model):
     def __str__(self):
         return '{}'.format(self.sigla)
 
-    @expose()
+    @expose(list=(), add=(), remove=())
     def get_cidades(self):
         return self.cidade_set.all()
 
