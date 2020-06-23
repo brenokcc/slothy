@@ -5,6 +5,7 @@ from django.db.models import query, base, manager, Sum, Count, Avg
 from django.db import models
 from django.db.models.fields import *
 from django.db.models.fields.files import *
+from django.db.models.fields.related import *
 from slothy.api.utils import getattrr
 from slothy.api import utils
 import zlib
@@ -336,8 +337,20 @@ class QuerySet(query.QuerySet):
         clone._search_fields = self._search_fields
         return clone
 
-    def add(self, **kwargs):
-        self.model.objects.create(**kwargs)
+    def add(self, *args, **kwargs):
+        for field, known_related_objects in getattr(self, '_known_related_objects').items():
+            for obj in known_related_objects.values():
+                if args:
+                    for instance in args:
+                        setattr(instance, field.name, obj)
+                        instance.save()
+                        return instance
+                else:
+                    kwargs.update(**{field.name: obj})
+        return self.model.objects.create(**kwargs)
+
+    def list(self):
+        return super().all()
 
     def count(self, x=None, y=None):
         return QuerySetStatistic(self, x, y=y) if x else super().count()
@@ -534,11 +547,18 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
         return satisfied
 
     @classmethod
+    def set_metadata(cls, name, value):
+        setattr(getattr(cls, '_meta'), name, value)
+
+    @classmethod
     def get_metadata(cls, name, default=None):
         metadata = getattr(cls, '_meta')
-        if name == 'fieldsets' and not hasattr(metadata, name):
+        if name in ('fieldsets', 'list_display') and not hasattr(metadata, name):
             field_names = [field.name for field in metadata.local_fields]
-            default = dict(title='Dados Gerais', fields=field_names, relations=[], lookups=[], actions=[], tab_name=None, tab_title=None, image=None),
+            if name == 'list_display':
+                default = field_names
+            else:
+                default = dict(title='Dados Gerais', fields=field_names, relations=[], lookups=[], actions=[], tab_name=None, tab_title=None, image=None),
         elif name == 'exclude':
             default = [field.name for field in metadata.get_fields() if hasattr(field, 'exclude') and field.exclude]
         elif name == 'tabs':

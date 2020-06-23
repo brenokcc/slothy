@@ -46,11 +46,9 @@ function Client(url='http://localhost:8000') {
     this.token = null;
     this.lazy = false;
 	this.request = function(method, url, data){
-	    var client = this;
-	    var response = function(){
-	        return Response(client, sync_request(method, client.url+url, data, client.token))
-	    }
-        return this.lazy ? response : response()
+	    var request = new Request(method, url, data, this)
+	    if(!this.lazy) request.fetch()
+        return Response(request);
 	 }
 	this.get = function(url, data={}){
 	    return this.request('GET', url, data)
@@ -60,18 +58,40 @@ function Client(url='http://localhost:8000') {
 	}
 }
 
-function Response(client, response){
-    return new Proxy(response, {
-      get(response, attr) {
-        if(attr in response){ // getting a response attribute
-            return response[attr]
+function Request(method, url, input, client){
+    this.method = method;
+    this.url = url;
+    this.client = client;
+    this.input = input;
+    this.response = null;
+    this.fetch = function(){
+        this.response = sync_request(this.method, this.client.url+url, this.input, this.client.token);
+    }
+    this.debug = function(){
+        if(Array.isArray(this.response.data)){
+            for(var obj of this.response.data) console.log(obj);
+        } else {
+            console.log(this.response.data);
         }
-        if(attr in response.data){ // getting a response data attribute
-            return response.data[attr]
+    }
+}
+
+function Response(request){
+    return new Proxy(request, {
+      get(request, attr) {
+        if(request.response==null && attr!='add' && attr!='remove' && attr!='dir') request.fetch()
+        if(attr in request){ // getting a request attribute
+            return request[attr]
+        }
+        else if(attr in request.response){ // getting a response attribute
+            return request.response[attr]
+        }
+        else if(attr in request.response.data){ // getting a response data attribute
+            return request.response.data[attr]
         }
         else{ // executing a function
             return function(data){
-                return client.post(response.url+attr+'/', data)
+                return request.client.post(request.url+attr+'/', data)
             }
         }
       },
@@ -103,13 +123,20 @@ function Endpoint(client){
         return endpoint
     }
     this.getUrl = function(){
-        if(this.path.length>0) var url = '/api/'+this.path.join('/')+'/';
+        if(this.path.length) var url = '/api/'+this.path.join('/')+'/';
         else var url = '';
         this.path = []
         return url;
     }
     this.lazy = function(lazy=true){
         this.client.lazy = lazy;
+    }
+    this.dir = function(){
+        if(this.path.length){
+            return this.client.get(this.getUrl()+'dir/').data;
+        } else {
+            return this.client.get('/api/dir/').data
+        }
     }
     this.login = function(username, password){
         var response = this.client.post('/api/login', {username: username, password: password})
@@ -181,7 +208,6 @@ function Endpoint(client){
           var tokens = action.split('/').pop().split('.').reverse();
           while(tokens.length>1){
             var token = tokens.pop();
-            console.log([obj, token]);
             obj = obj[token];
           }
           var func = obj[tokens.pop()](data);
@@ -195,7 +221,6 @@ function Endpoint(client){
               if(rdata){
                 var elements = rdata.split(',');
                 for(var i=0; i<elements.length; i++){
-                    console.log(elements[i]);
                     app.reload(elements[i]);
                 }
               }

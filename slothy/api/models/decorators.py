@@ -1,14 +1,25 @@
 # -*- coding: utf-8 -*-
+import types
 
 
-def expose(*lookups):
-    def decorate(func):
-        metadata = getattr(func, '_metadata', {})
-        metadata.update(
-            lookups=lookups,
-        )
-        setattr(func, '_metadata', metadata)
-        return func
+def expose(*args, **kwargs):
+    def decorate(target):
+        if isinstance(target, types.FunctionType):
+            metadata = getattr(target, '_metadata', {})
+            metadata.update(lookups=args)
+            for func_name, lookups in kwargs.items():
+                metadata.update(**{'{}_expose'.format(func_name): lookups})
+            setattr(target, '_metadata', metadata)
+        else:
+            for func_name, lookups in kwargs.items():
+                if func_name in ('list', 'add'):
+                    target.set_metadata('{}_expose'.format(func_name), lookups)
+                else:
+                    func = getattr(target, func_name)
+                    metadata = getattr(func, '_metadata', {})
+                    metadata.update(lookups=args)
+                    setattr(func, '_metadata', metadata)
+        return target
 
     return decorate
 

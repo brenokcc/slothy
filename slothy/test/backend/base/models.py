@@ -6,11 +6,11 @@ from slothy.api.models.decorators import expose, param
 class UsuarioManager(models.DefaultManager):
     @expose()
     def add(self, **kwargs):
-        return super().create(**kwargs)
+        return super().add(**kwargs)
 
     @expose()
     def list(self):
-        return super().all()
+        return super().list()
 
     @expose()
     def delete(self):
@@ -28,8 +28,6 @@ class Usuario(models.AbstractUser):
     foto = models.ImageField(verbose_name='Foto', null=True, blank=True, upload_to='fotos')
 
     class Meta:
-        icon = 'fa-users'
-        menu = 'Usuários'
         verbose_name = 'Usuário'
         verbose_name_plural = 'Usuários'
         list_display = 'nome', 'email'
@@ -52,3 +50,49 @@ class Usuario(models.AbstractUser):
     @param(raw_password=models.CharField())
     def change_password(self, raw_password):
         super().change_password(raw_password)
+
+
+class PontoTuristico(models.Model):
+    nome = models.CharField(verbose_name='Nome', max_length=255)
+
+    class Meta:
+        verbose_name = 'Ponto Turístico'
+        verbose_name_plural = 'Pontos Turísticos'
+
+    def __str__(self):
+        return '{}'.format(self.nome)
+
+
+@expose(list=(), add=())
+class Estado(models.Model):
+    sigla = models.CharField(verbose_name='Sigla', max_length=255)
+
+    class Meta:
+        verbose_name = 'Estado'
+        verbose_name_plural = 'Estados'
+
+    def __str__(self):
+        return '{}'.format(self.sigla)
+
+    @expose()
+    def get_cidades(self):
+        return self.cidade_set.all()
+
+    def alterar_sigla(self, sigla):
+        self.sigla = sigla
+        self.save()
+
+
+@expose(list=(), add=())
+class Cidade(models.Model):
+    estado = models.ForeignKey(Estado, verbose_name='Estado', on_delete=models.CASCADE)
+    nome = models.CharField(verbose_name='Nome', max_length=255)
+    pontos_turisticos = models.ManyToManyField(PontoTuristico, verbose_name='Pontos Turísticos')
+
+    class Meta:
+        verbose_name = 'Estado'
+        verbose_name_plural = 'Estados'
+
+    def __str__(self):
+        return '{}/{}'.format(self.nome, self.estado)
+

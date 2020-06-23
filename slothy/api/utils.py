@@ -192,13 +192,22 @@ def _getattr_rec(obj, attrs, request=None):
 
 
 def apply(model, func, data, user):
+    lookups = None
+    metadata = {}
     if hasattr(func, '_metadata'):
         metadata = getattr(func, '_metadata')
-    else:
-        manager_func = getattr(getattr(func.__self__, '_queryset_class'), func.__name__)
-        metadata = getattr(manager_func, '_metadata', {})
-    if 'lookups' in metadata:
-        if model.check_lookups(user, metadata['lookups']):
+        lookups = metadata.get('lookups')
+    if lookups is None and func.__name__ in ('list', 'add'):
+        lookups = model.get_metadata('{}_expose'.format(func.__name__))
+    if lookups is None:
+        if hasattr(func.__self__, '_queryset_class'):
+            manager = getattr(func.__self__, '_queryset_class')
+            if hasattr(manager, func.__name__):
+                metadata = getattr(getattr(manager, func.__name__), '_metadata', {})
+                lookups = metadata.get('lookups')
+
+    if lookups is not None:
+        if model.check_lookups(user, lookups):
             for name, value in data.items():
                 field = metadata.get('fields', {}).get(name) or model.get_field(name)
                 if field:

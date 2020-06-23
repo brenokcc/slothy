@@ -46,29 +46,36 @@ class Api(APIView):
         # print(request.user, path, data.keys())
         response = dict(message=None, exception=None, error=None, data=None, metadata=[], url='/api/{}'.format(path))
         try:
-            if path.startswith('user'):
-                if request.user.is_authenticated:
-                    response.update(data=request.user.values())
-                else:
-                    response.update(data={}, message='Nenhum usuário autenticado')
-            elif path.startswith('login'):
-                user = authenticate(request, username=data['username'], password=data['password'])
-                if user:
-                    login(request, user)
-                    data = dict(token=request.user.auth_token.key)
-                    response.update(message='Login realizado com sucesso', data=data)
-                else:
-                    data = dict(token=None)
-                    response.update(message='Usuário não autenticado', data=data)
-            elif path.startswith('logout'):
-                logout(request)
-                response.update(message='Logout realizado com sucesso')
+            if path.endswith('/'):
+                path = path[0:-1]
+            tokens = path.split('/')
+            if len(tokens) == 1:
+                if path == 'user':
+                    if request.user.is_authenticated:
+                        response.update(data=request.user.values())
+                    else:
+                        response.update(data={}, message='Nenhum usuário autenticado')
+                elif path == 'login':
+                    user = authenticate(request, username=data['username'], password=data['password'])
+                    if user:
+                        login(request, user)
+                        data = dict(token=request.user.auth_token.key)
+                        response.update(message='Login realizado com sucesso', data=data)
+                    else:
+                        data = dict(token=None)
+                        response.update(message='Usuário não autenticado', data=data)
+                elif path == 'logout':
+                    logout(request)
+                    response.update(message='Logout realizado com sucesso')
+                elif path == 'dir':
+                    response.update(data=['user', 'login', 'logout'])
             else:
-                tokens = path.split('/')
                 if len(tokens) > 1:
                     model = apps.get_model(tokens[0], tokens[1])
-                    if tokens[2]:
-                        if tokens[2] == 'add':  # add
+                    if len(tokens) > 2:
+                        if tokens[2] == 'dir':  # dir
+                            response.update(data=['add', 'get', 'list', 'delete'])
+                        elif tokens[2] == 'add':  # add
                             func = model.objects.add
                             data = apply(model, func, data, request.user)
                             response.update(message='Cadastro realizado com sucesso', data=data)
@@ -78,10 +85,19 @@ class Api(APIView):
                             response.update(message='Exclusão realizada com sucesso', data=data)
                         elif tokens[2].isdigit():  # get or execute intance method
                             obj = model.objects.get(pk=tokens[2])
-                            if tokens[3]:  # execute instance method
-                                func = getattr(obj, tokens[3])
-                                data = apply(model, func, data, request.user)
-                                response.update(data=data, message='Ação realizada com sucesso')
+                            if len(tokens) > 3:  # execute instance method
+                                if tokens[3] == 'dir':
+                                    response.update(data=['xxx', 'yyy'])
+                                else:
+                                    func = getattr(obj, tokens[3])
+                                    if len(tokens) > 4:
+                                        if tokens[4] == 'add':
+                                            response.update(message='Adição realizada com sucesso')
+                                        elif tokens[4] == 'remove':
+                                            response.update(message='Removação realizada com sucesso')
+                                    else:
+                                        data = apply(model, func, data, request.user)
+                                        response.update(data=data, message='Ação realizada com sucesso')
                             else:  # get instance
                                 response.update(data=obj.values())
                         else:  # execute manager method
