@@ -3,6 +3,7 @@ import six
 from django.contrib.auth import base_user
 from django.db.models import query, base, manager, Sum, Count, Avg
 from django.db import models
+from django.db.models.fields import related
 from django.db.models.fields import *
 from django.db.models.fields.files import *
 from django.db.models.fields.related import *
@@ -246,6 +247,7 @@ class QuerySet(query.QuerySet):
         self._list_actions = None
         self._list_per_page = None
         self._search_fields = None
+        self._related_manager = None
         self._iterable_class = ModelIterable
 
     def filter(self, *args, **kwargs):
@@ -336,24 +338,43 @@ class QuerySet(query.QuerySet):
         clone._list_actions = self._list_actions
         clone._list_per_page = self._list_per_page
         clone._search_fields = self._search_fields
+        clone._related_manager = self._related_manager
         return clone
 
-    def add(self, *args, **kwargs):
-        for field, known_related_objects in getattr(self, '_known_related_objects').items():
-            for obj in known_related_objects.values():
-                if args:
-                    for instance in args:
-                        setattr(instance, field.name, obj)
-                        instance.save()
-                        return instance
-                else:
-                    kwargs.update(**{field.name: obj})
-        return self.model.objects.get_or_create(**kwargs)[0]
+    def add(self, instance):
+        related_manager = getattr(self, '_related_manager', None)
+        if related_manager:  # one-to-many or many-to-many
+            field = getattr(related_manager, 'field', None)
+            if field:  # one-to-many
+                if isinstance(instance, dict):  # dictionary instance
+                    instance.update(**{field.name: self._hints['instance']})
+                    return self.model.objects.get_or_create(**instance)[0]
+                else:  # model instance
+                    setattr(instance, field.name, self._hints['instance'])
+                    instance.save()
+                    return instance
+            else:  # many-to-many
+                if isinstance(instance, dict):  # dictionary instance
+                    if instance.get('id'):
+                        instance = self.model.objects.get(pk=instance.get('id'))
+                    else:
+                        instance = self.model.objects.get_or_create(**instance)[0]
+                related_manager.add(instance)
+                return instance
+        else:
+            return self.model.objects.get_or_create(**instance)[0]
 
-    def remove(self, pk):
-        for field, known_related_objects in getattr(self, '_known_related_objects').items():
-            for obj in known_related_objects.values():
-                print(obj)
+    def remove(self, instance):
+        if isinstance(instance, int):
+            instance = {'id': instance}
+        if isinstance(instance, dict):
+            instance = self.model.objects.get(pk=instance.get('id'))
+        related_manager = getattr(self, '_related_manager')
+        field = getattr(related_manager, 'field', None)
+        if field:  # one-to-many
+            instance.delete()
+        else:  # many-to-many
+            related_manager.remove(instance)
 
     def list(self):
         return super().all()
@@ -470,6 +491,7 @@ class Manager(manager.BaseManager.from_queryset(QuerySet)):
 
 
 class ModelBase(base.ModelBase):
+
     def __new__(mcs, name, bases, attrs):
         fromlist = list(map(str, attrs['__module__'].split('.')))
         module = __import__(attrs['__module__'], fromlist=fromlist)
@@ -493,6 +515,8 @@ class ModelBase(base.ModelBase):
         bases = utils.pre_new(bases, attrs)
         cls = super().__new__(mcs, name, bases, attrs)
         utils.post_new(cls)
+        utils.expose_new(cls)
+
         return cls
 
 
@@ -505,6 +529,32 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
     def __init__(self, *args, **kwargs):
         super(Model, self).__init__(*args, **kwargs)
         self._user = None
+
+        self.related_managers = {}
+        if self.pk:
+            for attr_name in type(self).get_related_managers():
+                self.related_managers[attr_name] = getattr(self, attr_name)
+
+    def __getattribute__(self, item):
+        if item in type(self).get_related_managers():
+            # reverse_many_to_one and many_to_many descriptors are intercept to return the querysets
+            if item in self.related_managers:
+                related_manager = self.related_managers[item]
+                queryset = related_manager.get_queryset()
+                queryset._related_manager = related_manager
+                return queryset
+        return super().__getattribute__(item)
+
+    @classmethod
+    def get_related_managers(cls):
+        if not hasattr(cls, '_related_managers'):
+            related_managers = []
+            for rel in cls._meta.related_objects:
+                related_managers.append(rel.get_accessor_name())
+            for field in cls._meta.local_many_to_many:
+                related_managers.append(field.name)
+            setattr(cls, '_related_managers', related_managers)
+        return getattr(cls, '_related_managers')
 
     def add(self):
         self.save()
@@ -756,3 +806,4 @@ class AbstractUser(six.with_metaclass(ModelBase, base_user.AbstractBaseUser, Mod
         super().save(*args, **kwargs)
         token_model = apps.get_model('authtoken', 'Token')
         token_model.objects.get_or_create(user=self)
+

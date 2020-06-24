@@ -1,3 +1,4 @@
+import types
 import datetime
 import collections
 from django.apps import apps
@@ -193,37 +194,58 @@ def _getattr_rec(obj, attrs, request=None):
     return None
 
 
-def apply(model, func, data, user):
-    lookups = None
-    metadata = {}
-    if hasattr(func, '_metadata'):
-        metadata = getattr(func, '_metadata')
-        lookups = metadata.get('lookups')
-    if lookups is None and func.__name__ in ('list', 'add'):
-        lookups = model.get_metadata('{}_expose'.format(func.__name__))
-    if lookups is None:
-        if hasattr(func.__self__, '_queryset_class'):
-            manager = getattr(func.__self__, '_queryset_class')
-            if hasattr(manager, func.__name__):
-                metadata = getattr(getattr(manager, func.__name__), '_metadata', {})
-                lookups = metadata.get('lookups')
+def expose_new(cls):
+    attrs = []
+    expose_dict = cls.get_metadata('expose', {})
+    for attr_name in dir(cls):
+        attrs.append((cls, attr_name))
+    if not cls.get_metadata('abstract'):
+        manager_cls = getattr(cls.objects, '_queryset_class')
+        for attr_name in dir(manager_cls):
+            attrs.append((manager_cls, attr_name))
+        for target, attr_name in attrs:
+            if '__' not in attr_name:
+                attr = getattr(target, attr_name)
+                if hasattr(attr, 'expose'):
+                    for func_name, lookups in attr.expose.items():
+                        expose_dict[func_name] = lookups
+    cls.set_metadata('expose', expose_dict)
 
+
+def apply(model, func, data, user, relation_name=None):
+    expose = '{}__{}'.format(relation_name, func.__name__) and relation_name or func.__name__
+    metadata = getattr(func, '_metadata', {})
+    lookups = model.get_metadata('expose', {}).get(expose)
     if lookups is not None:
         if model.check_lookups(user, lookups):
-            for name, value in data.items():
-                field = metadata.get('fields', {}).get(name) or model.get_field(name)
-                if field:
-                    try:
-                        form_field = data[name] = field.formfield()
-                        if form_field:
-                            data[name] = form_field.clean(value)
-                    except ValidationError as e:
-                        raise ValidationError({name: e.message})
-                else:
-                    raise BaseException('Type of "{}" is unknown')
-
+            if 'instance' not in data:  # not (add or remove)
+                for name, value in data.items():
+                    field = metadata.get('fields', {}).get(name) or model.get_field(name)
+                    if field:
+                        try:
+                            form_field = data[name] = field.formfield()
+                            if form_field:
+                                data[name] = form_field.clean(value)
+                        except ValidationError as e:
+                            raise ValidationError({name: e.message})
+                    else:
+                        raise BaseException('Type of "{}" is unknown')
             return custom_serialize(func(**data))
         else:
             raise BaseException('Permission denied')
     else:
         raise BaseException('This function is not exposed')
+
+
+class ObjectWrapper(object):
+    def __init__(self, obj, functions=[]):
+        self.obj = obj
+        self.functions = {f.__name__: f for f in functions}
+
+    def __getattr__(self, attr):
+        if attr in self.__dict__:
+            return self.__dict__[attr]
+        elif attr in self.__dict__['functions']:
+            return types.MethodType(self.__dict__['functions'][attr], self.__dict__['obj'])
+        else:
+            return getattr(self.obj, attr)

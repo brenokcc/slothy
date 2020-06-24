@@ -42,7 +42,6 @@ class Usuario(models.AbstractUser):
     @expose()
     @param(data_atualizacao=models.DateField())
     def atualizar_nome(self, nome, data_atualizacao):
-        print(data_atualizacao)
         self.nome = nome
         self.save()
 
@@ -52,6 +51,7 @@ class Usuario(models.AbstractUser):
         super().change_password(raw_password)
 
 
+@expose(list=(), delete=())
 class PontoTuristico(models.Model):
     nome = models.CharField(verbose_name='Nome', max_length=255)
 
@@ -63,7 +63,7 @@ class PontoTuristico(models.Model):
         return '{}'.format(self.nome)
 
 
-@expose(list=(), add=())
+@expose(list=(), add=(), delete=())
 class Estado(models.Model):
     sigla = models.CharField(verbose_name='Sigla', max_length=255)
 
@@ -83,7 +83,7 @@ class Estado(models.Model):
         self.save()
 
 
-@expose(list=(), add=())
+@expose(list=(), add=(), delete=())
 class Cidade(models.Model):
     estado = models.ForeignKey(Estado, verbose_name='Estado', on_delete=models.CASCADE)
     nome = models.CharField(verbose_name='Nome', max_length=255)
@@ -95,4 +95,8 @@ class Cidade(models.Model):
 
     def __str__(self):
         return '{}/{}'.format(self.nome, self.estado)
+
+    @expose()
+    def get_pontos_turisticos(self):
+        return self.pontos_turisticos.all()
 

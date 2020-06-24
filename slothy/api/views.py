@@ -43,7 +43,6 @@ class Api(APIView):
         return self.do(request, path, data)
 
     def do(self, request, path, data):
-        # print(request.user, path, data.keys())
         response = dict(message=None, exception=None, error=None, data=None, metadata=[], url='/api/{}'.format(path))
         try:
             if path.endswith('/'):
@@ -77,7 +76,7 @@ class Api(APIView):
                             response.update(data=['add', 'get', 'list', 'delete'])
                         elif tokens[2] == 'add':  # add
                             func = model.objects.add
-                            data = apply(model, func, data, request.user)
+                            data = apply(model, func, {'instance': data}, request.user)
                             response.update(message='Cadastro realizado com sucesso', data=data)
                         elif tokens[2] == 'delete':  # delete
                             func = model.objects.all().delete
@@ -90,14 +89,13 @@ class Api(APIView):
                                     response.update(data=['xxx', 'yyy'])
                                 else:
                                     func = getattr(obj, tokens[3])
-                                    if len(tokens) > 4:
+                                    if len(tokens) > 4:  # add or remove
                                         qs = func()
                                         if tokens[4] == 'add':
-                                            data = apply(qs.model, qs.add, data, request.user)
+                                            data = apply(model, qs.add, {'instance': data}, request.user, relation_name=tokens[3])
                                             response.update(message='Adição realizada com sucesso', data=data)
                                         elif tokens[4] == 'remove':
-                                            qs.remove(0)
-                                            data = apply(qs.model, qs.remove, data['id'], request.user)
+                                            data = apply(model, qs.remove, {'instance': data}, request.user, relation_name=tokens[3])
                                             response.update(message='Removação realizada com sucesso', data=data)
                                     else:
                                         data = apply(model, func, data, request.user)

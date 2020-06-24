@@ -4,23 +4,18 @@ import types
 
 def expose(*args, **kwargs):
     def decorate(target):
-        if isinstance(target, types.FunctionType):
-            metadata = getattr(target, '_metadata', {})
-            metadata.update(lookups=args)
+        if isinstance(target, types.FunctionType):  # function
+            expose_dict = getattr(target, 'expose', {})
+            expose_dict.update({target.__name__: args})
             for func_name, lookups in kwargs.items():
-                metadata.update(**{'{}_expose'.format(func_name): lookups})
-            setattr(target, '_metadata', metadata)
-        else:
+                expose_dict.update(**{'{}__{}'.format(target.__name__, func_name): lookups})
+            setattr(target, 'expose', expose_dict)
+        else:  # class
             for func_name, lookups in kwargs.items():
-                if func_name in ('list', 'add'):
-                    target.set_metadata('{}_expose'.format(func_name), lookups)
-                else:
-                    func = getattr(target, func_name)
-                    metadata = getattr(func, '_metadata', {})
-                    metadata.update(lookups=args)
-                    setattr(func, '_metadata', metadata)
+                expose_dict = target.get_metadata('expose', {})
+                expose_dict[func_name] = lookups
+                target.set_metadata('expose', expose_dict)
         return target
-
     return decorate
 
 

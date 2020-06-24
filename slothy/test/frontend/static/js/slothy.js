@@ -66,8 +66,10 @@ function Request(method, url, input, client){
     this.response = null;
     this.fetch = function(){
         this.response = sync_request(this.method, this.client.url+url, this.input, this.client.token);
+        // the response has the added object
+        if(this.url.endsWith('/add/')) this.url = this.url.replace('/add/', '/'+this.response.data.id+'/')
     }
-    this.debug = function(){
+    this.log = function(){
         if(Array.isArray(this.response.data)){
             for(var obj of this.response.data) console.log(obj);
         } else {
@@ -91,6 +93,7 @@ function Response(request){
         }
         else{ // executing a function
             return function(data){
+                if(typeof data == "number") data = {'id': data}
                 return request.client.post(request.url+attr+'/', data)
             }
         }
