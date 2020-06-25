@@ -1,3 +1,4 @@
+app.debug()
 app.base.estado.all().print()
 e=app.base.estado.add({sigla: 'RJ'})
 e.get_cidades().print()

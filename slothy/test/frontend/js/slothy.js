@@ -7,9 +7,17 @@ function dir(endpoint){
     return endpoint.dir();
 }
 
+function bold(text){
+	return '<b>'+text+'</b>';
+}
+
+function format(data){
+	return print(data);
+}
+
 if (typeof require == 'undefined'){ // browser
-    function sync_request(method, url, data, token){
-        console.log(url);
+    function sync_request(method, url, data, token, debug){
+        if(debug) console.log(url);
         //console.log(data);
         var headers = {}
         if(token) headers['Authorization'] = 'Token '+token;
@@ -27,7 +35,7 @@ if (typeof require == 'undefined'){ // browser
             options['contentType'] = false;
         }
         data = $.ajax(options).responseJSON;
-        console.log(data)
+        if(debug) console.log(data)
         return data;
     }
 } else { // nodejs
@@ -35,7 +43,7 @@ if (typeof require == 'undefined'){ // browser
     const querystring = require('querystring');
     const http = require('http');
     const request = require('sync-request');
-    function sync_request(method, url, data, token){
+    function sync_request(method, url, data, token, debug){
         var headers = {}
         if(token) headers['Authorization'] = 'Token '+token
         if(method=='GET') url += '?'+querystring.stringify(data);
@@ -50,6 +58,7 @@ function Client(url='http://localhost:8000') {
     this.url = url;
     this.token = null;
     this.lazy = false;
+    this.debug = false;
 	this.request = function(method, url, data){
 	    var request = new Request(method, url, data, this)
 	    if(!this.lazy) request.fetch()
@@ -69,8 +78,9 @@ function Request(method, url, input, client){
     this.client = client;
     this.input = input;
     this.response = null;
+    this.toString = function(){return print(this.response.data)}
     this.fetch = function(){
-        this.response = sync_request(this.method, this.client.url+url, this.input, this.client.token);
+        this.response = sync_request(this.method, this.client.url+url, this.input, this.client.token, this.client.debug);
         // the response returned an object
         if(this.response.url) this.url = this.response.url;
     }
@@ -114,6 +124,7 @@ function Endpoint(client){
     this.data = []
     this.path = []
     this.context = {}
+    this.toString = function(){return print(self.data)}
     this.execute = function(){
         var path = window.document.location.pathname.substring(1) || 'index';
         this.template = 'pages/'+path+'.html';
@@ -148,6 +159,9 @@ function Endpoint(client){
     this.lazy = function(lazy=true){
         this.client.lazy = lazy;
     }
+    this.debug = function(debug=true){
+        this.client.debug = debug;
+    }
     this.dir = function(){
         if(this.path.length){
             data = this.client.get(this.getUrl()+'dir/').data;
@@ -177,6 +191,8 @@ function Endpoint(client){
     this.getRenderer = function(){
         var env = nunjucks.configure(document.location.origin, { autoescape: false, web: {useCache: true} });
         env.addFilter('bold', bold);
+        env.addFilter('format', format);
+        env.addFilter('json', print);
         return env;
     }
     this.render = function(){
@@ -267,10 +283,6 @@ function EndpointProxy(endpoint){
         endpoint[attr] = value;
       }
     });
-}
-
-function bold(x){
-	return '<b>'+x+'</b>';
 }
 
 if (typeof exports != 'undefined'){

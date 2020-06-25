@@ -78,6 +78,7 @@ class Estado(models.Model):
     def get_cidades(self):
         return self.cidade_set.all()
 
+    @expose()
     def alterar_sigla(self, sigla):
         self.sigla = sigla
         self.save()

@@ -5,6 +5,7 @@ if (typeof require != "undefined"){
 }
 
 app = App('http://localhost:8000')
+app.debug()
 app.logout()
 user = app.base.usuario.add({nome: 'Bruno José', email: 'bruno_ufrn_natal@yahoo.com.br'})
 app.base.usuario.all()

@@ -67,7 +67,7 @@ class Api(APIView):
                     logout(request)
                     response.update(message='Logout realizado com sucesso')
                 elif path == 'dir':
-                    response.update(data=['user', 'login', 'logout'])
+                    response.update(data=['user', 'login', 'logout'] + list(utils.EXPOSED_MODELS.keys()))
             else:
                 if len(tokens) > 1:
                     if tokens[1] == 'dir':  # dir app
@@ -100,7 +100,6 @@ class Api(APIView):
                                         func = getattr(obj, tokens[3])
                                         if len(tokens) > 4:  # add or remove
                                             qs = func()
-                                            print(data, 9999)
                                             if tokens[4] == 'add':
                                                 data = utils.apply(model, qs.add, {'instance': data}, request.user, relation_name=tokens[3])
                                                 response.update(message='Adição realizada com sucesso', data=data)

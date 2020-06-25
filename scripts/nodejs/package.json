@@ -1,6 +1,6 @@
 {
   "name": "slothy-nodejs",
-  "version": "1.0.2",
+  "version": "1.0.4",
   "description": "Client for slothy framework",
   "main": "slothy.js",
   "scripts": {

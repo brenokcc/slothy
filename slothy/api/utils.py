@@ -1,13 +1,13 @@
 import types
 import datetime
 import collections
-from django.apps import apps
 from django.conf import settings
 from django.db.models import signals
 from django.core.exceptions import ValidationError
 from django.apps import apps
 
 FOREIGNKEY_GROUP_FIELDS = collections.defaultdict(list)
+EXPOSED_MODELS = collections.defaultdict(list)
 
 
 def m2m_signal(sender, **kwargs):
@@ -210,6 +210,8 @@ def expose_new(cls):
                 if hasattr(attr, 'expose'):
                     for func_name, lookups in attr.expose.items():
                         expose_dict[func_name] = lookups
+    if expose_dict:
+        EXPOSED_MODELS[cls.get_metadata('app_label')].append(cls.get_metadata('model_name'))
     cls.set_metadata('expose', expose_dict)
 
 
@@ -239,12 +241,7 @@ def apply(model, func, data, user, relation_name=None):
 
 
 def dir_app(app_label):
-    model_names = []
-    app_config = apps.get_app_config(app_label)
-    for model in app_config.get_models():
-        if model.get_metadata('expose'):
-            model_names.append(model.get_metadata('model_name'))
-    return model_names
+    return EXPOSED_MODELS[app_label]
 
 
 def dir_model(model):
