@@ -70,11 +70,7 @@ function Request(method, url, input, client){
         if(this.url.endsWith('/add/')) this.url = this.url.replace('/add/', '/'+this.response.data.id+'/')
     }
     this.log = function(){
-        if(Array.isArray(this.response.data)){
-            for(var obj of this.response.data) console.log(obj);
-        } else {
-            console.log(this.response.data);
-        }
+        return JSON.stringify(this.response.data, undefined, 2);
     }
 }
 
@@ -114,8 +110,8 @@ function Endpoint(client){
     this.execute = function(){
         var app = this;
         var path = window.document.location.pathname.substring(1) || 'index';
-        app.template = path+'.html';
-        $.getScript('/'+path+'.js', function(){app.render()});
+        app.template = 'pages/'+path+'.html';
+        $.getScript('/pages/'+path+'.js', function(){app.render()});
     }
     this.clone = function(){
         var endpoint = new Endpoint()
@@ -174,7 +170,7 @@ function Endpoint(client){
         if(template==null){
             template = this.template;
         }
-        var env = nunjucks.configure(document.location.origin, { autoescape: false });
+        var env = nunjucks.configure(document.location.origin, { autoescape: false, web: {useCache: true} });
         env.addFilter('bold', bold);
         if(template){
             try{
@@ -190,7 +186,7 @@ function Endpoint(client){
         return html;
     }
     this.reload = function(element){
-        var env = nunjucks.configure(document.location.origin, { autoescape: false });
+        var env = nunjucks.configure(document.location.origin, { autoescape: false, web: {useCache: true} });
         var html = $('<div>'+env.getTemplate(this.template).tmplStr+'</div>').find(element).html();
         html = env.renderString(html, this.getData());
         $(document).find(element).html(html);

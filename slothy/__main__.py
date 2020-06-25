@@ -18,15 +18,8 @@ if sys.argv[1] == 'front-end':
     project_name = sys.argv[2]
     project_path = os.path.join(os.path.abspath('.'), project_name)
     test_path = os.path.join(os.path.dirname(__file__), 'test')
-    os.makedirs(project_path, exist_ok=True)
-    # os.makedirs(os.path.join(project_path, 'static'), exist_ok=True)
-    test_base_path = os.path.join(test_path, 'frontend', 'base.html')
-    test_index_html = os.path.join(test_path, 'frontend', 'index.html')
-    for file_name in ('base.html', 'index.html', 'index.js'):
-        file_path = os.path.join(test_path, 'frontend', file_name)
-        shutil.copyfile(file_path, os.path.join(project_path, file_name))
-    static_dir_path = os.path.join(test_path, 'frontend', 'static')
-    shutil.copytree(static_dir_path, os.path.join(project_path, 'static'))
+    frontend_dir_path = os.path.join(test_path, 'frontend')
+    shutil.copytree(frontend_dir_path, project_path)
 
 elif sys.argv[1] == 'back-end':
     project_name = sys.argv[2]
@@ -65,7 +58,7 @@ elif sys.argv[1] == 'server':
             if '.' in self.path:
                 super().do_GET()
             else:
-                path = os.path.join(os.getcwd(), 'base.html')
+                path = os.path.join(os.getcwd(), 'pages/base.html')
                 self.send_response(200)
                 self.end_headers()
                 with open(path, 'rb') as f:
