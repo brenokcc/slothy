@@ -1,11 +1,16 @@
 
 function print(data){
-    console.log(data)
+    if(data && typeof data.data == "object") data = data.data; // it is a response proxy
+    return JSON.stringify(data, undefined, 2);
+}
+function dir(endpoint){
+    return endpoint.dir();
 }
 
 if (typeof require == 'undefined'){ // browser
     function sync_request(method, url, data, token){
         console.log(url);
+        //console.log(data);
         var headers = {}
         if(token) headers['Authorization'] = 'Token '+token;
         if(typeof window && $.cookie("token")) headers['Authorization'] = 'Token '+$.cookie("token");
@@ -22,7 +27,7 @@ if (typeof require == 'undefined'){ // browser
             options['contentType'] = false;
         }
         data = $.ajax(options).responseJSON;
-        print(data)
+        console.log(data)
         return data;
     }
 } else { // nodejs
@@ -66,11 +71,11 @@ function Request(method, url, input, client){
     this.response = null;
     this.fetch = function(){
         this.response = sync_request(this.method, this.client.url+url, this.input, this.client.token);
-        // the response has the added object
-        if(this.url.endsWith('/add/')) this.url = this.url.replace('/add/', '/'+this.response.data.id+'/')
+        // the response returned an object
+        if(this.response.url) this.url = this.response.url;
     }
-    this.log = function(){
-        return JSON.stringify(this.response.data, undefined, 2);
+    this.print = function(){
+        return print(this.response.data);
     }
 }
 
@@ -89,7 +94,8 @@ function Response(request){
         }
         else{ // executing a function
             return function(data){
-                if(typeof data == "number") data = {'id': data}
+                if(data && typeof data == "number") data = {'id': data} // it is an id
+                if(data && typeof data.data == "object") data = data.data; // it is a response proxy
                 return request.client.post(request.url+attr+'/', data)
             }
         }
@@ -144,10 +150,11 @@ function Endpoint(client){
     }
     this.dir = function(){
         if(this.path.length){
-            return this.client.get(this.getUrl()+'dir/').data;
+            data = this.client.get(this.getUrl()+'dir/').data;
         } else {
-            return this.client.get('/api/dir/').data
+            data = this.client.get('/api/dir/').data
         }
+        return print(data);
     }
     this.login = function(username, password){
         var response = this.client.post('/api/login', {username: username, password: password})

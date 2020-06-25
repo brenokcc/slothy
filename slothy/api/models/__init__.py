@@ -540,9 +540,10 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             # reverse_many_to_one and many_to_many descriptors are intercept to return the querysets
             if item in self.related_managers:
                 related_manager = self.related_managers[item]
-                queryset = related_manager.get_queryset()
-                queryset._related_manager = related_manager
-                return queryset
+                if hasattr(related_manager, 'get_queryset'):
+                    queryset = related_manager.get_queryset()
+                    queryset._related_manager = related_manager
+                    return queryset
         return super().__getattribute__(item)
 
     @classmethod

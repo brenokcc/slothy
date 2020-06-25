@@ -5,6 +5,7 @@ from django.apps import apps
 from django.conf import settings
 from django.db.models import signals
 from django.core.exceptions import ValidationError
+from django.apps import apps
 
 FOREIGNKEY_GROUP_FIELDS = collections.defaultdict(list)
 
@@ -235,6 +236,22 @@ def apply(model, func, data, user, relation_name=None):
             raise BaseException('Permission denied')
     else:
         raise BaseException('This function is not exposed')
+
+
+def dir_app(app_label):
+    model_names = []
+    app_config = apps.get_app_config(app_label)
+    for model in app_config.get_models():
+        if model.get_metadata('expose'):
+            model_names.append(model.get_metadata('model_name'))
+    return model_names
+
+
+def dir_model(model):
+    endpoints = []
+    for key in model.get_metadata('expose'):
+        endpoints.append(key)
+    return endpoints
 
 
 class ObjectWrapper(object):
