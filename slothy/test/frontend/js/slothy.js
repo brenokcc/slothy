@@ -107,11 +107,23 @@ function Endpoint(client){
     this.client = client;
     this.data = []
     this.path = []
+    this.context = {}
     this.execute = function(){
-        var app = this;
         var path = window.document.location.pathname.substring(1) || 'index';
-        app.template = 'pages/'+path+'.html';
-        $.getScript('/pages/'+path+'.js', function(){app.render()});
+        this.template = 'pages/'+path+'.html';
+        this.context = this.load('/pages/'+path+'.js');
+        this.context['app'] = this;
+        this.render()
+    }
+    this.load = function(script){
+        var context = Array();
+        var vars = Array();
+        for(key in window) vars[key]=true;
+        $.ajax({async: false, url: script, dataType: "script"});
+        for(key in window){
+            if(vars[key]!=true) context[key] = window[key];
+        }
+        return context;
     }
     this.clone = function(){
         var endpoint = new Endpoint()
@@ -155,40 +167,26 @@ function Endpoint(client){
     this.all = function(){return this.client.get(this.getUrl())}
     this.get = function(pk){return this.client.get(this.getUrl()+pk+'/', {})}
     this.add = function(data){return this.client.post(this.getUrl()+'add/', data);}
-    this.getData = function(){
-        var data = []
-        for(key in this.data){
-            if(typeof this.data[key] == 'function'){
-                data[key] = this.data[key]();
-            } else {
-                data[key] = this.data[key];
-            }
-        }
-        return data;
-    }
-    this.render = function(template=null, inline=true){
-        if(template==null){
-            template = this.template;
-        }
+    this.getRenderer = function(){
         var env = nunjucks.configure(document.location.origin, { autoescape: false, web: {useCache: true} });
         env.addFilter('bold', bold);
-        if(template){
-            try{
-                var html = env.render(template, this.getData());
-            } catch (e) {
-                if(e.message.indexOf('template not found')) throw e;
-            }
-        } else {
-            var html = env.renderString($(window.document.body).html(), this.getData());
+        return env;
+    }
+    this.render = function(){
+        try{
+            var html = this.getRenderer().render(this.template, this.context);
+            $(window.document.body).html(html);
+            this.initialize(window.document.body);
+        } catch (e) {
+            if(e.message.indexOf('template not found')) throw e;
         }
-        if(inline) $(window.document.body).html(html);
-        this.initialize(window.document.body);
-        return html;
     }
     this.reload = function(element){
-        var env = nunjucks.configure(document.location.origin, { autoescape: false, web: {useCache: true} });
-        var html = $('<div>'+env.getTemplate(this.template).tmplStr+'</div>').find(element).html();
-        html = env.renderString(html, this.getData());
+        var html = this.getRenderer().getTemplate(this.template).tmplStr;
+        html = html.replace(/src/g, 'data-src');
+        html = $('<div>'+html+'</div>').find(element).html();
+        html = this.getRenderer().renderString(html, this.context);
+        html = html.replace(/data-src/g, 'src');
         $(document).find(element).html(html);
         this.initialize(element);
     }

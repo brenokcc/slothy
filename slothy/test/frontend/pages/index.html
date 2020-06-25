@@ -1,1 +1,6 @@
 <h1>Hello {{ world }}!</h1>
+<div id="time">
+    {{ currentDate() }}
+</div>
+
+<button onclick="app.reload('#time')">Update Time</button>

@@ -1,3 +1,6 @@
-app.context({
-    world: 'World!!!!'
-})
+var world = 'World!!!!';
+
+function currentDate(){
+    return Date();
+}
+
