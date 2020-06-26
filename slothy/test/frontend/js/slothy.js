@@ -124,7 +124,7 @@ function Endpoint(client){
     this.data = []
     this.path = []
     this.context = {}
-    this.toString = function(){return print(self.data)}
+    this.toString = function(){return print(this.data)}
     this.execute = function(){
         var path = window.document.location.pathname.substring(1) || 'index';
         this.template = 'pages/'+path+'.html';
@@ -195,11 +195,15 @@ function Endpoint(client){
         env.addFilter('json', print);
         return env;
     }
-    this.render = function(){
+    this.render = function(template=null, context={}){
         try{
-            var html = this.getRenderer().render(this.template, this.context);
-            $(window.document.body).html(html);
-            this.initialize(window.document.body);
+            if(template){
+                return this.getRenderer().render(template, context);
+            } else {
+                var html = this.getRenderer().render(this.template, this.context);
+                $(window.document.body).html(html);
+                this.initialize(window.document.body);
+            }
         } catch (e) {
             if(e.message.indexOf('template not found')) throw e;
         }

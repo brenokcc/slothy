@@ -1,0 +1,30 @@
+<script>
+  google.load('visualization', '1', {
+      'packages': ['geochart'],
+  });
+  google.setOnLoadCallback(drawRegionsMap);
+  function drawRegionsMap() {
+      var data = google.visualization.arrayToDataTable([
+        ['State', 'Views'],
+        {% for serie in this.series %}
+            ['{{ serie[0] }}', {{ serie[1] }}],
+        {% endfor %}
+      ]);
+      var view = new google.visualization.DataView(data)
+      view.setColumns([0, 1])
+      var options = {
+          region: 'BR',
+          dataMode: 'markers',
+          resolution: 'provinces',
+      };
+      var chart = new google.visualization.GeoChart(
+      document.getElementById('chart_div'));
+      chart.draw(data, options);
+  };
+</script>
+
+
+<div>
+    {% if this.title %}<h2>{{ this.title }}</h2>{% endif %}
+    <div id="chart_div"></div>
+</div>
