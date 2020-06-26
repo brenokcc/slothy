@@ -4,7 +4,7 @@ function Component(){
 		return this.templateDir+'/'+this.constructor.name+'.html'
 	}
 	this.toString = function(){
-		return app.render(this.getTemplate(), {'this': this});
+		return renderTemplate(this.getTemplate(), {'this': this});
 	}
 }
 

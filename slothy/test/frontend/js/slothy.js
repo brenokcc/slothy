@@ -15,6 +15,55 @@ function format(data){
 	return print(data);
 }
 
+var env = nunjucks.configure(document.location.origin, { autoescape: false, web: {useCache: true} });
+env.addFilter('bold', bold);
+env.addFilter('format', format);
+env.addFilter('json', print);
+function wrapBlocks(template){
+    var html = template.tmplStr;
+    var blockNames = html.match(/(?<={% block\s+).*?(?=\s+%})/gs);
+    if(blockNames){
+        for(var name of blockNames){
+            var re = new RegExp("(?<={% block "+name+" %}\\s+).*?(?=\\s+{% endblock %})", 'gs');
+            for(var content of html.match(re)){
+                html = html.replace(content, '<div id="block'+name+'">'+content+'</div>');
+            }
+        }
+    }
+    return html;
+}
+function precompile(name){
+    var template = env.getTemplate(name);
+    var html = wrapBlocks(template);
+    var script = nunjucks.precompileString(html, {name: name});
+    eval(script);
+    return script;
+}
+
+function renderTemplate(name, context){
+    var template = env.getTemplate(name);
+    if(template.tmplProps){
+        template.compile();
+    }
+    if(!template.compiled){ // not compiled
+        var html = wrapBlocks(template);
+        return env.renderString(html, context);
+    } else {
+        return template.render(context);
+    }
+}
+function toFile(text, filename) {
+  var element = document.createElement('a');
+  element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
+  element.setAttribute('download', filename);
+  element.style.display = 'none';
+  document.body.appendChild(element);
+  element.click();
+  document.body.removeChild(element);
+}
+//toFile('Hello world!', 'test.txt');
+
+
 if (typeof require == 'undefined'){ // browser
     function sync_request(method, url, data, token, debug){
         if(debug) console.log(url);
@@ -130,7 +179,7 @@ function Endpoint(client){
         this.template = 'pages/'+path+'.html';
         this.context = this.load('/pages/'+path+'.js');
         this.context['app'] = this;
-        this.render()
+        this.render(this.template, this.context)
     }
     this.load = function(script){
         var context = Array();
@@ -188,33 +237,24 @@ function Endpoint(client){
     this.all = function(){return this.client.get(this.getUrl())}
     this.get = function(pk){return this.client.get(this.getUrl()+pk+'/', {})}
     this.add = function(data){return this.client.post(this.getUrl()+'add/', data);}
-    this.getRenderer = function(){
-        var env = nunjucks.configure(document.location.origin, { autoescape: false, web: {useCache: true} });
-        env.addFilter('bold', bold);
-        env.addFilter('format', format);
-        env.addFilter('json', print);
-        return env;
+    this.render = function(template, context){
+        var html = renderTemplate(template, context);
+        $(window.document.body).html(html);
+        this.initialize(window.document.body);
     }
-    this.render = function(template=null, context={}){
-        try{
-            if(template){
-                return this.getRenderer().render(template, context);
-            } else {
-                var html = this.getRenderer().render(this.template, this.context);
-                $(window.document.body).html(html);
-                this.initialize(window.document.body);
-            }
-        } catch (e) {
-            if(e.message.indexOf('template not found')) throw e;
+    this.reload = function(block){
+        var element = '#block'+block;
+        var template = env.getTemplate(this.template);
+        if(!template.compiled){
+            template = nunjucks.compile(wrapBlocks(template));
+            template.compile()
         }
-    }
-    this.reload = function(element){
-        var html = this.getRenderer().getTemplate(this.template).tmplStr;
-        html = html.replace(/src/g, 'data-src');
-        html = $('<div>'+html+'</div>').find(element).html();
-        html = this.getRenderer().renderString(html, this.context);
-        html = html.replace(/data-src/g, 'src');
-        $(document).find(element).html(html);
+        var root = template.rootRenderFunc;
+        template.rootRenderFunc = template.blocks[block];
+        var html = template.render(this.context);
+        console.log(this.context);
+        template.rootRenderFunc = root;
+        $(document).find(element).replaceWith(html);
         this.initialize(element);
     }
     this.initialize = function(element){
