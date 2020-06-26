@@ -1,5 +1,6 @@
 *˜
 templates.js
+compiler.html
 *.pyc
 .svn
 .DS_Store

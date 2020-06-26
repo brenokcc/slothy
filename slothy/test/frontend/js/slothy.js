@@ -252,7 +252,6 @@ function Endpoint(client){
         var root = template.rootRenderFunc;
         template.rootRenderFunc = template.blocks[block];
         var html = template.render(this.context);
-        console.log(this.context);
         template.rootRenderFunc = root;
         $(document).find(element).replaceWith(html);
         this.initialize(element);
