@@ -1,0 +1,1 @@
+export CD=$(pwd) && docker run --name slothy --rm -d -p 8000:8000 -p 9000:9000 -v $CD:/var/slothy -w /var/slothy slothy sleep infinity && alias python='docker exec -it -w /var/slothy${$(pwd)/$CD/} slothy python'
