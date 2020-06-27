@@ -107,6 +107,19 @@ elif sys.argv[1] == 'server':
  ___) | | (_) | |_| | | | |_| |
 |____/|_|\___/ \__|_| |_|\__, |
                          |___/     
+
+Nginx configuration:
+
+server {
+    listen         80 default_server;
+    listen         [::]:80 default_server;
+    server_name    localhost;
+    index          index;
+    try_files $uri /index;
+    root /var/www/;
+    location ~* \.(js|html|png|css)$ {}
+    location / {rewrite ^ /pages/base.html break;}
+}
     ''')
     print('Access http://0.0.0.0:{}/ for navigatings the pages defined in the "pages" directory.'.format(port))
     print('Access http://0.0.0.0:{}/compile for compiling the templates into "js/templates.js" file.'.format(port))
@@ -114,4 +127,7 @@ elif sys.argv[1] == 'server':
 
     with open(templates_file_path, 'w') as templates_file:
         templates_file.write('')
-    httpd.serve_forever()
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
