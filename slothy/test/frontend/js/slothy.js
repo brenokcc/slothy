@@ -15,10 +15,13 @@ function format(data){
 	return print(data);
 }
 
-var env = nunjucks.configure(document.location.origin, { autoescape: false, web: {useCache: true} });
-env.addFilter('bold', bold);
-env.addFilter('format', format);
-env.addFilter('json', print);
+if (typeof nunjucks != 'undefined'){
+    var env = nunjucks.configure(document.location.origin, { autoescape: false, web: {useCache: true} });
+    env.addFilter('bold', bold);
+    env.addFilter('format', format);
+    env.addFilter('json', print);
+}
+
 function wrapBlocks(template){
     var html = template.tmplStr;
     var blockNames = html.match(/(?<={% block\s+).*?(?=\s+%})/gs);
@@ -32,6 +35,7 @@ function wrapBlocks(template){
     }
     return html;
 }
+
 function precompile(name){
     var template = env.getTemplate(name);
     var html = wrapBlocks(template);
@@ -52,6 +56,7 @@ function renderTemplate(name, context){
         return template.render(context);
     }
 }
+
 function toFile(text, filename) {
   var element = document.createElement('a');
   element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));

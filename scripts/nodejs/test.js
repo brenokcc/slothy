@@ -1,3 +1,3 @@
 var slothy = require('slothy-nodejs/slothy')
-var api = slothy.Api();
+var app = slothy.App();
 console.log('[OK]')

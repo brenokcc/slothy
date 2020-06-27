@@ -20,7 +20,9 @@ if sys.argv[1] == 'front-end':
     project_path = os.path.join(os.path.abspath('.'), project_name)
     test_path = os.path.join(os.path.dirname(__file__), 'test')
     frontend_dir_path = os.path.join(test_path, 'frontend')
+    test_pages_dir_path = os.path.join(project_path, 'pages', 'test')
     shutil.copytree(frontend_dir_path, project_path)
+    shutil.rmtree(test_pages_dir_path)
 
 elif sys.argv[1] == 'back-end':
     project_name = sys.argv[2]
