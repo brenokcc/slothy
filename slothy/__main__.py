@@ -59,8 +59,31 @@ elif sys.argv[1] == 'server':
 
     class HttpHandler(SimpleHTTPRequestHandler):
         def do_GET(self):
+            print(self.path)
             if '.' in self.path:
                 super().do_GET()
+            elif self.path == '/compile':
+                templates = []
+                for root, dirs, files in os.walk(current_dir):
+                    for file in files:
+                        if file.endswith(".html"):
+                            templates.append(os.path.join(root, file)[len(current_dir) + 1:])
+                compile_code = '''<html>
+                        <head>
+                            <script src="/js/jquery-3.5.1.min.js"></script>
+                            <script src="/js/nunjucks.js"></script>
+                            <script src="/js/slothy.js"></script>
+                            <script>
+                            var text="";
+                            for(var path of {}) text+=precompile(path);
+                            $.post("/", {{t:text}}, function( data ) {{alert(data);}});
+                            </script>
+                        </head>
+                    </html>
+                        '''.format(templates)
+                self.send_response(200)
+                self.end_headers()
+                self.wfile.write(compile_code.encode())
             else:
                 file_path = os.path.join(os.getcwd(), 'pages/base.html')
                 self.send_response(200)
@@ -69,37 +92,26 @@ elif sys.argv[1] == 'server':
                     self.wfile.write(f.read())
 
         def do_POST(self):
-            script = self.rfile.read(int(self.headers.get('Content-Length'))).decode()[2:]
+            script = urllib.parse.unquote(self.rfile.read(int(self.headers.get('Content-Length'))).decode()[2:])
             with open(templates_file_path, 'w') as templates_file:
-                templates_file.write(urllib.parse.unquote(script))
+                templates_file.write(script)
             self.send_response(200)
             self.end_headers()
             self.wfile.write(b'Templates sucessfully compiled!')
 
     port = len(sys.argv) > 2 and int(sys.argv[2]) or 9000
-    print('http://0.0.0.0:{}/'.format(port))
+    print('''
+ ____  _       _   _           
+/ ___|| | ___ | |_| |__  _   _ 
+\___ \| |/ _ \| __| '_ \| | | |
+ ___) | | (_) | |_| | | | |_| |
+|____/|_|\___/ \__|_| |_|\__, |
+                         |___/     
+    ''')
+    print('Access http://0.0.0.0:{}/ for navigatings the pages defined in the "pages" directory.'.format(port))
+    print('Access http://0.0.0.0:{}/compile for compiling the templates into "js/templates.js" file.'.format(port))
     httpd = HTTPServer(("", port), HttpHandler)
 
-    templates = []
-    for root, dirs, files in os.walk(current_dir):
-        for file in files:
-            if file.endswith(".html"):
-                templates.append(os.path.join(root, file)[len(current_dir) + 1:])
-    compile_code = '''<html>
-        <head>
-            <script src="/js/jquery-3.5.1.min.js"></script>
-            <script src="/js/nunjucks.js"></script>
-            <script src="/js/slothy.js"></script>
-            <script>
-            var text="";
-            for(var path of {}) text+=precompile(path);
-            $.post( "/", function( data ) {{alert(data);}});
-            </script>
-        </head>
-    </html>
-        '''.format(templates)
-    with open(os.path.join(current_dir, 'pages', 'compiler.html'), 'w') as compiler_file:
-        compiler_file.write(compile_code)
     with open(templates_file_path, 'w') as templates_file:
         templates_file.write('')
     httpd.serve_forever()
