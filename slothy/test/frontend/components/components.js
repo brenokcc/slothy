@@ -27,11 +27,11 @@ function Timeline(title, steps=[]){
 function Report(templateName, context){
     this.templateName = templateName;
     this.context = context;
-    this.save = function(fileName){
+    this.save = function(filename){
         var html = renderTemplate(this.templateName, this.context);
         html2pdf().from(html).set({
            margin: [2.0, 0.5, 1.5, 0.5],
-           filename: 'samplepdf.pdf',
+           filename: filename,
            pageBreak: {mode: 'css'},
            jsPDF: {orientation: 'portrait', unit: 'cm', format: 'a4'}
         }).toPdf().get('pdf').then(function (pdf) {

@@ -11,8 +11,3 @@ function cadastrar(data){
     app.base.usuario.add(data);
     app.redirect('/')
 }
-
-function relatorio(){
-    report = new Report('pages/test/relatorio.html', {});
-    report.save('Relatorio.html');
-}

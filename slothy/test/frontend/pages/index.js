@@ -17,5 +17,10 @@ var steps = [
 var timeline1 = new Timeline('Linha do Tempo Horizontal', steps);
 var timeline2 = new Timeline('Linha do Tempo Vertical', steps);
 
+function printReport(){
+    report = new Report('pages/report.html', {});
+    report.save('Relatorio.pdf');
+}
+
 
 

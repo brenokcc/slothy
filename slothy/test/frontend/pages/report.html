@@ -1,12 +1,4 @@
 <style type="text/css">
-      /* Avoid unexpected sizing on all elements. */
-      * {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
-
-      /* CSS styling for before/after/avoid. */
       .before {
         page-break-before: always;
       }
@@ -16,32 +8,34 @@
       .avoid {
         page-break-inside: avoid;
       }
-
-      /* Table styling */
       table {
         border-collapse: collapse;
       }
-      td {
-        border: 1px solid black;
+      thead {
+        display: table-header-group;
       }
-
-      thead { background-color:#DDD }
-      tr, td { page-break-inside: avoid }
-
-      .bold {font-weight: bold;}
-       table{
+      thead th{
+        font-weight: bold;
+        background-color:#EEE;
+      }
+      tr, td {
+        page-break-inside: avoid;
+      }
+      .bold {
+        font-weight: bold;
+      }
+      table{
         width: 100%;
-       }
+      }
       table.info,  table.info th,  table.info td, table.data {
           border: 0px;
-        }
+      }
       .page-break {
-	   page-break-before: always;
-	 }
-	 table.data th, table.data td{
+	    page-break-before: always;
+	  }
+	  table.data th, table.data td{
 	    border: solid 1px black;
-	 }
-
+	  }
 </style>
 
 
@@ -93,47 +87,45 @@
     <table class="data">
         <thead>
         <tr>
-            <td>Header A</td>
-            <td>Header B</td>
+            <th>Header A</th>
+            <th>Header B</th>
+            <th>Header C</th>
+            <th>Header D</th>
         </tr>
         </thead>
         <tbody>
-        <tr>
-            <td>Col A</td>
-            <td>Col B</td>
-        </tr>
-        <tr>
-            <td>Col A</td>
-            <td>Col B</td>
-        </tr>
-        <tr>
-            <td>Col A</td>
-            <td>Col B</td>
-        </tr>
-        <tr>
-            <td>Col A</td>
-            <td>Col B</td>
-        </tr>
-        <tr>
-            <td>Col A</td>
-            <td>Col B</td>
-        </tr>
-        <tr>
-            <td>Col A</td>
-            <td>Col B</td>
-        </tr>
-        <tr>
-            <td>Col A</td>
-            <td>Col B</td>
-        </tr>
+            <tr>
+                <td>Col A</td>
+                <td>Col B</td>
+                <td>Col C</td>
+                <td>Col D</td>
+            </tr>
+            <tr>
+                <td>Col A</td>
+                <td>Col B</td>
+                <td>Col C</td>
+                <td>Col D</td>
+            </tr>
+            <tr>
+                <td>Col A</td>
+                <td>Col B</td>
+                <td>Col C</td>
+                <td>Col D</td>
+            </tr>
+            <tr>
+                <td>Col A</td>
+                <td>Col B</td>
+                <td>Col C</td>
+                <td>Col D</td>
+            </tr>
         </tbody>
     </table>
     <br>
-    <table repeat="1" class="data">
-        <thead style="display: table-header-group;">
+    <table class="data">
+        <thead>
         <tr>
-            <td>Header A</td>
-            <td>Header B</td>
+            <th>Header A</th>
+            <th>Header B</th>
         </tr>
         </thead>
         <tbody>
