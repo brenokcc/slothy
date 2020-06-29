@@ -1,5 +1,7 @@
 # Slothy
 
+![Kiku](draft.png)
+
 ## Dependencies
 
 ### Python

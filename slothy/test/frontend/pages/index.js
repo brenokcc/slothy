@@ -19,6 +19,7 @@ var timeline2 = new Timeline('Linha do Tempo Vertical', steps);
 
 function printReport(){
     report = new Report('pages/report.html', {});
+    report.setHeader( 'EMPRESA FICTÍCIA LTDA\nRua das Flores\nTelefone (84) 2222-2387');
     report.save('Relatorio.pdf');
 }
 

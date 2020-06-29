@@ -27,26 +27,38 @@ function Timeline(title, steps=[]){
 function Report(templateName, context){
     this.templateName = templateName;
     this.context = context;
+    this.headerText = null;
+    this.headerImage = null;
+    this.setHeader = function(headerText, headerImage){
+        this.headerText = headerText;
+        this.headerImage = headerImage;
+    }
     this.save = function(filename){
-        var html = renderTemplate(this.templateName, this.context);
+        var content = renderTemplate(this.templateName, this.context);
+        if(this.headerImage) content+= '<img src="'+this.headerImage+'" alt="" width="0" height="0">'
+        var html = renderTemplate('components/Report.html', {content:content});
+        var headerImage = this.headerImage;
+        var headerText = this.headerText;
         html2pdf().from(html).set({
-           margin: [2.0, 0.5, 1.5, 0.5],
+           margin: [2.5, 0.5, 1.5, 0.5],
            filename: filename,
            pageBreak: {mode: 'css'},
            jsPDF: {orientation: 'portrait', unit: 'cm', format: 'a4'}
         }).toPdf().get('pdf').then(function (pdf) {
            var totalPages = pdf.internal.getNumberOfPages();
            for (i = 1; i <= totalPages; i++) {
-             var img = new Image()
-             img.src = '/images/sample.jpg'
              pdf.setPage(i);
-             pdf.addImage(img, 'jpg', 0, 0, 2.0, 2.0)
-             pdf.setFontSize(14);
-             pdf.setTextColor(150);
+             var startText = 0.5;
+             if(headerImage){
+                var img = new Image()
+                img.src = headerImage;
+                pdf.addImage(img, 'jpg', 0.5, 0.5, 2.0, 2.0);
+                startText = 3;
+             }
+             pdf.setFontSize(12);
              pdf.text(
-                'Lorem Ipsum is simply dummy text of the printing \nThis is theheader text',
-                (3),
-                (pdf.internal.pageSize.getHeight()-29.2)
+                headerText, startText,
+                (pdf.internal.pageSize.getHeight()-29)
              );
              pdf.setFontSize(10);
              pdf.text('Página '+i+' de '+totalPages, 0.5, pdf.internal.pageSize.getHeight()-1.0)
