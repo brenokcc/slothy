@@ -1,0 +1,315 @@
+<style type="text/css">
+      /* Avoid unexpected sizing on all elements. */
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      /* CSS styling for before/after/avoid. */
+      .before {
+        page-break-before: always;
+      }
+      .after {
+        page-break-after: always;
+      }
+      .avoid {
+        page-break-inside: avoid;
+      }
+
+      /* Table styling */
+      table {
+        border-collapse: collapse;
+      }
+      td {
+        border: 1px solid black;
+      }
+
+      thead { background-color:#DDD }
+      tr, td { page-break-inside: avoid }
+
+      .bold {font-weight: bold;}
+       table{
+        width: 100%;
+       }
+      table.info,  table.info th,  table.info td, table.data {
+          border: 0px;
+        }
+      .page-break {
+	   page-break-before: always;
+	 }
+	 table.data th, table.data td{
+	    border: solid 1px black;
+	 }
+
+</style>
+
+
+<div id="root2">
+
+    <h1>Relatório</h1>
+    <div>
+        Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum is simply dummy text of
+        the printing and typesetting industry. Lorem Ipsum is simply dummy text of the printing and typesetting
+        industry. Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum is simply dummy
+        text of the printing and typesetting industry. Lorem Ipsum is simply dummy text of the printing and typesetting
+        industry.
+    </div>
+    <h3>Dados Pessoais</h3>
+    <table class="info">
+        <tr>
+            <td class="bold">Nome:</td>
+            <td colspan="3">Carlos Breno Pereira Silva</td>
+        </tr>
+        <tr>
+            <td class="bold">CPF:</td>
+            <td>12345678900</td>
+            <td class="bold">Data de Nascimento:</td>
+            <td>01/01/2020</td>
+        </tr>
+    </table>
+    <h3>Endereço</h3>
+    <table class="info">
+        <tr>
+            <td class="bold">Rua:</td>
+            <td colspan="3">Rua das Flores, nº 2343</td>
+        </tr>
+        <tr>
+            <td class="bold">CEP:</td>
+            <td>59080-060</td>
+            <td class="bold">Bairo:</td>
+            <td>Jasmin</td>
+        </tr>
+        <tr>
+            <td class="bold">Cidade:</td>
+            <td>Natal</td>
+            <td class="bold">Estado:</td>
+            <td>RN</td>
+        </tr>
+    </table>
+
+    <img src="/images/sample.jpg" alt="" width="0" height="0">
+    <h3>Itens</h3>
+    <table class="data">
+        <thead>
+        <tr>
+            <td>Header A</td>
+            <td>Header B</td>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        </tbody>
+    </table>
+    <br>
+    <table repeat="1" class="data">
+        <thead style="display: table-header-group;">
+        <tr>
+            <td>Header A</td>
+            <td>Header B</td>
+        </tr>
+        </thead>
+        <tbody>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        <tr>
+            <td>Col A</td>
+            <td>Col B</td>
+        </tr>
+        </tbody>
+    </table>
+
+    <div class="page-break">
+        <h3>Outra Página</h3>
+        Lorem Ipsum is simply dummied text of the printing and typesetting industry.
+    </div>
+</div>
