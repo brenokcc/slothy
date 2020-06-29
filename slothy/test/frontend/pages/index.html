@@ -2,23 +2,27 @@
 
 {% block time %}
     <h2>Current Time</h2>
-    <div>
-        {{ currentDate() }}
-    </div>
+    <div>{{ currentDate() }}</div>
 {% endblock %}
 
-<button class="btn btn-primary" onclick="app.reload('time')">Update Time</button>
+<button class="btn btn-primary" onclick="reload('time')">Update Time</button>
 
-<div style="width: 400px; height: 300px">
-  {{ map }}
-</div>
+<div style="width:500px;height:400px;">{{ map }}</div>
 
-<div>
-    {{ timeline1 }}
-</div>
+<div>{{ timeline }}</div>
 
-<div style="width: 400px">
-    {{ timeline2 }}
-</div>
+{% block greeting %}
+    <h2>Greeting Form!!!</h2>
+    {% if name %}
+        <h2>Welcome, {{ name }}!</h2>
+    {% else %}
+        <form action="greet" data-reload="" data-redirect="" novalidate class="slothy" enctype="multipart/form-data">
+            What's your name? <input type="text" name="name">
+            <button class="btn btn-primary" type="submit">Send</button>
+        </form>
+    {% endif %}
+{% endblock %}
 
+
+<h2>PDF Report</h2>
 <button onclick="printReport()" class="btn btn-primary">Print Report</button>

@@ -15,6 +15,16 @@ function format(data){
 	return print(data);
 }
 
+function reload(block, data={}){
+    var context = {}
+    if('getAll' in data){ // it is a FormData
+        for(var key of data.keys()) context[key] = data.get(key);
+    } else { //  it a dictionary
+        for(var key in data) context[key] = data[key];
+    }
+    app.reload(block, context);
+}
+
 if (typeof nunjucks != 'undefined'){
     var env = nunjucks.configure(document.location.origin, { autoescape: false, web: {useCache: true} });
     env.addFilter('bold', bold);
@@ -247,7 +257,7 @@ function Endpoint(client){
         $(window.document.body).html(html);
         this.initialize(window.document.body);
     }
-    this.reload = function(block){
+    this.reload = function(block, context={}){
         var element = '#block'+block;
         var template = env.getTemplate(this.template);
         if(!template.compiled){
@@ -256,7 +266,8 @@ function Endpoint(client){
         }
         var root = template.rootRenderFunc;
         template.rootRenderFunc = template.blocks[block];
-        var html = template.render(this.context);
+        for(key in this.context) context[key] = this.context[key];
+        var html = template.render(context);
         template.rootRenderFunc = root;
         $(document).find(element).replaceWith(html);
         this.initialize(element);

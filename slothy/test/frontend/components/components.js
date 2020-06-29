@@ -22,6 +22,11 @@ function Timeline(title, steps=[]){
 	this.title = title;
 	this.uuid = Math.random().toString(36).substring(7);
 	this.steps = steps;
+	this.add = function(title, date, exta=[]){
+	    data = []
+	    for(var item of exta) data.push({key: item[0], value: item[1]});
+	    this.steps.push({date: date, title: title, data: data})
+	}
 }
 
 function Report(templateName, context){

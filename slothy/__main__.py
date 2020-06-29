@@ -125,6 +125,7 @@ server {
     ''')
     print('Access http://0.0.0.0:{}/ for navigatings the pages defined in the "pages" directory.'.format(port))
     print('Access http://0.0.0.0:{}/compile for compiling the templates into "js/templates.js" file.'.format(port))
+    print('Quit the server with CONTROL-C')
     httpd = HTTPServer(("", port), HttpHandler)
 
     with open(templates_file_path, 'w') as templates_file:

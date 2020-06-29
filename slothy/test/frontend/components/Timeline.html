@@ -3,6 +3,9 @@
 	.timeline{
 		visibility: hidden;
 	}
+	.timeline dl{
+		display: -webkit-inline-box;
+	}
 	.timeline.horizontal{
 		margin-left:-75px;
 		text-align:center
@@ -104,7 +107,7 @@
 		<li class="{% if step.date %}active{% endif %}">
 			<hr>
 			<div class="step-content">
-				<strong>{{ step.title }}</strong>
+				<strong>{{ step.title }}</strong><br>
 				<dl>
 				{% for data in step.data %}
 					<dt>{{ data.key }}:</dt>
