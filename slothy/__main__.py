@@ -138,8 +138,8 @@ server {
     print('Quit the server with CONTROL-C')
     httpd = HTTPServer(("", port), HttpHandler)
 
-    with open(templates_file_path, 'w') as templates_file:
-        pass  # templates_file.write('')
+    # with open(templates_file_path, 'w') as templates_file:
+    #    templates_file.write('')
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
