@@ -14,7 +14,7 @@
 {% block greeting %}
     <h2>Greeting Form!!!</h2>
     {% if name %}
-        <h2>Welcome, {{ name }}!</h2>
+        <p>Welcome, <strong>{{ name }}</strong>!</p>
     {% else %}
         <form action="greet" data-reload="" data-redirect="" novalidate class="slothy" enctype="multipart/form-data">
             What's your name? <input type="text" name="name">

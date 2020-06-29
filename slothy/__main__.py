@@ -2,6 +2,7 @@ import sys
 import os
 import shutil
 import urllib.parse
+from base64 import b64decode
 
 # ~/Library/Preferences/PyCharmCE2019.3/templates/dp.xml
 # ~/.PyCharmCE2019.3
@@ -58,6 +59,14 @@ elif sys.argv[1] == 'server':
 
     current_dir = os.path.abspath('.')
     templates_file_path = os.path.join(current_dir, 'js', 'templates.js')
+    templates = []
+    size = 0
+    for root, dirs, files in os.walk(current_dir):
+        for file in files:
+            if file.endswith(".html"):
+                file_path = os.path.join(root, file)
+                size += os.path.getsize(file_path)
+                templates.append(file_path[len(current_dir) + 1:])
 
     class HttpHandler(SimpleHTTPRequestHandler):
         def do_GET(self):
@@ -65,11 +74,6 @@ elif sys.argv[1] == 'server':
             if '.' in self.path:
                 super().do_GET()
             elif self.path == '/compile':
-                templates = []
-                for root, dirs, files in os.walk(current_dir):
-                    for file in files:
-                        if file.endswith(".html"):
-                            templates.append(os.path.join(root, file)[len(current_dir) + 1:])
                 compile_code = '''<html>
                         <head>
                             <script src="/js/jquery-3.5.1.min.js"></script>
@@ -78,7 +82,9 @@ elif sys.argv[1] == 'server':
                             <script>
                             var text="";
                             for(var path of {}) text+=precompile(path);
-                            $.post("/", {{t:text}}, function( data ) {{alert(data);}});
+                            $.post("/", {{t:btoa(unescape(encodeURIComponent(text)))}}, function( data ) {{
+                                document.body.innerHTML = data;
+                            }});
                             </script>
                         </head>
                     </html>
@@ -94,12 +100,16 @@ elif sys.argv[1] == 'server':
                     self.wfile.write(f.read())
 
         def do_POST(self):
-            script = urllib.parse.unquote(self.rfile.read(int(self.headers.get('Content-Length'))).decode()[2:])
+            s = self.rfile.read(int(self.headers.get('Content-Length'))).decode()
+            script = b64decode(urllib.parse.unquote(s[2:]))
             with open(templates_file_path, 'w') as templates_file:
-                templates_file.write(script)
+                templates_file.write(script.decode())
             self.send_response(200)
             self.end_headers()
-            self.wfile.write(b'Templates sucessfully compiled!')
+            html = '<h1>Compiled Files:</h1><ul>{}</ul><p>Size: {}K</p>'.format(
+                ''.join(['<li>{}</li>'.format(t) for t in templates]), int(size/1024)
+            )
+            self.wfile.write(html.encode())
 
     port = len(sys.argv) > 2 and int(sys.argv[2]) or 9000
     print('''
@@ -129,7 +139,7 @@ server {
     httpd = HTTPServer(("", port), HttpHandler)
 
     with open(templates_file_path, 'w') as templates_file:
-        templates_file.write('')
+        pass  # templates_file.write('')
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
