@@ -8,6 +8,14 @@ from base64 import b64decode
 # ~/.PyCharmCE2019.3
 # ~\.PyCharmCE2019.3
 
+if len(sys.argv) < 2:
+    print('Type one of the following options: front-end, back-end or server')
+    sys.exit(0)
+
+if sys.argv[1] not in ('front-end', 'back-end', 'server'):
+    print('The allowed options are: front-end, back-end or server')
+    sys.exit(0)
+
 
 def replace_text(file_path, text, replace):
     with open(file_path, 'r') as f:
@@ -24,6 +32,7 @@ if sys.argv[1] == 'front-end':
     test_pages_dir_path = os.path.join(project_path, 'pages', 'test')
     shutil.copytree(frontend_dir_path, project_path)
     shutil.rmtree(test_pages_dir_path)
+    print('Project successfully created! Type "cd {}" to get into project\'s directory and then "python -m slothy server" to start development web server.'.format(project_name))
 
 elif sys.argv[1] == 'back-end':
     project_name = sys.argv[2]
@@ -41,7 +50,7 @@ elif sys.argv[1] == 'back-end':
     shutil.copyfile(test_init_path, os.path.join(project_path, project_name, '__init__.py'))
     shutil.copyfile(test_models_path, os.path.join(project_path, project_name, 'models.py'))
     replace_text(os.path.join(project_path, 'settings.py'), 'base', project_name)
-    os.system('cd {} && python manage.py sync'.format(project_name))
+    print('Project successfully created! Type "cd {}" to get into project\'s directory and then "python manage.py sync" to initialize the database. To start development server, type "python manage.py runserver".'.format(project_name))
 
 elif sys.argv[1] == 'configure':
     home_dir = os.path.expanduser('~')

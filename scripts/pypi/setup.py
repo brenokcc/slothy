@@ -5,9 +5,9 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='slothy',
-    version='0.0.10',
+    version='0.0.11',
     packages=find_packages(),
-    install_requires=['Django', 'django_rest_framework', 'six', 'django-cors-headers', 'Pillow'],
+    install_requires=['wheel', 'Django', 'django_rest_framework', 'six', 'django-cors-headers', 'Pillow'],
     include_package_data=True,
     license='BSD License',
     description='Slothy framework',
