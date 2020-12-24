@@ -27,6 +27,20 @@ from django.conf import settings
 ValidationError = exceptions.ValidationError
 
 
+class ForeignKey(models.ForeignKey):
+    def __init__(self, to, **kwargs):
+        on_delete = kwargs.pop('on_delete', models.CASCADE)
+        super().__init__(to, on_delete, **kwargs)
+
+
+class RoleForeignKey(ForeignKey):
+    pass
+
+
+class RoleManyToManyField(models.ManyToManyField):
+    pass
+
+
 class ModelGeneratorWrapper:
     def __init__(self, generator, user):
         self.generator = generator
@@ -436,10 +450,6 @@ class QuerySet(query.QuerySet):
                     else:  # self__<attr>
                         lookup_key = lookup_key[6:]
                         field = self.model.get_field(lookup_key)
-                        if hasattr(field.related_model, '__parent_foreignkey_field__'):
-                            lookup_key = '{}__{}'.format(
-                                lookup_key, getattr(field.related_model, '__parent_foreignkey_field__')
-                            )
                     lookup = {lookup_key: user.pk}
                     filters.append(Q(**lookup))
                 else:  # group
@@ -591,9 +601,7 @@ class ModelBase(base.ModelBase):
                 attrs.update(USERNAME_FIELD=username_field)
             setattr(settings, 'AUTH_USER_MODEL', '{}.{}'.format(fromlist[-2], name))
 
-        bases = utils.pre_new(bases, attrs)
         cls = super().__new__(mcs, name, bases, attrs)
-        utils.post_new(cls)
 
         return cls
 
@@ -828,8 +836,6 @@ class Group(Model):
         verbose_name = 'Grupo'
         verbose_name_plural = 'Grupos'
         list_display = 'name',
-        list_lookups = ()
-        add_lookups = ()
 
     def get_users(self):
         from django.conf import settings

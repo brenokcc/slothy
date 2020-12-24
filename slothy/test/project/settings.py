@@ -37,4 +37,4 @@ TEMPLATES = [
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 STATIC_URL = '/static/'
 MEDIA_URL = '/media/'
-AUTH_USER_MODEL = 'base.usuario'
+AUTH_USER_MODEL = 'base.pessoa'

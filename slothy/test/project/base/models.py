@@ -1,17 +1,18 @@
 # -*- coding: utf-8 -*-
 from slothy.api import models
-from slothy.api.models.decorators import param, meta
+from slothy.api.models.decorators import param, meta, role
 
 
-class Usuario(models.AbstractUser):
+class Pessoa(models.AbstractUser):
     USERNAME_FIELD = 'email'
-    email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255)
+
     nome = models.CharField(verbose_name='Nome', max_length=255)
+    email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255)
     foto = models.ImageField(verbose_name='Foto', null=True, blank=True, upload_to='fotos')
 
     class Meta:
-        verbose_name = 'Usuário'
-        verbose_name_plural = 'Usuários'
+        verbose_name = 'Pessoa'
+        verbose_name_plural = 'Pessoas'
         list_display = 'nome', 'email'
 
     def __str__(self):
@@ -113,9 +114,47 @@ class Estado(models.Model):
         self.save()
 
 
+class PresidenteManager(models.DefaultManager):
+    @meta('Presidentes')
+    def list(self):
+        return self.all()
+
+
+@role()
+class Presidente(Pessoa):
+
+    class Meta:
+        verbose_name = 'Presidente'
+        verbose_name_plural = 'Presidentes'
+
+    def __str__(self):
+        return '{}'.format(self.nome)
+
+
+class GovernadorManager(models.DefaultManager):
+    @meta('Listar')
+    def list(self):
+        return self.all()
+
+
+@role('pessoa')
+class Governador(models.Model):
+    pessoa = models.ForeignKey(Pessoa, verbose_name='Pessoa')
+    estado = models.ForeignKey(Estado, verbose_name='Estado')
+
+    class Meta:
+        verbose_name = 'Governador'
+        verbose_name_plural = 'Governadores'
+
+    def __str__(self):
+        return '{} - {}'.format(self.pessoa, self.estado)
+
+
 class Cidade(models.Model):
-    estado = models.ForeignKey(Estado, verbose_name='Estado', on_delete=models.CASCADE)
     nome = models.CharField(verbose_name='Nome', max_length=255)
+    estado = models.ForeignKey(Estado, verbose_name='Estado', on_delete=models.CASCADE)
+    prefeito = models.RoleForeignKey(Pessoa, verbose_name='Prefeito', null=True)
+    vereadores = models.RoleManyToManyField(Pessoa, verbose_name='Vereadores', blank=True, related_name='cidades_legisladas')
     pontos_turisticos = models.ManyToManyField(PontoTuristico, verbose_name='Pontos Turísticos')
 
     class Meta:

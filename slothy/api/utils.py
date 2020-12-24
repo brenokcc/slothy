@@ -33,7 +33,7 @@ def setup_signals():
         auth_user_model = apps.get_model(settings.AUTH_USER_MODEL)
         group_related_objects = [
             related_object for related_object in getattr(auth_user_model, '_meta').related_objects if
-            hasattr(related_object.field, 'is_group') and related_object.field.is_group
+            type(related_object.field).__name__ in ('RoleForeignKey', 'RoleManyToManyField')
         ]
         for related_object in group_related_objects:
             descriptor = getattr(related_object.field.model, related_object.field.name)
@@ -53,20 +53,29 @@ def pre_save(instance):
         setattr(instance, '_foreignkey_group_values', values.first() or {})
 
 
-def post_save(instance):
+def check_group_membership(instance, remove=False):
     from slothy.api.models import Group
-    from slothy.api.models import AbstractUser
-    if isinstance(instance, AbstractUser) or hasattr(instance, '__parent_foreignkey_field__'):
-        group = Group.objects.get_or_create(
-            name=instance.get_metadata('verbose_name'),
-            lookup=instance.get_metadata('model_name')
-        )[0]
-        if hasattr(instance, '__parent_foreignkey_field__'):
-            user = getattr(instance, getattr(instance, '__parent_foreignkey_field__'))
-        else:
+    role_field_name = getattr(type(instance), '_metadata', {}).get('role_field_name')
+    if role_field_name:
+        group_name = instance.get_metadata('verbose_name')
+        group_lookup = instance.get_metadata('model_name')
+        group = Group.objects.get_or_create(name=group_name, lookup=group_lookup)[0]
+        if role_field_name == 'id':
             user = instance
-        user.groups.add(group)
+        else:
+            user = getattr(instance, role_field_name)
+        if remove:
+            remove_lookup = {role_field_name: user}
+            if type(instance).objects.filter(**remove_lookup).count() == 1:
+                user.groups.remove(group)
+        else:
+            user.groups.add(group)
+
+
+def post_save(instance):
+    check_group_membership(instance)
     if type(instance) in FOREIGNKEY_GROUP_FIELDS:
+        from slothy.api.models import Group
         previous_values = getattr(instance, '_foreignkey_group_values')
         for field_name in FOREIGNKEY_GROUP_FIELDS[type(instance)]:
             field = instance.get_field(field_name)
@@ -88,16 +97,7 @@ def post_save(instance):
 
 
 def pre_delete(instance):
-    if hasattr(instance, '__parent_foreignkey_field__'):
-        from slothy.api.models import Group
-        group = Group.objects.get_or_create(
-            name=instance.get_metadata('verbose_name'),
-            lookup=instance.get_metadata('model_name')
-        )[0]
-        user = getattr(instance, getattr(instance, '__parent_foreignkey_field__'))
-        lookup = {getattr(instance, '__parent_foreignkey_field__'): user}
-        if type(instance).objects.filter(**lookup).count() == 1:
-            user.groups.remove(group)
+    check_group_membership(instance, remove=True)
 
     if type(instance) in FOREIGNKEY_GROUP_FIELDS:
         from slothy.api.models import Group
@@ -112,31 +112,6 @@ def pre_delete(instance):
                 lookup = {field_name: user.pk}
                 if type(instance).objects.filter(**lookup).count() == 1:
                     user.groups.remove(group)
-
-
-def pre_new(bases, attrs):
-    user_base = [cls for cls in bases if hasattr(cls, 'USERNAME_FIELD')]
-    if user_base:
-        from django.db.models import Model, ForeignKey
-        model = user_base.pop()
-        parent_foreignkey_field = model.get_metadata('model_name').lower()
-        attrs.update(**{
-            '__parent_foreignkey_field__': parent_foreignkey_field,
-            parent_foreignkey_field: ForeignKey(model, verbose_name=model.get_metadata('verbose_name')),
-        })
-        return Model,
-    return bases
-
-
-def post_new(cls):
-    if hasattr(cls, '__parent_foreignkey_field__'):
-        def __getattr__(self, attribute):
-            if attribute in self.__dict__:
-                return getattr(self, attribute)
-            else:
-                return getattr(getattr(self, getattr(cls, '__parent_foreignkey_field__')), attribute)
-
-        cls.__getattr__ = __getattr__
 
 
 def custom_serialize(obj):

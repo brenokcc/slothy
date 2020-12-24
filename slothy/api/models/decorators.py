@@ -1,7 +1,17 @@
 # -*- coding: utf-8 -*-
 
 
-def meta(verbose_name, formatter=None, lookups=(), actions=()):
+def role(field='id'):
+    def decorate(cls):
+        metadata = getattr(cls, '_metadata', {})
+        metadata.update(role_field_name=field)
+        setattr(cls, '_metadata', metadata)
+        return cls
+
+    return decorate
+
+
+def meta(verbose_name, formatter=None, lookups=(), add_lookups=(), remove_lookups=()):
     def decorate(func):
         metadata = getattr(func, '_metadata', {})
         metadata.update(
@@ -10,7 +20,8 @@ def meta(verbose_name, formatter=None, lookups=(), actions=()):
             verbose_name=verbose_name,
             formatter=formatter,
             lookups=lookups,
-            actions=actions
+            add_lookups=add_lookups,
+            remove_lookups=remove_lookups
         )
         setattr(func, '_metadata', metadata)
         return func
@@ -18,7 +29,7 @@ def meta(verbose_name, formatter=None, lookups=(), actions=()):
     return decorate
 
 
-def action(verbose_name, lookups=(), condition=None, message=None, category=None, style=None, icon=None, popup=True):
+def action(verbose_name, lookups=(), condition=None, message=None, category=None, style=None, icon=None, modal=True):
     def decorate(func):
         metadata = getattr(func, '_metadata', {})
         params = func.__code__.co_varnames[1:func.__code__.co_argcount]
@@ -34,7 +45,7 @@ def action(verbose_name, lookups=(), condition=None, message=None, category=None
             category=category,
             style=style,
             icon=icon,
-            popup=popup,
+            modal=modal,
         )
         setattr(func, '_metadata', metadata)
         return func
@@ -42,7 +53,7 @@ def action(verbose_name, lookups=(), condition=None, message=None, category=None
     return decorate
 
 
-def classaction(verbose_name, lookups=(), condition=None, message=None, category=None, style=None, icon=None, popup=True):
+def classaction(verbose_name, lookups=(), condition=None, message=None, category=None, style=None, icon=None, modal=True):
     def decorate(func):
         metadata = getattr(func, '_metadata', {})
         params = func.__code__.co_varnames[1:func.__code__.co_argcount]
@@ -58,7 +69,7 @@ def classaction(verbose_name, lookups=(), condition=None, message=None, category
             category=category,
             style=style,
             icon=icon,
-            popup=popup
+            modal=modal
         )
         setattr(func, '_metadata', metadata)
         return func

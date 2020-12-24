@@ -1,7 +1,9 @@
 from django.test import TestCase
-from base.models import Estado, Cidade, PontoTuristico
+from base.models import Pessoa, Estado, Cidade, PontoTuristico, Presidente, Governador
 from django.apps import apps
+from slothy.api.models import Group
 import json
+from slothy.api.utils import setup_signals
 
 # /queryset
 # /queryset/<filter>
@@ -24,8 +26,11 @@ import json
 # /base/estado/<id>/get_pontos_turisticos/add/
 # /base/estado/<id>/get_pontos_turisticos/remove/1/
 
+# curl -H "Content-Type: application/json" -X POST http://localhost:8000/api/login/ -d '{"username": "brenokcc@yahoo.com.br", "password": "senha"}'
 # curl -H "Content-Type: application/json" -H "Authorization: Token 3853ded71e2cb8299a1e1c7e45c4722a787a45e9" -X GET http://localhost:8000/api/base/estado/
 
+
+setup_signals()
 
 def parse_url(url):
     tokens = url.split('/')
@@ -34,6 +39,57 @@ def parse_url(url):
 
 
 class SuapTestCase(TestCase):
+
+    def setUp(self):
+        Group.objects.all().delete()
+
+    def test_direct_inherited_role(self):
+        self.assertFalse(Group.objects.filter(name='Presidente').exists())
+        presidente = Presidente.objects.create(nome='Jair Bolsonaro')
+        self.assertTrue(Group.objects.filter(name='Presidente').exists())
+        self.assertTrue(presidente.groups.filter(name='Presidente').exists())
+
+    def test_indirect_inherited_role(self):
+        self.assertFalse(Group.objects.filter(name='Governador').exists())
+        rn = Estado.objects.create(nome='Rio Grande do Norte', sigla='RN')
+        pessoa = Pessoa.objects.create(nome='Fátima', email='fatima@mail.com')
+        governador_rn = Governador.objects.create(pessoa=pessoa, estado=rn)
+        self.assertTrue(Group.objects.filter(name='Governador').exists())
+        self.assertTrue(pessoa.groups.filter(name='Governador').exists())
+
+        rj = Estado.objects.create(nome='Rio de Janeiro', sigla='RJ')
+        governador_rj = Governador.objects.create(pessoa=pessoa, estado=rj)
+        governador_rn.delete()
+        self.assertTrue(pessoa.groups.filter(name='Governador').exists())
+        governador_rj.delete()
+        self.assertFalse(pessoa.groups.filter(name='Governador').exists())
+
+    def test_fk_inherited_role(self):
+        self.assertFalse(Group.objects.filter(name='Prefeito').exists())
+        rn = Estado.objects.create(nome='Rio Grande do Norte', sigla='RN')
+        natal = Cidade.objects.create(nome='Natal', estado=rn)
+        alvaro_dias = Pessoa.objects.create(nome='Álvaro Dias', email='alvaro@mail.com')
+        self.assertFalse(alvaro_dias.groups.filter(name='Prefeito').exists())
+        natal.prefeito = alvaro_dias
+        natal.save()
+        self.assertTrue(Group.objects.filter(name='Prefeito').exists())
+        self.assertTrue(alvaro_dias.groups.filter(name='Prefeito').exists())
+        natal.prefeito = None
+        natal.save()
+        self.assertFalse(alvaro_dias.groups.filter(name='Prefeito').exists())
+
+    def test_m2m_inherited_role(self):
+        self.assertFalse(Group.objects.filter(name='Vereadores').exists())
+        rn = Estado.objects.create(nome='Rio Grande do Norte', sigla='RN')
+        natal = Cidade.objects.create(nome='Natal', estado=rn)
+        kelps = Pessoa.objects.create(nome='Kelps', email='kelps@mail.com')
+        self.assertFalse(kelps.groups.filter(name='Vereadores').exists())
+        natal.vereadores.add(kelps)
+        self.assertTrue(Group.objects.filter(name='Vereadores').exists())
+        self.assertTrue(kelps.groups.filter(name='Vereadores').exists())
+        natal.vereadores.remove(kelps)
+        self.assertFalse(kelps.groups.filter(name='Vereadores').exists())
+
     def test_models(self):
 
         parse_url('/base/estado/')
@@ -76,3 +132,5 @@ class SuapTestCase(TestCase):
         # print(json.dumps(payload))
         qs = Estado.objects.loads(json.dumps(payload['metadata']))
         # print(qs.dumps())
+
+        self.assertTrue(1)
