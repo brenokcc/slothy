@@ -1,25 +1,7 @@
 # -*- coding: utf-8 -*-
-import types
 
 
-def expose(*args, **kwargs):
-    def decorate(target):
-        if isinstance(target, types.FunctionType):  # function
-            expose_dict = getattr(target, 'expose', {})
-            expose_dict.update({target.__name__: args})
-            for func_name, lookups in kwargs.items():
-                expose_dict.update(**{'{}__{}'.format(target.__name__, func_name): lookups})
-            setattr(target, 'expose', expose_dict)
-        else:  # class
-            for func_name, lookups in kwargs.items():
-                expose_dict = target.get_metadata('expose', {})
-                expose_dict[func_name] = lookups
-                target.set_metadata('expose', expose_dict)
-        return target
-    return decorate
-
-
-def meta(verbose_name, formatter=None, lookups=(), actions=(), **kwargs):
+def meta(verbose_name, formatter=None, lookups=(), actions=()):
     def decorate(func):
         metadata = getattr(func, '_metadata', {})
         metadata.update(
@@ -30,7 +12,6 @@ def meta(verbose_name, formatter=None, lookups=(), actions=(), **kwargs):
             lookups=lookups,
             actions=actions
         )
-        metadata.update(kwargs)
         setattr(func, '_metadata', metadata)
         return func
 

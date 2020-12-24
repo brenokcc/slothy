@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import six
+import json
 from django.contrib.auth import base_user
 from django.db.models import query, base, manager, Sum, Count, Avg
 from django.db import models
@@ -241,12 +242,20 @@ class QuerySet(query.QuerySet):
         super().__init__(*args, **kwargs)
         self._user = None
         self._slice = None
-        self._list_display = None
-        self._list_filter = None
-        self._list_subsets = None
-        self._list_actions = None
-        self._list_per_page = None
-        self._search_fields = None
+        self._list_display = ()
+        self._list_filter = ()
+        self._list_subsets = ()
+        self._list_actions = ()
+        self._list_per_page = 5
+        self._list_search = None
+        self._page = 0
+        self._subset = None
+        self._q = None
+        self._filters = []
+        self._actions = []
+        self._subsets = []
+        self._display = []
+        self._deserialized = False
         self._related_manager = None
         self._iterable_class = ModelIterable
 
@@ -319,14 +328,14 @@ class QuerySet(query.QuerySet):
             self._list_per_page = self.model.get_metadata('list_per_page')
         return self._list_per_page or 5
 
-    def search_fields(self, *search_fields):
-        self._search_fields = search_fields
+    def list_search(self, *search_fields):
+        self._list_search = search_fields
         return self
 
-    def get_search_fields(self, add_default=False):
-        if self._search_fields is None and add_default:
-            self._search_fields = self.model.get_metadata('search_fields')
-        return self._search_fields
+    def get_list_search(self, add_default=False):
+        if self._list_search is None and add_default:
+            self._list_search = self.model.get_metadata('search_fields')
+        return self._list_search
 
     def _clone(self):
         clone = super()._clone()
@@ -337,7 +346,14 @@ class QuerySet(query.QuerySet):
         clone._list_subsets = self._list_subsets
         clone._list_actions = self._list_actions
         clone._list_per_page = self._list_per_page
-        clone._search_fields = self._search_fields
+        clone._list_search = self._list_search
+        clone._page = self._page
+        clone._subset = self._subset
+        clone._q = self._q
+        clone._filters = self._filters
+        clone._actions = self._actions
+        clone._subsets = self._subsets
+        clone._display = self._display
         clone._related_manager = self._related_manager
         return clone
 
@@ -359,6 +375,9 @@ class QuerySet(query.QuerySet):
                         instance = self.model.objects.get(pk=instance.get('id'))
                     else:
                         instance = self.model.objects.get_or_create(**instance)[0]
+                else:
+                    if instance.pk is None:
+                        instance.save()
                 related_manager.add(instance)
                 return instance
         else:
@@ -438,39 +457,99 @@ class QuerySet(query.QuerySet):
         search_fields = self.model.get_metadata('search_fields')
         if not search_fields:
             local_fields = self.model.get_metadata('local_fields')
-            search_fields = [field.name for field in local_fields if field.__class__.__name__=='CharField']
+            search_fields = [field.name for field in local_fields if field.__class__.__name__ == 'CharField']
         for search_field in search_fields:
             queryset = queryset | self.filter(**{'{}__icontains'.format(search_field): q})
         return queryset
 
     @staticmethod
-    def loads(data):
-        payload = signing.loads(data)
-        model = apps.get_model(payload['model_label'])
+    def loads(payload):
+        payload = json.loads(payload)
+        model = apps.get_model(payload['model'])
         qs = model.objects.none()
-        qs.query = cpickle.loads(zlib.decompress(base64.b64decode(payload['query'])))
-        qs.list_display(*payload['list_display'])
-        qs.list_filter(*payload['list_filter'])
-        qs.list_subsets(*payload['list_subsets'])
-        qs.list_actions(*payload['list_actions'])
-        qs.list_per_page(payload['list_per_page'])
-        qs.search_fields(*payload['search_fields'])
+        qs.query = cpickle.loads(zlib.decompress(base64.b64decode(signing.loads(payload['query']))))
+        qs.list_display(*payload['list']['display'])
+        qs.list_filter(*payload['list']['filter'])
+        qs.list_subsets(*payload['list']['subsets'])
+        qs.list_actions(*payload['list']['actions'])
+        qs.list_per_page(payload['list']['per_page'])
+        qs.list_search(payload['list']['search'])
+        qs._q = payload['q']
+        qs._filters = payload['filters']
+        qs._actions = payload['actions']
+        qs._subsets = payload['subsets']
+        qs._subset = payload['subset']
+        qs._display = payload['display']
+        qs._page = payload['page']
+        qs._deserialized = True
+
         return qs
 
     def dumps(self):
+        data = []
         serialized_str = base64.b64encode(zlib.compress(cpickle.dumps(self.query))).decode()
-        payload = {
-            'model_label': getattr(self.model, '_meta').label,
-            'query': serialized_str,
-            'list_display': self._list_display or (),
-            'list_filter': self._list_filter or (),
-            'list_subsets': self._list_subsets or (),
-            'list_actions': self._list_actions or (),
-            'list_per_page': self._list_per_page or 5,
-            'search_fields': self._search_fields or ()
 
+        if not self._deserialized:
+            for lookup in self._list_subsets:
+                metadata = getattr(getattr(self, lookup), '_metadata', {})
+                self._subsets.append(
+                    {'name': lookup, 'label': metadata.get('verbose_name'), 'active': False}
+                )
+            for lookup in self._list_filter:
+                self._filters.append(
+                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None}
+                )
+            for lookup in self._list_actions:
+                self._actions.append(
+                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None}
+                )
+            for lookup in self._list_display:
+                self._display.append(
+                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'sorted': False, 'formatter': None},
+                )
+
+        if self._subset:
+            qs = getattr(self, self._subset)()
+        else:
+            qs = self.all()
+
+        if qs._q:
+            qs = qs.search(qs._q)
+
+        for _filter in qs._filters:
+            if _filter['value']:
+                qs = qs.filter(**{_filter['name']: _filter['value']})
+
+        for obj in qs[self._page * self._list_per_page:self._page * self._list_per_page + self._list_per_page]:
+            item = []
+            for lookup in self._list_display:
+                item.append(getattrr(obj, lookup))
+            data.append(item)
+
+        payload = {
+            'metadata': not self._deserialized and {
+                'model': getattr(self.model, '_meta').label,
+                'query': signing.dumps(serialized_str),
+                'list': {
+                    'display': self._list_display,
+                    'filter': self._list_filter,
+                    'subsets': self._list_subsets,
+                    'actions': self._list_actions,
+                    'per_page': self._list_per_page,
+                    'search': self._list_search
+                },
+                'q': None,
+                'filters': self._filters,
+                'actions': self._actions,
+                'subsets': self._subsets,
+                'subset': self._subset,
+                'display': self._display,
+                'page': self._page,
+            } or {},
+            'data': data,
+            'total': self.count()
         }
-        return signing.dumps(payload)
+        return json.dumps(payload)
 
 
 class DefaultManager(QuerySet):
@@ -515,7 +594,6 @@ class ModelBase(base.ModelBase):
         bases = utils.pre_new(bases, attrs)
         cls = super().__new__(mcs, name, bases, attrs)
         utils.post_new(cls)
-        utils.expose_new(cls)
 
         return cls
 
@@ -530,32 +608,13 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
         super(Model, self).__init__(*args, **kwargs)
         self._user = None
 
-        self.related_managers = {}
-        if self.pk:
-            for attr_name in type(self).get_related_managers():
-                self.related_managers[attr_name] = getattr(self, attr_name)
-
     def __getattribute__(self, item):
-        if item in type(self).get_related_managers():
-            # reverse_many_to_one and many_to_many descriptors are intercept to return the querysets
-            if item in self.related_managers:
-                related_manager = self.related_managers[item]
-                if hasattr(related_manager, 'get_queryset'):
-                    queryset = related_manager.get_queryset()
-                    queryset._related_manager = related_manager
-                    return queryset
-        return super().__getattribute__(item)
-
-    @classmethod
-    def get_related_managers(cls):
-        if not hasattr(cls, '_related_managers'):
-            related_managers = []
-            for rel in cls._meta.related_objects:
-                related_managers.append(rel.get_accessor_name())
-            for field in cls._meta.local_many_to_many:
-                related_managers.append(field.name)
-            setattr(cls, '_related_managers', related_managers)
-        return getattr(cls, '_related_managers')
+        value = super().__getattribute__(item)
+        if hasattr(value, 'get_queryset'):
+            queryset = value.get_queryset()
+            queryset._related_manager = value
+            return queryset
+        return value
 
     def add(self):
         self.save()

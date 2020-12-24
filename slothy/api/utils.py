@@ -7,7 +7,6 @@ from django.core.exceptions import ValidationError
 from django.apps import apps
 
 FOREIGNKEY_GROUP_FIELDS = collections.defaultdict(list)
-EXPOSED_MODELS = collections.defaultdict(list)
 
 
 def m2m_signal(sender, **kwargs):
@@ -195,60 +194,32 @@ def _getattr_rec(obj, attrs, request=None):
     return None
 
 
-def expose_new(cls):
-    attrs = []
-    expose_dict = cls.get_metadata('expose', {})
-    for attr_name in dir(cls):
-        attrs.append((cls, attr_name))
-    if not cls.get_metadata('abstract'):
-        manager_cls = getattr(cls.objects, '_queryset_class')
-        for attr_name in dir(manager_cls):
-            attrs.append((manager_cls, attr_name))
-        for target, attr_name in attrs:
-            if '__' not in attr_name:
-                attr = getattr(target, attr_name)
-                if hasattr(attr, 'expose'):
-                    for func_name, lookups in attr.expose.items():
-                        expose_dict[func_name] = lookups
-    if expose_dict:
-        EXPOSED_MODELS[cls.get_metadata('app_label')].append(cls.get_metadata('model_name'))
-    cls.set_metadata('expose', expose_dict)
-
-
 def apply(model, func, data, user, relation_name=None):
-    expose = '{}__{}'.format(relation_name, func.__name__) and relation_name or func.__name__
-    metadata = getattr(func, '_metadata', {})
-    lookups = model.get_metadata('expose', {}).get(expose)
-    if lookups is not None:
-        if model.check_lookups(user, lookups):
-            if 'instance' not in data:  # not (add or remove)
-                for name, value in data.items():
-                    field = metadata.get('fields', {}).get(name) or model.get_field(name)
-                    if field:
-                        try:
-                            form_field = data[name] = field.formfield()
-                            if form_field:
-                                data[name] = form_field.clean(value)
-                        except ValidationError as e:
-                            raise ValidationError({name: e.message})
-                    else:
-                        raise BaseException('Type of "{}" is unknown')
-            return custom_serialize(func(**data))
-        else:
-            raise BaseException('Permission denied')
+    parameters = [varname for varname in func.__code__.co_varnames if varname not in ('self', 'args', 'kwargs')]
+    requires_parameter = parameters or func.__name__ in ('add', 'edit')
+    metadata = []
+    if 'instance' not in data:  # not (add or remove)
+        for name in parameters:
+            # get field from function params (@param decorator) or from the model
+            field = getattr(func, '_metadata', {}).get('fields', {}).get(name) or model.get_field(name)
+            if field:
+                try:
+                    form_field = data[name] = field.formfield()
+                    if form_field:
+                        if name in data:
+                            data[name] = form_field.clean(data[name])
+                        metadata.append(
+                            dict(name=name, type=type(form_field).__name__, required=form_field.required,
+                                 verbose_name=form_field.label)
+                        )
+                except ValidationError as e:
+                    raise ValidationError({name: e.message})
+            else:
+                raise BaseException('Type of "{}" is unknown')
+    if data or not requires_parameter:
+        return custom_serialize(func(**data)), metadata
     else:
-        raise BaseException('This function is not exposed')
-
-
-def dir_app(app_label):
-    return EXPOSED_MODELS[app_label]
-
-
-def dir_model(model):
-    endpoints = []
-    for key in model.get_metadata('expose'):
-        endpoints.append(key)
-    return endpoints
+        return [], metadata
 
 
 class ObjectWrapper(object):
