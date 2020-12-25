@@ -125,10 +125,10 @@ class MainTestCase(TestCase):
         print(estado.get_cidades())
 
         payload = json.loads(Estado.objects.list().dumps())
-        payload['metadata']['q'] = 'RN'
-        payload['metadata']['filters'][0]['value'] = True
-        payload['metadata']['page'] = 0
-        payload['metadata']['subset'] = 'ativos'
+        payload['metadata']['q'] = 'SP'
+        payload['metadata']['filters'][0]['value'] = False
+        payload['metadata']['page'] = 1
+        payload['metadata']['subset'] = 'inativos'
         # print(json.dumps(payload))
         qs = Estado.objects.loads(json.dumps(payload['metadata']))
         # print(qs.dumps())

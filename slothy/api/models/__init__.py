@@ -249,6 +249,9 @@ class ValuesDict(UserDict):
     def get_image(self):
         return self.image_lookup and getattr(self.obj, self.image_lookup) or None
 
+    def serialize(self):
+        return str(self)
+
 
 class QuerySet(query.QuerySet):
 
@@ -488,24 +491,24 @@ class QuerySet(query.QuerySet):
         model = apps.get_model(payload['model'])
         qs = model.objects.none()
         qs.query = cpickle.loads(zlib.decompress(base64.b64decode(signing.loads(payload['query']))))
-        qs.list_display(*payload['list']['display'])
-        qs.list_filter(*payload['list']['filter'])
-        qs.list_subsets(*payload['list']['subsets'])
-        qs.list_actions(*payload['list']['actions'])
-        qs.list_per_page(payload['list']['per_page'])
-        qs.list_search(payload['list']['search'])
+        qs.list_display(*payload['list_display'])
+        qs.list_filter(*payload['list_filter'])
+        qs.list_subsets(*payload['list_subsets'])
+        qs.list_actions(*payload['list_actions'])
+        qs.list_per_page(payload['list_per_page'])
+        qs.list_search(payload['list_search'])
         qs._q = payload['q']
         qs._filters = payload['filters']
         qs._actions = payload['actions']
         qs._subsets = payload['subsets']
         qs._subset = payload['subset']
         qs._display = payload['display']
-        qs._page = payload['page']
+        qs._page = payload['page'] - 1
         qs._deserialized = True
 
         return qs
 
-    def dumps(self):
+    def serialize(self):
         data = []
         serialized_str = base64.b64encode(zlib.compress(cpickle.dumps(self.query))).decode()
 
@@ -523,7 +526,7 @@ class QuerySet(query.QuerySet):
                 self._actions.append(
                     {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None}
                 )
-            for lookup in self._list_display:
+            for lookup in self.get_list_display():
                 self._display.append(
                     {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'sorted': False, 'formatter': None},
                 )
@@ -543,33 +546,40 @@ class QuerySet(query.QuerySet):
         for obj in qs[self._page * self._list_per_page:self._page * self._list_per_page + self._list_per_page]:
             item = []
             for lookup in self._list_display:
-                item.append(getattrr(obj, lookup))
+                value = getattrr(obj, lookup)
+                if isinstance(value, Model):
+                    value = str(value)
+                item.append(value)
             data.append(item)
 
         payload = {
+            'type': 'queryset',
             'metadata': not self._deserialized and {
-                'model': getattr(self.model, '_meta').label,
+                'model': getattr(self.model, '_meta').label.lower(),
                 'query': signing.dumps(serialized_str),
-                'list': {
-                    'display': self._list_display,
-                    'filter': self._list_filter,
-                    'subsets': self._list_subsets,
-                    'actions': self._list_actions,
-                    'per_page': self._list_per_page,
-                    'search': self._list_search
-                },
+
+                'list_display': self._list_display,
+                'list_filter': self._list_filter,
+                'list_subsets': self._list_subsets,
+                'list_actions': self._list_actions,
+                'list_per_page': self._list_per_page,
+                'list_search': self._list_search,
+
                 'q': None,
                 'filters': self._filters,
                 'actions': self._actions,
                 'subsets': self._subsets,
                 'subset': self._subset,
                 'display': self._display,
-                'page': self._page,
+                'page': self._page + 1,
             } or {},
             'data': data,
             'total': self.count()
         }
-        return json.dumps(payload)
+        return payload
+
+    def dumps(self):
+        return json.dumps(self.serialize())
 
 
 class DefaultManager(QuerySet):
@@ -635,15 +645,6 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             return queryset
         return value
 
-    def add(self):
-        self.save()
-
-    def edit(self):
-        self.save()
-
-    def super_save(self):
-        super().save()
-
     def save(self, *args, **kwargs):
         utils.pre_save(self)
         super().save(*args, **kwargs)
@@ -705,14 +706,14 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
 
     @classmethod
     def get_list_url(cls):
-        return '/admin/{}/{}/'.format(
+        return '/api/{}/{}/'.format(
             cls.get_metadata('app_label'),
             cls.get_metadata('model_name')
         )
 
     @classmethod
     def get_add_url(cls):
-        return '/admin/{}/{}/add/'.format(
+        return '/api/{}/{}/add/'.format(
             cls.get_metadata('app_label'),
             cls.get_metadata('model_name')
         )
@@ -747,6 +748,9 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
         if not lookups:
             lookups = list(self.get_metadata('list_display')) + ['id']
         return ValuesDict(self, *lookups, verbose_key=verbose_key)
+
+    def serialize(self):
+        return str(self)
 
     @classmethod
     def get_field(cls, lookup):

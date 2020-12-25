@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 from slothy.api import models
-from slothy.api.models.decorators import param, meta, role, action, classaction
+from slothy.api.models.decorators import param, meta, role, user
 
 
+@user('email')
 class Pessoa(models.AbstractUser):
-    USERNAME_FIELD = 'email'
 
     nome = models.CharField(verbose_name='Nome', max_length=255)
     email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255)
@@ -47,7 +47,7 @@ class PontoTuristicoManager(models.DefaultManager):
         return self.filter(cidade__estado__sigla=sigla)
 
     @classmethod
-    @classaction('Remover Tudo')
+    @meta('Remover Tudo')
     def remover_tudo(cls):
         PontoTuristico.objects.all().delete()
 
@@ -62,19 +62,21 @@ class PontoTuristico(models.Model):
     def __str__(self):
         return '{}'.format(self.nome)
 
-    @action('Cadastrar')
+    @meta('Cadastrar')
     def add(self):
         self.save()
 
-    @action('Editar')
+    @meta('Editar')
     def edit(self):
+        if self.pk:
+            raise models.ValidationError('Período de edição ainda não está aberto')
         self.save()
 
-    @action('Visualizar')
+    @meta('Visualizar')
     def view(self):
         return self.values('nome')
 
-    @action('Remover')
+    @meta('Remover')
     def remove(self):
         self.delete()
 
@@ -106,31 +108,31 @@ class EstadoManager(models.DefaultManager):
     def inativos(self):
         return self.filter(ativo=False)
 
-    @action('Ativar')
+    @meta('Ativar')
     def ativar(self):
         self.update(ativo=True)
 
-    @action('Agendar Inativacao')
+    @meta('Agendar Inativacao')
     @param(data=models.DateField('Data'))
     def agendar_inativacao(self, data):
         self.update(ativo=False)
 
-    @action('Atualizar Status')
+    @meta('Atualizar Status')
     def atualizar_status(self, ativo):
         self.update(ativo=ativo)
 
-    @action('Agendar Atualização de Status')
+    @meta('Agendar Atualização de Status')
     @param(data=models.DateField('Data'))
     def agendar_atualizacao_status(self, ativo, data):
         self.update(ativo=ativo)
 
     @classmethod
-    @classaction('Inativar Todos')
+    @meta('Inativar Todos')
     def inativar_todos(cls):
         Estado.objects.update(ativo=False)
 
     @classmethod
-    @classaction('Agendar Inativação Total')
+    @meta('Agendar Inativação Total')
     @param(data=models.DateField('Data'))
     def agendar_inativacao_total(cls, data):
         Estado.objects.update(ativo=False)
@@ -160,7 +162,7 @@ class Estado(models.Model):
     def dados_populacionais(self):
         return self.values('get_populacao')
 
-    @action('Cadastrar')
+    @meta('Cadastrar')
     def add(self):
         self.save()
 
@@ -172,12 +174,12 @@ class Estado(models.Model):
     def remove(self):
         self.delete()
 
-    @action('Ativar')
+    @meta('Ativar')
     def ativar(self):
         self.ativo = True
         self.save()
 
-    @action('Ativar')
+    @meta('Ativar')
     def inativar(self):
         self.ativo = False
         self.save()
@@ -190,12 +192,12 @@ class Estado(models.Model):
     def get_cidades(self):
         return self.cidade_set
 
-    @action('Alterar Sigpla')
+    @meta('Alterar Sigla')
     def alterar_sigla(self, sigla):
         self.sigla = sigla
         self.save()
 
-    @action('Programar Ativação')
+    @meta('Programar Ativação')
     @param(data=models.DateField('Data da Ativação'))
     def programar_ativacao(self, data):
         pass
@@ -258,4 +260,3 @@ class Cidade(models.Model):
     @meta('Pontos Turísticos')
     def get_pontos_turisticos(self):
         return self.pontos_turisticos
-

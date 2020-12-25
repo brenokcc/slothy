@@ -11,8 +11,9 @@ from slothy.api.models import ValidationError
 
 
 class InputValidationError(BaseException):
-    def __init__(self, errors):
+    def __init__(self, errors, metadata):
         self.errors = errors
+        self.metadata = metadata
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
@@ -48,7 +49,7 @@ class Api(APIView):
 
     def do(self, request, path, data):
         print('# {}'.format(path))
-        response = dict(message=None, exception=None, error=None, data=None, metadata=[], url=None)
+        response = dict(message=None, exception=None, error=None, data=None, metadata=[], url=path)
         try:
             if path.endswith('/'):
                 path = path[0:-1]
@@ -116,16 +117,21 @@ class Api(APIView):
                         func = model.objects.list
                         meta_func = getattr(model.objects, '_queryset_class').list
 
-                    output = self.apply(model, func, meta_func or func, instance, data)
+                    output, metadata = self.apply(model, func, meta_func or func, instance, data)
                     if output is not None:
-                        print(output)
+                        response.update(data=output.serialize())
+                    response.update(metadata=metadata)
 
         except InputValidationError as e:
-            print(9999999, e.errors)
-            response.update(errors=e.errors)
+            response.update(errors=e.errors, metadata=e.metadata)
         except BaseException as e:
             traceback.print_exc(file=sys.stdout)
             response.update(exception=str(e))
+        try:
+            print(json.dumps(response, indent=2, sort_keys=False, ensure_ascii=False))
+        except BaseException:
+            print(response)
+            import pdb; pdb.set_trace()
         response = Response(response)
         response["Access-Control-Allow-Origin"] = "*"
         return response
@@ -166,6 +172,14 @@ class Api(APIView):
                     for name, field in custom_fields.items():
                         self.fields[name] = field.formfield()
 
+                def get_field_metadata(self):
+                    items = []
+                    for name, field in self.fields.items():
+                        choices = []
+                        item = dict(name=name, label=field.label, required=field.required, mask=None, value='', choices=choices, help_text=field.help_text)
+                        items.append(item)
+                    return items
+
             form = Form(data=data, instance=instance)
             if form.is_valid():
                 # print(data, form.cleaned_data)
@@ -173,14 +187,18 @@ class Api(APIView):
                 params = {}
                 for param in metadata['params']:
                     params[param] = form.cleaned_data.get(param)
-                return func(**params)
-
+                try:
+                    return func(**params), form.get_field_metadata()
+                except ValidationError as e:
+                    raise InputValidationError({None: e.message}, form.get_field_metadata())
             else:
                 errors = {}
                 for field_name, messages in form.errors.items():
                     errors[field_name] = ','.join(messages)
-                raise InputValidationError(errors)
+                raise InputValidationError(errors, form.get_field_metadata())
 
         else:
-            return func()
-
+            try:
+                return func(), {}
+            except ValidationError as e:
+                raise InputValidationError({None: e.message})
