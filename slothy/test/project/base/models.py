@@ -146,7 +146,7 @@ class Estado(models.Model):
         verbose_name_plural = 'Estados'
 
     def __str__(self):
-        return '{}'.format(self.sigla)
+        return self.sigla
 
     @meta('Visualizar')
     def view(self):
@@ -240,9 +240,9 @@ class Governador(models.Model):
 class Cidade(models.Model):
     nome = models.CharField(verbose_name='Nome', max_length=255)
     estado = models.ForeignKey(Estado, verbose_name='Estado', on_delete=models.CASCADE)
-    prefeito = models.RoleForeignKey(Pessoa, verbose_name='Prefeito', null=True)
+    prefeito = models.RoleForeignKey(Pessoa, verbose_name='Prefeito', null=True, blank=True)
     vereadores = models.RoleManyToManyField(Pessoa, verbose_name='Vereadores', blank=True, related_name='cidades_legisladas')
-    pontos_turisticos = models.ManyToManyField(PontoTuristico, verbose_name='Pontos Turísticos')
+    pontos_turisticos = models.ManyToManyField(PontoTuristico, verbose_name='Pontos Turísticos', blank=True)
 
     class Meta:
         verbose_name = 'Estado'
@@ -251,6 +251,11 @@ class Cidade(models.Model):
     def __str__(self):
         return '{}/{}'.format(self.nome, self.estado)
 
+    @meta('Adicionar')
+    def add(self):
+        self.save()
+
+    @meta('Pontos Turísticos')
     def get_pontos_turisticos(self):
         return self.pontos_turisticos
 

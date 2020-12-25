@@ -10,6 +10,11 @@ from django.forms import ModelForm
 from slothy.api.models import ValidationError
 
 
+class InputValidationError(BaseException):
+    def __init__(self, errors):
+        self.errors = errors
+
+
 class CsrfExemptSessionAuthentication(SessionAuthentication):
 
     def enforce_csrf(self, request):
@@ -20,28 +25,29 @@ class Api(APIView):
     authentication_classes = CsrfExemptSessionAuthentication, TokenAuthentication
 
     def get(self, request, path):
-        data = {}
-        for key in request.GET:
-            data[key] = request.GET[key]
-        return self.do(request, path, data)
+        # data = {}
+        # for key in request.GET:
+        #     data[key] = request.GET[key]
+        return self.do(request, path, request.GET)
 
     def options(self, request, path):
         return self.do(request, path, {})
 
     def post(self, request, path):
-        body = request.body
-        data = {}
-        if request.POST:  # browser
-            for key in request.POST:
-                data[key] = request.POST[key]
-            if request.FILES:
-                for key in request.FILES:
-                    data[key] = request.FILES[key]
+        # body = request.body
+        # data = {}
+        # if request.POST:  # browser
+        #     for key in request.POST:
+        #         data[key] = request.POST[key]
+        #     if request.FILES:
+        #         for key in request.FILES:
+        #             data[key] = request.FILES[key]
         # else:  # nodejs
-        #    data = json.loads(body or '{}')
-        return self.do(request, path, data)
+        #     data = json.loads(body or '{}')
+        return self.do(request, path, request.POST)
 
     def do(self, request, path, data):
+        print('# {}'.format(path))
         response = dict(message=None, exception=None, error=None, data=None, metadata=[], url=None)
         try:
             if path.endswith('/'):
@@ -85,7 +91,27 @@ class Api(APIView):
                             if len(tokens) == 3:  # view object
                                 func = instance.view
                             else:
-                                func = getattr(instance, tokens[3])  # object meta or action
+                                if len(tokens) == 4:  # object subset, meta or action
+                                    func = getattr(instance, tokens[3])  # object meta or action
+                                else:  # object relation (add or remove)
+                                    qs = getattr(instance, tokens[3])().none()
+                                    if tokens[4] == 'add':
+                                        field = getattr(getattr(qs, '_related_manager'), 'field', None)
+                                        if field:  # one-to-many
+                                            value = getattr(qs, '_hints')['instance']
+                                            model = qs.model
+                                            instance = model()
+                                            setattr(instance, field.name, value)
+                                            func = instance.add
+                                        else:  # many-to-many
+                                            def add(**kwargs):
+                                                for obj in kwargs[related_attribute]:
+                                                    qs.add(obj)
+                                            related_attribute = getattr(qs, '_related_attribute')
+                                            setattr(add, '_metadata', dict(name='add_m2m', params=(related_attribute,)))
+                                            func = add
+                                    else:
+                                        func = None
                     else:
                         func = model.objects.list
                         meta_func = getattr(model.objects, '_queryset_class').list
@@ -94,11 +120,9 @@ class Api(APIView):
                     if output is not None:
                         print(output)
 
-        except ValidationError as e:
-            error = {}
-            for key, messages in e.message_dict.items():
-                error[key] = ', '.join(messages)
-            response.update(error=error)
+        except InputValidationError as e:
+            print(9999999, e.errors)
+            response.update(errors=e.errors)
         except BaseException as e:
             traceback.print_exc(file=sys.stdout)
             response.update(exception=str(e))
@@ -109,7 +133,6 @@ class Api(APIView):
     def apply(self, _model, func, meta_func, instance, data):
         metadata = getattr(meta_func, '_metadata')
         custom_fields = metadata.get('fields', {})
-        print('====== {} ======'.format(metadata['name']))
         # print(metadata)
         if 'params' in metadata:
             if metadata['params']:
@@ -153,8 +176,10 @@ class Api(APIView):
                 return func(**params)
 
             else:
-                print(333, form.errors)
-                raise ValidationError('9999')
+                errors = {}
+                for field_name, messages in form.errors.items():
+                    errors[field_name] = ','.join(messages)
+                raise InputValidationError(errors)
 
         else:
             return func()

@@ -152,3 +152,17 @@ class MainTestCase(TestCase):
         data = dict(sigla='RN')
         self.client.get('/api/base/pontoturistico/referenciados_no_estado/', data=data)
         self.client.get('/api/base/pontoturistico/remover_tudo/')
+
+        data = dict(nome='Rio Grande do Norte', sigla='RN')
+        self.client.post('/api/base/estado/add/', data=data)
+        self.client.get('/api/base/estado/1/get_cidades/')
+        data = dict(nome='Natal', estado=1)
+        self.client.get('/api/base/estado/1/get_cidades/add/', data=data)
+        self.client.get('/api/base/estado/1/get_cidades/')
+
+        data = dict(nome='Morro do Careca')
+        self.client.post('/api/base/pontoturistico/add/', data=data)
+        self.client.get('/api/base/cidade/1/get_pontos_turisticos/')
+        data = dict(pontos_turisticos=2)
+        self.client.post('/api/base/cidade/1/get_pontos_turisticos/add/', data=data)
+        self.client.get('/api/base/cidade/1/get_pontos_turisticos/')

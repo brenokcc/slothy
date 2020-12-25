@@ -271,6 +271,7 @@ class QuerySet(query.QuerySet):
         self._display = []
         self._deserialized = False
         self._related_manager = None
+        self._related_attribute = None
         self._iterable_class = ModelIterable
 
     def filter(self, *args, **kwargs):
@@ -377,6 +378,7 @@ class QuerySet(query.QuerySet):
         clone._subsets = self._subsets
         clone._display = self._display
         clone._related_manager = self._related_manager
+        clone._related_attribute = self._related_attribute
         return clone
 
     def add(self, instance):
@@ -629,6 +631,7 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
         if hasattr(value, 'get_queryset'):
             queryset = value.get_queryset()
             queryset._related_manager = value
+            queryset._related_attribute = item
             return queryset
         return value
 
