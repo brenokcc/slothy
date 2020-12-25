@@ -14,8 +14,10 @@ def role(field='id'):
 def meta(verbose_name, formatter=None, lookups=(), add_lookups=(), remove_lookups=()):
     def decorate(func):
         metadata = getattr(func, '_metadata', {})
+        params = func.__code__.co_varnames[1:func.__code__.co_argcount]
         metadata.update(
             name=func.__name__,
+            params=params,
             type='meta',
             verbose_name=verbose_name,
             formatter=formatter,

@@ -202,7 +202,7 @@ class QuerySetStatistic(object):
 
 class ValuesDict(UserDict):
 
-    def __init__(self, obj, *lookups, verbose_key=False):
+    def __init__(self, obj, *lookups, verbose_key=True):
         self.obj = obj
         self.lookups = lookups
         self.image_lookup = None
@@ -215,7 +215,7 @@ class ValuesDict(UserDict):
             if not isinstance(lookup, tuple):
                 lookup = lookup,
             for attr in lookup:
-                verbose_name = obj.get_verbose_name(attr) if verbose_key else attr
+                verbose_name = obj.get_verbose_name(attr)
                 value = obj.value(attr, serialized=True)
                 value = utils.custom_serialize(value)
                 self[verbose_name] = value
@@ -350,6 +350,14 @@ class QuerySet(query.QuerySet):
         if self._list_search is None and add_default:
             self._list_search = self.model.get_metadata('search_fields')
         return self._list_search
+
+    def __str__(self):
+        output = list()
+        for obj in self[0:10]:
+            output.append("'{}'".format(obj))
+        if self.count() > 10:
+            output.append(' ...')
+        return '[{}]'.format(','.join(output))
 
     def _clone(self):
         clone = super()._clone()
@@ -722,6 +730,8 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
         value = getattrr(self, lookup)
         if serialized:
             value = utils.custom_serialize(value)
+        if callable(value):
+            value = value()
         return value
 
     def enable_nested_values(self):

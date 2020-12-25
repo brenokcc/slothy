@@ -38,7 +38,7 @@ def parse_url(url):
     print(model)
 
 
-class SuapTestCase(TestCase):
+class MainTestCase(TestCase):
 
     def setUp(self):
         Group.objects.all().delete()
@@ -134,3 +134,21 @@ class SuapTestCase(TestCase):
         # print(qs.dumps())
 
         self.assertTrue(1)
+
+    def test_api(self):
+        data = dict(nome='Parque do Povo')
+        self.client.post('/api/base/pontoturistico/add/', data=data)
+        self.client.get('/api/base/pontoturistico/')
+        self.client.get('/api/base/pontoturistico/1/')
+        data = dict(nome='Parque da Cidade')
+        self.client.post('/api/base/pontoturistico/1/edit/', data=data)
+        self.client.get('/api/base/pontoturistico/')
+        self.client.get('/api/base/pontoturistico/referenciados/')
+        data = dict(sigla='RN')
+        self.client.post('/api/base/pontoturistico/referenciados_no_estado/', data=data)
+        self.client.post('/api/base/pontoturistico/1/remove/')
+        self.client.get('/api/base/pontoturistico/')
+
+        data = dict(sigla='RN')
+        self.client.get('/api/base/pontoturistico/referenciados_no_estado/', data=data)
+        self.client.get('/api/base/pontoturistico/remover_tudo/')

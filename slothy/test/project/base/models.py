@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from slothy.api import models
-from slothy.api.models.decorators import param, meta, role
+from slothy.api.models.decorators import param, meta, role, action, classaction
 
 
 class Pessoa(models.AbstractUser):
@@ -31,6 +31,27 @@ class Pessoa(models.AbstractUser):
         super().change_password(raw_password)
 
 
+class PontoTuristicoManager(models.DefaultManager):
+
+    @meta('Todos')
+    def list(self):
+        return self.all()
+
+    @meta('Referenciados')
+    def referenciados(self):
+        return self.filter(cidade__isnull=False)
+
+    @meta('Referenciados')
+    @param(sigla=models.CharField())
+    def referenciados_no_estado(self, sigla):
+        return self.filter(cidade__estado__sigla=sigla)
+
+    @classmethod
+    @classaction('Remover Tudo')
+    def remover_tudo(cls):
+        PontoTuristico.objects.all().delete()
+
+
 class PontoTuristico(models.Model):
     nome = models.CharField(verbose_name='Nome', max_length=255)
 
@@ -41,13 +62,28 @@ class PontoTuristico(models.Model):
     def __str__(self):
         return '{}'.format(self.nome)
 
+    @action('Cadastrar')
+    def add(self):
+        self.save()
+
+    @action('Editar')
+    def edit(self):
+        self.save()
+
+    @action('Visualizar')
+    def view(self):
+        return self.values('nome')
+
+    @action('Remover')
+    def remove(self):
+        self.delete()
+
 
 class EstadoManager(models.DefaultManager):
 
     @meta('Todos')
     def list(self):
-        return self.filter(
-            pk__lte=10
+        return self.all(
         ).list_display(
             'nome', 'ativo'
         ).list_filter(
@@ -70,8 +106,34 @@ class EstadoManager(models.DefaultManager):
     def inativos(self):
         return self.filter(ativo=False)
 
-    def inativar(self):
+    @action('Ativar')
+    def ativar(self):
         self.update(ativo=True)
+
+    @action('Agendar Inativacao')
+    @param(data=models.DateField('Data'))
+    def agendar_inativacao(self, data):
+        self.update(ativo=False)
+
+    @action('Atualizar Status')
+    def atualizar_status(self, ativo):
+        self.update(ativo=ativo)
+
+    @action('Agendar Atualização de Status')
+    @param(data=models.DateField('Data'))
+    def agendar_atualizacao_status(self, ativo, data):
+        self.update(ativo=ativo)
+
+    @classmethod
+    @classaction('Inativar Todos')
+    def inativar_todos(cls):
+        Estado.objects.update(ativo=False)
+
+    @classmethod
+    @classaction('Agendar Inativação Total')
+    @param(data=models.DateField('Data'))
+    def agendar_inativacao_total(cls, data):
+        Estado.objects.update(ativo=False)
 
 
 class Estado(models.Model):
@@ -86,32 +148,57 @@ class Estado(models.Model):
     def __str__(self):
         return '{}'.format(self.sigla)
 
+    @meta('Visualizar')
     def view(self):
-        self.values('nome', ('sigla', 'estado'))
+        return self.values('dados_gerais', 'dados_populacionais')
 
+    @meta('Dados Gerais')
+    def dados_gerais(self):
+        return self.values('nome', ('sigla', 'ativo'))
+
+    @meta('Dados Populacionais')
+    def dados_populacionais(self):
+        return self.values('get_populacao')
+
+    @action('Cadastrar')
     def add(self):
         self.save()
 
+    @meta('Editar')
     def edit(self):
         self.save()
 
+    @meta('Excluir')
     def remove(self):
         self.delete()
 
+    @action('Ativar')
     def ativar(self):
         self.ativo = True
         self.save()
 
+    @action('Ativar')
     def inativar(self):
         self.ativo = False
         self.save()
 
+    @meta('População')
+    def get_populacao(self):
+        return 279876
+
+    @meta('População')
     def get_cidades(self):
         return self.cidade_set
 
+    @action('Alterar Sigpla')
     def alterar_sigla(self, sigla):
         self.sigla = sigla
         self.save()
+
+    @action('Programar Ativação')
+    @param(data=models.DateField('Data da Ativação'))
+    def programar_ativacao(self, data):
+        pass
 
 
 class PresidenteManager(models.DefaultManager):
