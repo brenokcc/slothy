@@ -93,7 +93,7 @@ class EstadoManager(models.DefaultManager):
         ).list_actions(
             'inativar'
         ).list_search(
-            'inativar'
+            'nome', 'sigla'
         ).list_subsets(
             'ativos', 'inativos'
         ).list_per_page(
@@ -188,9 +188,9 @@ class Estado(models.Model):
     def get_populacao(self):
         return 279876
 
-    @meta('População')
+    @meta('Cidades')
     def get_cidades(self):
-        return self.cidade_set
+        return self.cidade_set.all().list_filter('estado')
 
     @meta('Alterar Sigla')
     def alterar_sigla(self, sigla):
@@ -237,6 +237,13 @@ class Governador(models.Model):
 
     def __str__(self):
         return '{} - {}'.format(self.pessoa, self.estado)
+
+
+class CidadeManager(models.DefaultManager):
+
+    @meta('Listar')
+    def list(self):
+        return self.all()
 
 
 class Cidade(models.Model):

@@ -32,11 +32,6 @@ from slothy.api.utils import setup_signals
 
 setup_signals()
 
-def parse_url(url):
-    tokens = url.split('/')
-    model = apps.get_model(tokens[1], tokens[2])
-    print(model)
-
 
 class MainTestCase(TestCase):
 
@@ -92,7 +87,6 @@ class MainTestCase(TestCase):
 
     def test_models(self):
 
-        parse_url('/base/estado/')
         estado = Estado(nome='São Paulo', sigla='SP', ativo=False)
         estado.add()
         estado = Estado(nome='Rio Grande do Norte', sigla='RN')
@@ -127,7 +121,7 @@ class MainTestCase(TestCase):
         payload = json.loads(Estado.objects.list().dumps())
         payload['metadata']['q'] = 'SP'
         payload['metadata']['filters'][0]['value'] = False
-        payload['metadata']['page'] = 1
+        payload['metadata']['page']['number'] = 1
         payload['metadata']['subset'] = 'inativos'
         # print(json.dumps(payload))
         qs = Estado.objects.loads(json.dumps(payload['metadata']))
@@ -166,3 +160,18 @@ class MainTestCase(TestCase):
         data = dict(pontos_turisticos=2)
         self.client.post('/api/base/cidade/1/get_pontos_turisticos/add/', data=data)
         self.client.get('/api/base/cidade/1/get_pontos_turisticos/')
+
+    def test_queryset(self):
+        estado = Estado(nome='Rio Grande do Norte', sigla='RN')
+        estado.add()
+        estado.get_cidades().add(Cidade(nome='Macaíba'))
+        estado.get_cidades().add(Cidade(nome='Natal'))
+        response = self.client.get('/api/base/cidade/')
+        metadata = response.data['output']['data']['metadata']
+        metadata['q'] = 'Maca'
+        response = self.client.post(
+            response.data['output']['data']['path'],
+            data=dict(metadata=json.dumps(metadata))
+        )
+        print(json.loads(response.content))
+

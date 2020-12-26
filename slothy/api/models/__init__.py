@@ -263,15 +263,16 @@ class QuerySet(query.QuerySet):
         self._list_filter = ()
         self._list_subsets = ()
         self._list_actions = ()
-        self._list_per_page = 5
-        self._list_search = None
+        self._list_search = ()
         self._page = 0
+        self._page_size = 5
         self._subset = None
         self._q = None
         self._filters = []
         self._actions = []
         self._subsets = []
         self._display = []
+        self._search = []
         self._deserialized = False
         self._related_manager = None
         self._related_attribute = None
@@ -337,14 +338,12 @@ class QuerySet(query.QuerySet):
             list_actions.extend(self.model.get_metadata('list_actions', ()))
         return list_actions
 
-    def list_per_page(self, list_per_page):
-        self._list_per_page = list_per_page
+    def list_per_page(self, page_size):
+        self._page_size = page_size
         return self
 
-    def get_list_per_page(self, add_default=False):
-        if self._list_per_page is None and add_default:
-            self._list_per_page = self.model.get_metadata('list_per_page')
-        return self._list_per_page or 5
+    def get_page_size(self):
+        return self._page_size
 
     def list_search(self, *search_fields):
         self._list_search = search_fields
@@ -357,9 +356,9 @@ class QuerySet(query.QuerySet):
 
     def __str__(self):
         output = list()
-        for obj in self[0:10]:
+        for obj in self[0:self._page_size]:
             output.append("'{}'".format(obj))
-        if self.count() > 10:
+        if self.count() > self._page_size:
             output.append(' ...')
         return '[{}]'.format(','.join(output))
 
@@ -371,7 +370,7 @@ class QuerySet(query.QuerySet):
         clone._list_filter = self._list_filter
         clone._list_subsets = self._list_subsets
         clone._list_actions = self._list_actions
-        clone._list_per_page = self._list_per_page
+        clone._page_size = self._page_size
         clone._list_search = self._list_search
         clone._page = self._page
         clone._subset = self._subset
@@ -380,6 +379,7 @@ class QuerySet(query.QuerySet):
         clone._actions = self._actions
         clone._subsets = self._subsets
         clone._display = self._display
+        clone._search = self._search
         clone._related_manager = self._related_manager
         clone._related_attribute = self._related_attribute
         return clone
@@ -421,9 +421,6 @@ class QuerySet(query.QuerySet):
             instance.delete()
         else:  # many-to-many
             related_manager.remove(instance)
-
-    def list(self):
-        return super().all()
 
     def count(self, x=None, y=None):
         return QuerySetStatistic(self, x, y=y) if x else super().count()
@@ -485,27 +482,19 @@ class QuerySet(query.QuerySet):
             queryset = queryset | self.filter(**{'{}__icontains'.format(search_field): q})
         return queryset
 
-    @staticmethod
-    def loads(payload):
+    def loads(self, payload):
         payload = json.loads(payload)
-        model = apps.get_model(payload['model'])
-        qs = model.objects.none()
+        qs = self.all()
         qs.query = cpickle.loads(zlib.decompress(base64.b64decode(signing.loads(payload['query']))))
-        qs.list_display(*payload['list_display'])
-        qs.list_filter(*payload['list_filter'])
-        qs.list_subsets(*payload['list_subsets'])
-        qs.list_actions(*payload['list_actions'])
-        qs.list_per_page(payload['list_per_page'])
-        qs.list_search(payload['list_search'])
         qs._q = payload['q']
         qs._filters = payload['filters']
         qs._actions = payload['actions']
         qs._subsets = payload['subsets']
         qs._subset = payload['subset']
         qs._display = payload['display']
-        qs._page = payload['page'] - 1
+        qs._page = payload['page']['number'] - 1
+        qs._page_size = payload['page']['size']
         qs._deserialized = True
-
         return qs
 
     def serialize(self):
@@ -530,23 +519,27 @@ class QuerySet(query.QuerySet):
                 self._display.append(
                     {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'sorted': False, 'formatter': None},
                 )
+            for lookup in self._list_search:
+                self._search.append(
+                    {'name': lookup, 'label': self.model.get_verbose_name(lookup)}
+                )
 
         if self._subset:
             qs = getattr(self, self._subset)()
         else:
-            qs = self.all()
+            qs = self
 
-        if qs._q:
-            qs = qs.search(qs._q)
+        if self._q:
+            qs = qs.search(self._q)
 
-        for _filter in qs._filters:
+        for _filter in self._filters:
             if _filter['value']:
                 qs = qs.filter(**{_filter['name']: _filter['value']})
 
-        for obj in qs[self._page * self._list_per_page:self._page * self._list_per_page + self._list_per_page]:
+        for obj in qs[self._page * self._page_size:self._page * self._page_size + self._page_size]:
             item = []
-            for lookup in self._list_display:
-                value = getattrr(obj, lookup)
+            for display in self._display:
+                value = getattrr(obj, display['name'])
                 if isinstance(value, Model):
                     value = str(value)
                 item.append(value)
@@ -554,24 +547,23 @@ class QuerySet(query.QuerySet):
 
         payload = {
             'type': 'queryset',
+            'path': '/queryset/{}/{}/'.format(
+                getattr(self.model, '_meta').app_label.lower(),
+                self.model.__name__.lower()
+            ),
             'metadata': not self._deserialized and {
-                'model': getattr(self.model, '_meta').label.lower(),
                 'query': signing.dumps(serialized_str),
-
-                'list_display': self._list_display,
-                'list_filter': self._list_filter,
-                'list_subsets': self._list_subsets,
-                'list_actions': self._list_actions,
-                'list_per_page': self._list_per_page,
-                'list_search': self._list_search,
-
-                'q': None,
+                'search': self._search,
                 'filters': self._filters,
                 'actions': self._actions,
                 'subsets': self._subsets,
-                'subset': self._subset,
                 'display': self._display,
-                'page': self._page + 1,
+                'subset': self._subset,
+                'q': None,
+                'page': {
+                    'number': self._page + 1,
+                    'size': self._page_size
+                }
             } or {},
             'data': data,
             'total': self.count()
