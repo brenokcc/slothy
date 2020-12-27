@@ -30,6 +30,7 @@ ValidationError = exceptions.ValidationError
 class ForeignKey(models.ForeignKey):
     def __init__(self, to, **kwargs):
         on_delete = kwargs.pop('on_delete', models.CASCADE)
+        self.filter_display = kwargs.pop('filter_display', ('__str__',))
         super().__init__(to, on_delete, **kwargs)
 
 
@@ -200,13 +201,12 @@ class QuerySetStatistic(object):
         return rows
 
 
-class ValuesDict(UserDict):
+class ValueSet(UserDict):
 
-    def __init__(self, obj, *lookups, verbose_key=True):
+    def __init__(self, obj, *lookups, verbose=True):
         self.obj = obj
-        self.lookups = lookups
-        self.image_lookup = None
-        self.actions_lookups = []
+        self.thumbnail = None
+        self.actions = []
         self.nested_keys = []
         super().__init__()
         _values = []
@@ -215,20 +215,28 @@ class ValuesDict(UserDict):
             if not isinstance(lookup, tuple):
                 lookup = lookup,
             for attr in lookup:
-                verbose_name = obj.get_verbose_name(attr)
-                value = obj.value(attr, serialized=True)
+                if verbose:
+                    verbose_name = obj.get_verbose_name(attr)
+                else:
+                    verbose_name = attr
+
+                value = getattrr(obj, attr)
+                if callable(value):
+                    value = value()
                 value = utils.custom_serialize(value)
                 self[verbose_name] = value
                 keys.append(verbose_name)
             self.nested_keys.append(keys)
 
-    def image(self, lookup):
-        self.image_lookup = lookup
-        self[lookup] = self.get_image()
+    def thumbnail(self, lookup):
+        self.thumbnail = getattr(self.obj, lookup)
         return self
 
-    def actions(self, *lookups):
-        self.actions_lookups = lookups
+    def allow(self, *lookups):
+        for lookup in lookups:
+            self.actions.append(
+                {'name': lookup, 'label': self.obj.get_verbose_name(lookup)}
+            )
         return self
 
     def get_nested_values(self):
@@ -236,21 +244,12 @@ class ValuesDict(UserDict):
         for key_list in self.nested_keys:
             values = []
             for key in key_list:
-                values.append((key, self[key]))
+                values.append({key: self[key]})
             _values.append(values)
         return _values
 
-    def get_actions(self):
-        actions = []
-        for lookup in self.actions_lookups:
-            actions.append(self.obj.get_attr_metadata(lookup))
-        return actions
-
-    def get_image(self):
-        return self.image_lookup and getattr(self.obj, self.image_lookup) or None
-
     def serialize(self):
-        return str(self)
+        return self
 
 
 class QuerySet(query.QuerySet):
@@ -265,7 +264,7 @@ class QuerySet(query.QuerySet):
         self._list_actions = ()
         self._list_search = ()
         self._page = 0
-        self._page_size = 5
+        self._page_size = 10
         self._subset = None
         self._q = None
         self._filters = []
@@ -513,7 +512,7 @@ class QuerySet(query.QuerySet):
                 )
             for lookup in self._list_actions:
                 self._actions.append(
-                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None}
+                    {'name': lookup, 'label': self.model.get_verbose_name(lookup)}
                 )
             for lookup in self.get_list_display():
                 self._display.append(
@@ -540,14 +539,20 @@ class QuerySet(query.QuerySet):
             item = []
             for display in self._display:
                 value = getattrr(obj, display['name'])
-                if isinstance(value, Model):
+                if callable(value):
+                    value = value()
+                elif isinstance(value, Model):
                     value = str(value)
+                elif isinstance(value, datetime.date):
+                    value = value.strftime('%d/%d/%Y')
+                elif isinstance(value, datetime.datetime):
+                    value = value.strftime('%d/%m/%Y %H:%M')
                 item.append(value)
             data.append(item)
 
         payload = {
             'type': 'queryset',
-            'path': '/queryset/{}/{}/'.format(
+            'path': '/util/queryset/{}/{}/'.format(
                 getattr(self.model, '_meta').app_label.lower(),
                 self.model.__name__.lower()
             ),
@@ -674,75 +679,71 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
                 satisfied = not satisfied
         return satisfied
 
-    @classmethod
-    def set_metadata(cls, name, value):
-        setattr(getattr(cls, '_meta'), name, value)
+    def get_fieldsets_metadata(self):
+        cls = type(self)
+        if not hasattr(cls, '_fieldsets_metadata'):
+            default_category = None
+            fieldsets_metadata = []
+            categories_names = []
+            for attr_name in dir(cls):
+                if attr_name[0] != '_':
+                    attr = getattr(cls, attr_name)
+                    if hasattr(attr, '_metadata'):
+                        metadata = getattr(attr, '_metadata')
+                        if metadata['type'] == 'fieldset':
+                            fieldsets_metadata.append(metadata)
+            fieldsets_metadata = sorted(fieldsets_metadata, key=lambda k: k['order'])
+            for metadata in fieldsets_metadata:
+                if metadata['category'] and metadata['category'] not in categories_names:
+                    categories_names.append(metadata['category'])
+                if default_category is None:
+                    default_category = metadata['category']
+            setattr(cls, '_fieldsets_metadata', fieldsets_metadata)
+            setattr(cls, '_default_category', default_category)
+            setattr(cls, '_categories_names', categories_names)
+        return getattr(cls, '_default_category'), getattr(cls, '_categories_names'), getattr(cls, '_fieldsets_metadata')
+
+    def serialize(self):
+        fieldset_names = []
+        default_category, category_names, fieldsets_metadata = self.get_fieldsets_metadata()
+
+        current_category_name = getattrr(self, '_current_category_name', None)
+        if current_category_name is None:
+            current_category_name = default_category
+
+        for metadata in fieldsets_metadata:
+            if metadata['category'] is None:
+                fieldset_names.append(metadata['name'])
+
+        categories = {}
+        for category_name in category_names:
+            category_fieldset_names = []
+            for metadata in fieldsets_metadata:
+                if metadata['category'] == category_name and category_name == current_category_name:
+                    category_fieldset_names.append(metadata['name'])
+            if category_fieldset_names:
+                categories[category_name] = self.values(*category_fieldset_names, verbose=True)
+            else:
+                categories[category_name] = []
+
+        data = dict(
+            fieldsets=self.values(*fieldset_names, verbose=True),
+            categories=categories
+        )
+
+        return {'type': 'valueset', 'title': str(self), 'metadata': {'category': None}, 'data': data}
+
+    def values(self, *lookups, verbose=True):
+        if not lookups:
+            lookups = list(self.get_metadata('list_display')) + ['id']
+        return ValueSet(self, *lookups, verbose=verbose)
 
     @classmethod
     def get_metadata(cls, name, default=None):
         metadata = getattr(cls, '_meta')
-        if name in ('fieldsets', 'list_display') and not hasattr(metadata, name):
-            field_names = [field.name for field in metadata.local_fields]
-            if name == 'list_display':
-                default = field_names
-            else:
-                default = dict(title='Dados Gerais', fields=field_names, relations=[], lookups=[], actions=[], tab_name=None, tab_title=None, image=None),
-        elif name == 'exclude':
-            default = [field.name for field in metadata.get_fields() if hasattr(field, 'exclude') and field.exclude]
-        elif name == 'tabs':
-            if hasattr(metadata, 'fieldsets'):
-                default = [fieldset['tab_name'] for fieldset in metadata.fieldsets if fieldset['tab_name']]
-        elif name in ('list_lookups', 'add_lookups', 'edit_lookups', 'delete_lookups'):
-            default = getattr(metadata, 'lookups', None)
+        if name == 'list_display' and not hasattr(metadata, name):
+            default = [field.name for field in metadata.local_fields]
         return getattr(metadata, name, default)
-
-    @classmethod
-    def get_list_url(cls):
-        return '/api/{}/{}/'.format(
-            cls.get_metadata('app_label'),
-            cls.get_metadata('model_name')
-        )
-
-    @classmethod
-    def get_add_url(cls):
-        return '/api/{}/{}/add/'.format(
-            cls.get_metadata('app_label'),
-            cls.get_metadata('model_name')
-        )
-
-    def get_view_url(self):
-        return '{}{}/'.format(
-            type(self).get_list_url(),
-            self.pk
-        )
-
-    def get_edit_url(self):
-        return '{}edit/'.format(self.get_view_url())
-
-    def get_delete_url(self):
-        return '{}delete/'.format(self.get_view_url())
-
-    def value(self, lookup, serialized=False):
-        value = getattrr(self, lookup)
-        if serialized:
-            value = utils.custom_serialize(value)
-        if callable(value):
-            value = value()
-        return value
-
-    def enable_nested_values(self):
-        setattr(self, '_nestvalue', True)
-
-    def disable_nested_values(self):
-        delattr(self, '_nestvalue')
-
-    def values(self, *lookups, verbose_key=False):
-        if not lookups:
-            lookups = list(self.get_metadata('list_display')) + ['id']
-        return ValuesDict(self, *lookups, verbose_key=verbose_key)
-
-    def serialize(self):
-        return str(self)
 
     @classmethod
     def get_field(cls, lookup):
@@ -758,21 +759,11 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
                 field = getattr(model, '_meta').get_field(attr_name)
         return field
 
-    def get_one_to_one_field_names(self):
-        return (field.name for field in type(self).get_metadata('fields') if field.one_to_one)
-
-    def get_many_to_many_field_names(self):
-        return (field.name for field in type(self).get_metadata('many_to_many'))
-
-    def get_one_to_many_field_names(self):
-        return (field.name for field in type(self).get_metadata('get_fields')() if type(field).__name__ == 'OneToManyField')
-
-    def get_one_to_many_relation_names(self):
-        return (rel.get_accessor_name() for rel in type(self).get_metadata('related_objects'))
-
     @classmethod
     def get_verbose_name(cls, lookup):
         model = cls
+        if lookup == '__str__':
+            return getattr(model, '_meta').verbose_name
         attrs = lookup.split('__')
         while attrs:
             attr_name = attrs.pop(0)
@@ -780,35 +771,19 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
                 field = getattr(model, '_meta').get_field(attr_name)
                 model = field.related_model
             else:  # last
-                try:  # field
-                    field = getattr(model, '_meta').get_field(attr_name)
-                    if hasattr(field, 'verbose_name'):
-                        return field.verbose_name
-                    else:
-                        return getattr(field.related_model, '_meta').verbose_name
-                except FieldDoesNotExist:  # mehod
-                    attr = getattr(model, attr_name)
-                    return getattr(attr, '_metadata', {}).get('verbose_name')
-
-    @classmethod
-    def get_attr_metadata(cls, attr_name):
-        if not hasattr(cls, '_attr_metadata'):
-            chache = {}
-            for _cls in (cls, getattr(cls.objects, '_queryset_class')):
-                for name in dir(_cls):
-                    if name and not name.startswith('_'):
-                        attr = getattr(_cls, name)
-                        if hasattr(attr, '_metadata'):
-                            metadata = getattr(attr, '_metadata')
-                            if metadata['type'] == 'action':
-                                if metadata['scope'] != 'class':
-                                    if cls is _cls:
-                                        metadata['scope'] = 'instance'
-                                    else:
-                                        metadata['scope'] = 'manager'
-                            chache[name] = metadata
-            setattr(cls, '_attr_metadata', chache)
-        return getattr(cls, '_attr_metadata').get(attr_name)
+                attr = getattr(model, attr_name)
+                if hasattr(attr, '_meta'):  # method
+                    return getattr(attr, '_meta').verbose_name
+                else:
+                    try:
+                        field = getattr(model, '_meta').get_field(attr_name)
+                        if hasattr(field, 'verbose_name'):
+                            return field.verbose_name
+                        else:
+                            return getattr(field.related_model, '_meta').verbose_name
+                    except FieldDoesNotExist:  # mehod
+                        attr = getattr(model, attr_name)
+                        return getattr(attr, '_metadata', {}).get('verbose_name')
 
     @classmethod
     def check_lookups(cls, user, lookups, groups_only=True):

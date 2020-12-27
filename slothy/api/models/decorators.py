@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 
+order = 0
+
 
 def user(username_field_name):
     def decorate(cls):
@@ -19,7 +21,29 @@ def role(field='id'):
     return decorate
 
 
-def meta(verbose_name, condition=None, formatter=None, lookups=(), list_lookups=(), add_lookups=(), remove_lookups=(), category=None, icon=None, modal=True):
+def fieldset(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None):
+    def decorate(func):
+        global order
+        order += 1
+        metadata = getattr(func, '_metadata', {})
+        metadata.update(
+            name=func.__name__,
+            type='fieldset',
+            verbose_name=verbose_name,
+            condition=condition,
+            category=category,
+            icon=icon,
+            formatter=formatter,
+            lookups=lookups,
+            order=order
+        )
+        setattr(func, '_metadata', metadata)
+        return func
+
+    return decorate
+
+
+def meta(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None):
     def decorate(func):
         metadata = getattr(func, '_metadata', {})
         params = func.__code__.co_varnames[1:func.__code__.co_argcount]
@@ -31,12 +55,8 @@ def meta(verbose_name, condition=None, formatter=None, lookups=(), list_lookups=
             condition=condition,
             category=category,
             icon=icon,
-            modal=modal,
             formatter=formatter,
-            lookups=lookups,
-            add_lookups=add_lookups,
-            list_lookups=list_lookups,
-            remove_lookups=remove_lookups
+            lookups=lookups
         )
         setattr(func, '_metadata', metadata)
         return func

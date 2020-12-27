@@ -167,10 +167,10 @@ class MainTestCase(TestCase):
         estado.get_cidades().add(Cidade(nome='Macaíba'))
         estado.get_cidades().add(Cidade(nome='Natal'))
         response = self.client.get('/api/base/cidade/')
-        metadata = response.data['output']['data']['metadata']
+        metadata = response.data['output']['metadata']
         metadata['q'] = 'Maca'
         response = self.client.post(
-            response.data['output']['data']['path'],
+            response.data['output']['path'],
             data=dict(metadata=json.dumps(metadata))
         )
         print(json.loads(response.content))

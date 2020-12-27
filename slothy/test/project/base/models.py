@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
+import datetime
 from slothy.api import models
-from slothy.api.models.decorators import param, meta, role, user
+from slothy.api.models.decorators import param, meta, role, user, fieldset
 
 
 @user('email')
@@ -243,12 +244,12 @@ class CidadeManager(models.DefaultManager):
 
     @meta('Listar')
     def list(self):
-        return self.all()
+        return self.all().list_filter('estado')
 
 
 class Cidade(models.Model):
     nome = models.CharField(verbose_name='Nome', max_length=255)
-    estado = models.ForeignKey(Estado, verbose_name='Estado', on_delete=models.CASCADE)
+    estado = models.ForeignKey(Estado, verbose_name='Estado', on_delete=models.CASCADE, filter_display=('nome', 'sigla'))
     prefeito = models.RoleForeignKey(Pessoa, verbose_name='Prefeito', null=True, blank=True)
     vereadores = models.RoleManyToManyField(Pessoa, verbose_name='Vereadores', blank=True, related_name='cidades_legisladas')
     pontos_turisticos = models.ManyToManyField(PontoTuristico, verbose_name='Pontos Turísticos', blank=True)
@@ -264,6 +265,42 @@ class Cidade(models.Model):
     def add(self):
         self.save()
 
-    @meta('Pontos Turísticos')
+    @meta('Editar')
+    def edit(self):
+        self.save()
+
+    @meta('Visualizar')
+    def view(self):
+        return self.serialize()
+
+    @fieldset('Dados Gerais')
+    def dados_gerais(self):
+        return self.values('nome', ('estado', 'get_qtd_pontos_turisticos')).allow('edit')
+
+    @fieldset('Prefeito', category='Administração')
+    def get_prefeito(self):
+        return self.values('prefeito__nome', 'prefeito__email').allow('set_prefeito')
+
+    @fieldset('Vereadores', category='Administração')
+    def get_vereadores(self):
+        return self.vereadores
+
+    @fieldset('Quantidade de Pontos Turísticos', category='Turismo')
+    def get_qtd_pontos_turisticos(self):
+        return self.pontos_turisticos.count()
+
+    @fieldset('Pontos Turísticos', category='Turismo')
     def get_pontos_turisticos(self):
         return self.pontos_turisticos
+
+    @fieldset('Estatística Populacional', category='Estatística')
+    def get_estatisticas(self):
+        return {
+            'Polulação Infantil': 288989,
+            'População Adulta': 9389332
+        }
+
+    @meta('Definir Prefeito')
+    def set_prefeito(self, prefeito):
+        self.prefeito = prefeito
+        self.save()

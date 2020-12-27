@@ -10,7 +10,6 @@ from django.contrib.auth import login, logout, authenticate
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from django.forms import ModelForm
 from slothy.api.models import ValidationError
-from django.views import View
 
 
 class InputValidationError(BaseException):
@@ -26,14 +25,24 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
 
 
 class QuerysetView(APIView):
-    def post(self, request, app_label, model_name):
+    def post(self, request, app_label, model_name, filter_name=None):
         model = apps.get_model(app_label, model_name)
         body = request.body
         s = request.POST and request.POST['metadata'] or body
         qs = model.objects.loads(s)
-        return Response(qs.serialize())
+        if filter_name:
+            field = qs.model.get_field(filter_name)
+            list_display = ['id']
+            for filter_display in field.filter_display:
+                list_display.append(filter_display)
+            qs = field.related_model.objects.filter(
+                pk__in=qs.values_list(filter_name).distinct()
+            ).list_display(*list_display)
 
-    def get(self, request, app_label, model_name):
+            return Response(qs.serialize())
+        return Response(qs.serialize()['data'])
+
+    def get(self, request, app_label, model_name, filter_name=None):
         return Response({})
 
 
@@ -64,7 +73,7 @@ class Api(APIView):
 
     def do(self, request, path):
         print('# {}'.format(path))
-        response = dict(path=path, message=None, exception=None, errors=[], input=dict(data={}, metadata={}), output=dict(data={}, metadata={}))
+        response = dict(path=path, message=None, exception=None, errors=[], input=dict(data={}, metadata={}), output=None)
         try:
             if path.endswith('/'):
                 path = path[0:-1]
@@ -105,7 +114,11 @@ class Api(APIView):
                         else:
                             instance = model.objects.get(pk=tokens[2])
                             if len(tokens) == 3:  # view object
-                                func = instance.view
+                                setattr(instance, '_current_category_name', request.GET.get('category'))
+
+                                def func():
+                                    return instance
+                                setattr(func, '_metadata', getattr(instance.view, '_metadata'))
                             else:
                                 if len(tokens) == 4:  # object subset, meta or action
                                     func = getattr(instance, tokens[3])  # object meta or action
@@ -134,7 +147,7 @@ class Api(APIView):
 
                     output, metadata = self.apply(model, func, meta_func or func, instance, request.POST or request.GET)
                     if output is not None:
-                        response['output']['data'] = output.serialize()
+                        response['output'] = output.serialize()
                     response['input']['metadata'] = metadata
                     for item in metadata:
                         response['input']['data'][item['name']] = None
@@ -145,11 +158,10 @@ class Api(APIView):
         except BaseException as e:
             traceback.print_exc(file=sys.stdout)
             response.update(exception=str(e))
-        try:
-            print(json.dumps(response, indent=2, sort_keys=False, ensure_ascii=False))
-        except BaseException:
-            print(response)
-            import pdb; pdb.set_trace()
+        # try:
+        #     print(json.dumps(response, indent=2, sort_keys=False, ensure_ascii=False))
+        # except BaseException:
+        #     print(response)
         response = Response(response)
         response["Access-Control-Allow-Origin"] = "*"
         return response
@@ -157,7 +169,7 @@ class Api(APIView):
     def apply(self, _model, func, meta_func, instance, data):
         metadata = getattr(meta_func, '_metadata')
         custom_fields = metadata.get('fields', {})
-        print(metadata)
+        # print(metadata)
         if 'params' in metadata:
             if metadata['params']:
                 # we are adding or editing an object and all params are custom fields
@@ -224,7 +236,6 @@ class Api(APIView):
 
         else:
             try:
-                pdb.set_trace()
                 return func(), {}
             except ValidationError as e:
                 raise InputValidationError({None: e.message})

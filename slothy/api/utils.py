@@ -115,17 +115,17 @@ def pre_delete(instance):
 
 
 def custom_serialize(obj):
-    from slothy.api.models import QuerySet, ValuesDict
+    from slothy.api.models import QuerySet, ValueSet, Model
     if isinstance(obj, datetime.datetime):
         return obj.strftime('%d/%m/%Y %H:%M')
     elif isinstance(obj, datetime.date):
         return obj.strftime('%d/%m/%Y')
     elif isinstance(obj, QuerySet):
-        return list(obj.values())
-    elif isinstance(obj, ValuesDict):
-        return dict(obj)
-    if hasattr(obj, 'pk'):
-        return obj.values()
+        return obj.serialize()
+    elif isinstance(obj, ValueSet):
+        return dict(fields=obj.get_nested_values(), actions=obj.actions)
+    elif isinstance(obj, Model):
+        return str(obj)
     return obj
 
 
