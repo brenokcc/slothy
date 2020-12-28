@@ -1,9 +1,7 @@
-import types
 import datetime
 import collections
 from django.conf import settings
 from django.db.models import signals
-from django.core.exceptions import ValidationError
 from django.apps import apps
 
 FOREIGNKEY_GROUP_FIELDS = collections.defaultdict(list)
@@ -129,12 +127,6 @@ def custom_serialize(obj):
     return obj
 
 
-def igetattr(obj, attr):
-    for a in dir(obj):
-        if a.lower() == attr.lower():
-            return getattr(obj, a)
-
-
 def getattrr(obj, args, request=None):
     if args == '__str__':
         splitargs = [args]
@@ -167,45 +159,3 @@ def _getattr_rec(obj, attrs, request=None):
             value = attr
         return _getattr_rec(value, attrs, request=request) if attrs else value
     return None
-
-
-def apply(model, func, data, user, relation_name=None):
-    parameters = [varname for varname in func.__code__.co_varnames if varname not in ('self', 'args', 'kwargs')]
-    requires_parameter = parameters or func.__name__ in ('add', 'edit')
-    metadata = []
-    if 'instance' not in data:  # not (add or remove)
-        for name in parameters:
-            # get field from function params (@param decorator) or from the model
-            field = getattr(func, '_metadata', {}).get('fields', {}).get(name) or model.get_field(name)
-            if field:
-                try:
-                    form_field = data[name] = field.formfield()
-                    if form_field:
-                        if name in data:
-                            data[name] = form_field.clean(data[name])
-                        metadata.append(
-                            dict(name=name, type=type(form_field).__name__, required=form_field.required,
-                                 verbose_name=form_field.label)
-                        )
-                except ValidationError as e:
-                    raise ValidationError({name: e.message})
-            else:
-                raise BaseException('Type of "{}" is unknown')
-    if data or not requires_parameter:
-        return custom_serialize(func(**data)), metadata
-    else:
-        return [], metadata
-
-
-class ObjectWrapper(object):
-    def __init__(self, obj, functions=[]):
-        self.obj = obj
-        self.functions = {f.__name__: f for f in functions}
-
-    def __getattr__(self, attr):
-        if attr in self.__dict__:
-            return self.__dict__[attr]
-        elif attr in self.__dict__['functions']:
-            return types.MethodType(self.__dict__['functions'][attr], self.__dict__['obj'])
-        else:
-            return getattr(self.obj, attr)

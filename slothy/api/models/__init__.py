@@ -4,10 +4,11 @@ import json
 from django.contrib.auth import base_user
 from django.db.models import query, base, manager, Sum, Count, Avg
 from django.db import models
-from django.db.models.fields import related
 from django.db.models.fields import *
 from django.db.models.fields.files import *
 from django.db.models.fields.related import *
+
+from slothy.api.models.decorators import fieldset
 from slothy.api.utils import getattrr
 from slothy.api import utils
 import zlib
@@ -726,6 +727,8 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             else:
                 categories[category_name] = []
 
+        if not fieldset_names:
+            fieldset_names.append('default_fieldset')
         data = dict(
             fieldsets=self.values(*fieldset_names, verbose=True),
             categories=categories
@@ -735,8 +738,13 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
 
     def values(self, *lookups, verbose=True):
         if not lookups:
-            lookups = list(self.get_metadata('list_display')) + ['id']
+            return self.serialize()
         return ValueSet(self, *lookups, verbose=verbose)
+
+    @fieldset('Dados Gerais')
+    def default_fieldset(self):
+        lookups = self.get_metadata('list_display')
+        return self.values(*lookups)
 
     @classmethod
     def get_metadata(cls, name, default=None):

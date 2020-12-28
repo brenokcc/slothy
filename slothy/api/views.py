@@ -1,9 +1,7 @@
-import json
 import sys
-import pdb
+import json
 import traceback
 from django.apps import apps
-from django.http import HttpResponse
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
@@ -53,13 +51,22 @@ class Api(APIView):
         return self.do(request, path, {}, {})
 
     def get(self, request, path):
+        body = request.body
+        if body and body[0] == 123:
+            data = json.loads(body)
+        else:
+            data = {}
         # data = {}
         # for key in request.GET:
         #     data[key] = request.GET[key]
-        return self.do(request, path)
+        return self.do(request, path, data)
 
     def post(self, request, path):
-        # body = request.body
+        body = request.body
+        if body and body[0] == 123:
+            data = json.loads(body)
+        else:
+            data = {}
         # data = {}
         # if request.POST:  # browser
         #     for key in request.POST:
@@ -69,9 +76,9 @@ class Api(APIView):
         #             data[key] = request.FILES[key]
         # else:  # nodejs
         #     data = json.loads(body or '{}')
-        return self.do(request, path)
+        return self.do(request, path, data)
 
-    def do(self, request, path):
+    def do(self, request, path, data):
         print('# {}'.format(path))
         response = dict(path=path, message=None, exception=None, errors=[], input=dict(data={}, metadata={}), output=None)
         try:
@@ -115,10 +122,7 @@ class Api(APIView):
                             instance = model.objects.get(pk=tokens[2])
                             if len(tokens) == 3:  # view object
                                 setattr(instance, '_current_category_name', request.GET.get('category'))
-
-                                def func():
-                                    return instance
-                                setattr(func, '_metadata', getattr(instance.view, '_metadata'))
+                                func = instance.view
                             else:
                                 if len(tokens) == 4:  # object subset, meta or action
                                     func = getattr(instance, tokens[3])  # object meta or action
@@ -145,9 +149,12 @@ class Api(APIView):
                         func = model.objects.list
                         meta_func = getattr(model.objects, '_queryset_class').list
 
-                    output, metadata = self.apply(model, func, meta_func or func, instance, request.POST or request.GET)
+                    output, metadata = self.apply(model, func, meta_func or func, instance, request.POST or request.GET or data)
                     if output is not None:
-                        response['output'] = output.serialize()
+                        if isinstance(output, dict):
+                            response['output'] = output
+                        else:
+                            response['output'] = output.serialize()
                     response['input']['metadata'] = metadata
                     for item in metadata:
                         response['input']['data'][item['name']] = None

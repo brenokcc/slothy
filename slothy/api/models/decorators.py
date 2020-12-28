@@ -43,14 +43,35 @@ def fieldset(verbose_name, condition=None, formatter=None, lookups=(), category=
     return decorate
 
 
-def meta(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None):
+def attr(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None):
     def decorate(func):
         metadata = getattr(func, '_metadata', {})
         params = func.__code__.co_varnames[1:func.__code__.co_argcount]
         metadata.update(
             name=func.__name__,
             params=params,
-            type='meta',
+            type='attr',
+            verbose_name=verbose_name,
+            condition=condition,
+            category=category,
+            icon=icon,
+            formatter=formatter,
+            lookups=lookups
+        )
+        setattr(func, '_metadata', metadata)
+        return func
+
+    return decorate
+
+
+def action(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None):
+    def decorate(func):
+        metadata = getattr(func, '_metadata', {})
+        params = func.__code__.co_varnames[1:func.__code__.co_argcount]
+        metadata.update(
+            name=func.__name__,
+            params=params,
+            type='action',
             verbose_name=verbose_name,
             condition=condition,
             category=category,

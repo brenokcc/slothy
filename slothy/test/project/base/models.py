@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
 from slothy.api import models
-from slothy.api.models.decorators import param, meta, role, user, fieldset
+from slothy.api.models.decorators import param, attr, action, role, user, fieldset
 
 
 @user('email')
@@ -19,14 +19,29 @@ class Pessoa(models.AbstractUser):
     def __str__(self):
         return self.nome
 
-    def delete(self):
-        super().delete()
+    @action('Cadastrar')
+    def add(self):
+        self.save()
 
+    @action('Editar')
+    def edit(self):
+        self.save()
+
+    @action('Excluir')
+    def remove(self):
+        self.delete()
+
+    @action('Visualizar')
+    def view(self):
+        return self.values()
+
+    @action('Atualizar Nome')
     @param(data_atualizacao=models.DateField())
     def atualizar_nome(self, nome):
         self.nome = nome
         self.save()
 
+    @action('Alterar Senha')
     @param(raw_password=models.CharField('Senha'))
     def change_password(self, raw_password):
         super().change_password(raw_password)
@@ -34,21 +49,21 @@ class Pessoa(models.AbstractUser):
 
 class PontoTuristicoManager(models.DefaultManager):
 
-    @meta('Todos')
+    @action('Todos')
     def list(self):
         return self.all()
 
-    @meta('Referenciados')
+    @attr('Referenciados')
     def referenciados(self):
         return self.filter(cidade__isnull=False)
 
-    @meta('Referenciados')
+    @attr('Referenciados')
     @param(sigla=models.CharField())
     def referenciados_no_estado(self, sigla):
         return self.filter(cidade__estado__sigla=sigla)
 
     @classmethod
-    @meta('Remover Tudo')
+    @action('Remover Tudo')
     def remover_tudo(cls):
         PontoTuristico.objects.all().delete()
 
@@ -63,28 +78,28 @@ class PontoTuristico(models.Model):
     def __str__(self):
         return '{}'.format(self.nome)
 
-    @meta('Cadastrar')
+    @action('Cadastrar')
     def add(self):
         self.save()
 
-    @meta('Editar')
+    @action('Editar')
     def edit(self):
         if self.pk:
             raise models.ValidationError('Período de edição ainda não está aberto')
         self.save()
 
-    @meta('Visualizar')
+    @action('Visualizar')
     def view(self):
-        return self.values('nome')
+        return self.values()
 
-    @meta('Remover')
+    @action('Remover')
     def remove(self):
         self.delete()
 
 
 class EstadoManager(models.DefaultManager):
 
-    @meta('Todos')
+    @action('Todos')
     def list(self):
         return self.all(
         ).list_display(
@@ -101,39 +116,39 @@ class EstadoManager(models.DefaultManager):
             10
         )
 
-    @meta('Ativos')
+    @attr('Ativos')
     def ativos(self):
         return self.filter(ativo=True)
 
-    @meta('Inativos')
+    @attr('Inativos')
     def inativos(self):
         return self.filter(ativo=False)
 
-    @meta('Ativar')
+    @action('Ativar')
     def ativar(self):
         self.update(ativo=True)
 
-    @meta('Agendar Inativacao')
+    @action('Agendar Inativacao')
     @param(data=models.DateField('Data'))
     def agendar_inativacao(self, data):
         self.update(ativo=False)
 
-    @meta('Atualizar Status')
+    @action('Atualizar Status')
     def atualizar_status(self, ativo):
         self.update(ativo=ativo)
 
-    @meta('Agendar Atualização de Status')
+    @action('Agendar Atualização de Status')
     @param(data=models.DateField('Data'))
     def agendar_atualizacao_status(self, ativo, data):
         self.update(ativo=ativo)
 
     @classmethod
-    @meta('Inativar Todos')
+    @action('Inativar Todos')
     def inativar_todos(cls):
         Estado.objects.update(ativo=False)
 
     @classmethod
-    @meta('Agendar Inativação Total')
+    @attr('Agendar Inativação Total')
     @param(data=models.DateField('Data'))
     def agendar_inativacao_total(cls, data):
         Estado.objects.update(ativo=False)
@@ -151,61 +166,61 @@ class Estado(models.Model):
     def __str__(self):
         return self.sigla
 
-    @meta('Visualizar')
-    def view(self):
-        return self.values('dados_gerais', 'dados_populacionais')
-
-    @meta('Dados Gerais')
-    def dados_gerais(self):
-        return self.values('nome', ('sigla', 'ativo'))
-
-    @meta('Dados Populacionais')
-    def dados_populacionais(self):
-        return self.values('get_populacao')
-
-    @meta('Cadastrar')
+    @action('Cadastrar')
     def add(self):
         self.save()
 
-    @meta('Editar')
+    @action('Editar')
     def edit(self):
         self.save()
 
-    @meta('Excluir')
+    @action('Excluir')
     def remove(self):
         self.delete()
 
-    @meta('Ativar')
+    @action('Visualizar')
+    def view(self):
+        return self.values()
+
+    @fieldset('Dados Gerais')
+    def dados_gerais(self):
+        return self.values('nome', ('sigla', 'ativo'))
+
+    @fieldset('Dados Populacionais')
+    def dados_populacionais(self):
+        return self.values('get_populacao')
+
+    @fieldset('Cidades')
+    def get_cidades(self):
+        return self.cidade_set.all().list_filter('estado')
+
+    @action('Ativar')
     def ativar(self):
         self.ativo = True
         self.save()
 
-    @meta('Ativar')
+    @action('Ativar')
     def inativar(self):
         self.ativo = False
         self.save()
 
-    @meta('População')
+    @attr('População')
     def get_populacao(self):
         return 279876
 
-    @meta('Cidades')
-    def get_cidades(self):
-        return self.cidade_set.all().list_filter('estado')
-
-    @meta('Alterar Sigla')
+    @action('Alterar Sigla')
     def alterar_sigla(self, sigla):
         self.sigla = sigla
         self.save()
 
-    @meta('Programar Ativação')
+    @action('Programar Ativação')
     @param(data=models.DateField('Data da Ativação'))
     def programar_ativacao(self, data):
         pass
 
 
 class PresidenteManager(models.DefaultManager):
-    @meta('Presidentes')
+    @action('Presidentes')
     def list(self):
         return self.all()
 
@@ -222,7 +237,7 @@ class Presidente(Pessoa):
 
 
 class GovernadorManager(models.DefaultManager):
-    @meta('Listar')
+    @action('Listar')
     def list(self):
         return self.all()
 
@@ -242,9 +257,9 @@ class Governador(models.Model):
 
 class CidadeManager(models.DefaultManager):
 
-    @meta('Listar')
+    @action('Listar')
     def list(self):
-        return self.all().list_filter('estado')
+        return self.all().list_filter('estado').list_display('id', 'get_dados_gerais')
 
 
 class Cidade(models.Model):
@@ -261,20 +276,20 @@ class Cidade(models.Model):
     def __str__(self):
         return '{}/{}'.format(self.nome, self.estado)
 
-    @meta('Adicionar')
+    @action('Adicionar')
     def add(self):
         self.save()
 
-    @meta('Editar')
+    @action('Editar')
     def edit(self):
         self.save()
 
-    @meta('Visualizar')
+    @action('Visualizar')
     def view(self):
-        return self.serialize()
+        return self.values()
 
     @fieldset('Dados Gerais')
-    def dados_gerais(self):
+    def get_dados_gerais(self):
         return self.values('nome', ('estado', 'get_qtd_pontos_turisticos')).allow('edit')
 
     @fieldset('Prefeito', category='Administração')
@@ -300,7 +315,7 @@ class Cidade(models.Model):
             'População Adulta': 9389332
         }
 
-    @meta('Definir Prefeito')
+    @action('Definir Prefeito')
     def set_prefeito(self, prefeito):
         self.prefeito = prefeito
         self.save()
