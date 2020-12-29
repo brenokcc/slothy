@@ -84,9 +84,11 @@ class PontoTuristico(models.Model):
 
     @action('Editar')
     def edit(self):
-        if self.pk:
-            raise models.ValidationError('Período de edição ainda não está aberto')
         self.save()
+
+    @action('Atualizar Nome')
+    def atualizar_nome(self, nome):
+        raise models.ValidationError('Período de edição ainda não está aberto')
 
     @action('Visualizar')
     def view(self):

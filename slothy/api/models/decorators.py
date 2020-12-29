@@ -64,12 +64,21 @@ def attr(verbose_name, condition=None, formatter=None, lookups=(), category=None
     return decorate
 
 
-def action(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None):
+def action(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None, message=None):
     def decorate(func):
+        name = func.__name__
         metadata = getattr(func, '_metadata', {})
         params = func.__code__.co_varnames[1:func.__code__.co_argcount]
+        if name == 'add':
+            default_message = 'Cadastro realizado com sucesso'
+        elif name == 'edit':
+            default_message = 'Edição realizada com sucesso'
+        elif name == 'remove':
+            default_message = 'Exclusão realizada com sucesso'
+        else:
+            default_message = None
         metadata.update(
-            name=func.__name__,
+            name=name,
             params=params,
             type='action',
             verbose_name=verbose_name,
@@ -77,7 +86,8 @@ def action(verbose_name, condition=None, formatter=None, lookups=(), category=No
             category=category,
             icon=icon,
             formatter=formatter,
-            lookups=lookups
+            lookups=lookups,
+            message=message or default_message
         )
         setattr(func, '_metadata', metadata)
         return func

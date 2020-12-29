@@ -80,7 +80,8 @@ class Api(APIView):
 
     def do(self, request, path, data):
         print('# {}'.format(path))
-        response = dict(path=path, message=None, exception=None, errors=[], input=dict(data={}, metadata={}), output=None)
+        data = request.POST or request.GET or data
+        response = dict(path='/{}'.format(path), message=None, exception=None, errors=[], input=dict(data={}, metadata={}), output=None)
         try:
             if path.endswith('/'):
                 path = path[0:-1]
@@ -108,6 +109,7 @@ class Api(APIView):
                     meta_func = None
                     instance = None
                     model = apps.get_model(tokens[0], tokens[1])
+                    exclude_field = None
                     if len(tokens) > 2:
                         if tokens[2] == 'add':  # add object
                             instance = model()
@@ -127,29 +129,47 @@ class Api(APIView):
                                 if len(tokens) == 4:  # object subset, meta or action
                                     func = getattr(instance, tokens[3])  # object meta or action
                                 else:  # object relation (add or remove)
-                                    qs = getattr(instance, tokens[3])().none()
-                                    if tokens[4] == 'add':
+                                    qs = getattr(instance, tokens[3])()
+                                    if tokens[4] in ('add', 'remove'):
                                         field = getattr(getattr(qs, '_related_manager'), 'field', None)
                                         if field:  # one-to-many
-                                            value = getattr(qs, '_hints')['instance']
-                                            model = qs.model
-                                            instance = model()
-                                            setattr(instance, field.name, value)
-                                            func = instance.add
+                                            if tokens[4] == 'add':  # add
+                                                value = getattr(qs, '_hints')['instance']
+                                                model = qs.model
+                                                instance = model()
+                                                setattr(instance, field.name, value)
+                                                func = instance.add
+                                                exclude_field = field.name
+                                            else:  # remove
+                                                name = qs.model.__name__.lower()
+                                                def func():  # add or remove
+                                                    obj = qs.get(pk=data[name])
+                                                    qs.remove(obj)
+                                                metadata = dict(
+                                                    name='_',
+                                                    message='Ação realizada com sucesso'
+                                                )
+                                                setattr(func, '_metadata', metadata)
+                                                response['input']['data'] = {name: None}
                                         else:  # many-to-many
-                                            def add(**kwargs):
+                                            def func(**kwargs):  # add or remove
                                                 for obj in kwargs[related_attribute]:
-                                                    qs.add(obj)
+                                                    getattr(qs, tokens[4])(obj)
                                             related_attribute = getattr(qs, '_related_attribute')
-                                            setattr(add, '_metadata', dict(name='add_m2m', params=(related_attribute,)))
-                                            func = add
+                                            metadata = dict(
+                                                name='_',
+                                                params=(related_attribute,),
+                                                message='Ação realizada com sucesso'
+                                            )
+                                            setattr(func, '_metadata', metadata)
+                                            response['input']['data'] = {related_attribute: None}
                                     else:
                                         func = None
                     else:
                         func = model.objects.list
                         meta_func = getattr(model.objects, '_queryset_class').list
 
-                    output, metadata = self.apply(model, func, meta_func or func, instance, request.POST or request.GET or data)
+                    output, metadata = self.apply(model, func, meta_func or func, instance, data, exclude_field)
                     if output is not None:
                         if isinstance(output, dict):
                             response['output'] = output
@@ -158,6 +178,7 @@ class Api(APIView):
                     response['input']['metadata'] = metadata
                     for item in metadata:
                         response['input']['data'][item['name']] = None
+                    response['message'] = getattr(meta_func or func, '_metadata', {}).get('message')
 
         except InputValidationError as e:
             response['errors'] = e.errors
@@ -173,7 +194,7 @@ class Api(APIView):
         response["Access-Control-Allow-Origin"] = "*"
         return response
 
-    def apply(self, _model, func, meta_func, instance, data):
+    def apply(self, _model, func, meta_func, instance, data, exclude_field):
         metadata = getattr(meta_func, '_metadata')
         custom_fields = metadata.get('fields', {})
         # print(metadata)
@@ -200,7 +221,7 @@ class Api(APIView):
                         try:
                             return func(), {}
                         except ValidationError as e:
-                            raise InputValidationError({None: e.message}, {})
+                            raise InputValidationError([{'message': e.message, 'field': None}], {})
 
             class Form(ModelForm):
 
@@ -213,6 +234,8 @@ class Api(APIView):
                     super().__init__(*args, **kwargs)
                     for name, field in custom_fields.items():
                         self.fields[name] = field.formfield()
+                    if exclude_field and exclude_field in self.fields:
+                        del(self.fields[exclude_field])
 
                 def get_field_metadata(self):
                     items = []
@@ -232,11 +255,11 @@ class Api(APIView):
                 try:
                     return func(**params), form.get_field_metadata()
                 except ValidationError as e:
-                    raise InputValidationError({None: e.message}, form.get_field_metadata())
+                    raise InputValidationError([{'message': e.message, 'field': None}], form.get_field_metadata())
             elif form.errors:
-                errors = {}
+                errors = []
                 for field_name, messages in form.errors.items():
-                    errors[field_name] = ','.join(messages)
+                    errors.append({'message': ','.join(messages), 'field': field_name})
                 raise InputValidationError(errors, form.get_field_metadata())
             else:
                 return None, form.get_field_metadata()
@@ -245,4 +268,4 @@ class Api(APIView):
             try:
                 return func(), {}
             except ValidationError as e:
-                raise InputValidationError({None: e.message})
+                raise InputValidationError([{'message': e.message, 'field': None}], {})

@@ -22,15 +22,19 @@ from slothy.api.utils import setup_signals
 # /base/estado/<id>/altualizar_sigla/
 # /base/estado/<id>/get_cidades/
 # /base/estado/<id>/get_cidades/add/
-# /base/estado/<id>/get_cidades/remove/1/
+# /base/estado/<id>/get_cidades/remove/
 # /base/estado/<id>/get_pontos_turisticos/add/
-# /base/estado/<id>/get_pontos_turisticos/remove/1/
+# /base/estado/<id>/get_pontos_turisticos/remove/
 
 # curl -H "Content-Type: application/json" -X POST http://localhost:8000/api/login/ -d '{"username": "brenokcc@yahoo.com.br", "password": "senha"}'
 # curl -H "Content-Type: application/json" -H "Authorization: Token 3853ded71e2cb8299a1e1c7e45c4722a787a45e9" -X GET http://localhost:8000/api/base/estado/
 
 
 setup_signals()
+
+
+def log(response):
+    print(json.dumps(response, indent=2, sort_keys=False, ensure_ascii=False))
 
 
 class MainTestCase(TestCase):
@@ -129,37 +133,78 @@ class MainTestCase(TestCase):
 
         self.assertTrue(1)
 
+    def get(self, url, data=None):
+        response = self.client.get(url, data=data)
+        return json.loads(response.content)
+
+    def post(self, url, data=None):
+        response = self.client.post(url, data=data)
+        return json.loads(response.content)
+
     def test_api(self):
         data = dict(nome='Parque do Povo')
-        self.client.post('/api/base/pontoturistico/add/', data=data)
-        self.client.get('/api/base/pontoturistico/')
-        self.client.get('/api/base/pontoturistico/1/')
+        # add
+        r = self.post('/api/base/pontoturistico/add/', data=data)
+        self.assertEqual(r['message'], 'Cadastro realizado com sucesso')
+        self.assertEqual(PontoTuristico.objects.count(), 1)
+        # list
+        r = self.get('/api/base/pontoturistico/')
+        self.assertEqual(len(r['output']['data']), 1)
+        # view
+        r = self.get('/api/base/pontoturistico/1/')
+        self.assertIn([{'Nome': 'Parque do Povo'}], r['output']['data']['fieldsets']['Dados Gerais']['fields'])
+        # edit
         data = dict(nome='Parque da Cidade')
-        self.client.post('/api/base/pontoturistico/1/edit/', data=data)
-        self.client.get('/api/base/pontoturistico/')
-        self.client.get('/api/base/pontoturistico/referenciados/')
-        data = dict(sigla='RN')
-        self.client.post('/api/base/pontoturistico/referenciados_no_estado/', data=data)
-        self.client.post('/api/base/pontoturistico/1/remove/')
-        self.client.get('/api/base/pontoturistico/')
+        r = self.post('/api/base/pontoturistico/1/edit/', data=data)
+        self.assertEqual(r['message'], 'Edição realizada com sucesso')
+        r = self.get('/api/base/pontoturistico/1/')
+        self.assertIn([{'Nome': 'Parque da Cidade'}], r['output']['data']['fieldsets']['Dados Gerais']['fields'])
+        self.assertEqual(PontoTuristico.objects.count(), 1)
+        # validation error
+        data = dict(nome='Parque da Cidade')
+        r = self.post('/api/base/pontoturistico/1/atualizar_nome/', data=data)
+        self.assertIn({'message': 'Período de edição ainda não está aberto', 'field': None}, r['errors'])
+        # remove
+        r = self.post('/api/base/pontoturistico/1/remove/')
+        self.assertEqual(r['message'], 'Exclusão realizada com sucesso')
+        self.assertEqual(PontoTuristico.objects.count(), 0)
 
-        data = dict(sigla='RN')
-        self.client.get('/api/base/pontoturistico/referenciados_no_estado/', data=data)
-        self.client.get('/api/base/pontoturistico/remover_tudo/')
-
+        # one-to-many (add)
         data = dict(nome='Rio Grande do Norte', sigla='RN')
-        self.client.post('/api/base/estado/add/', data=data)
-        self.client.get('/api/base/estado/1/get_cidades/')
-        data = dict(nome='Natal', estado=1)
-        self.client.get('/api/base/estado/1/get_cidades/add/', data=data)
-        self.client.get('/api/base/estado/1/get_cidades/')
+        self.post('/api/base/estado/add/', data=data)
+        r = self.get('/api/base/estado/1/get_cidades/')
+        self.assertEqual(r['output']['total'], 0)
+        data = dict(nome='Natal')
+        r = self.get('/api/base/estado/1/get_cidades/add/', data=data)
+        r = self.get('/api/base/estado/1/get_cidades/')
+        self.assertEqual(r['output']['total'], 1)
 
+        # many-to-many (add)
         data = dict(nome='Morro do Careca')
-        self.client.post('/api/base/pontoturistico/add/', data=data)
-        self.client.get('/api/base/cidade/1/get_pontos_turisticos/')
-        data = dict(pontos_turisticos=2)
-        self.client.post('/api/base/cidade/1/get_pontos_turisticos/add/', data=data)
-        self.client.get('/api/base/cidade/1/get_pontos_turisticos/')
+        r = self.post('/api/base/pontoturistico/add/', data=data)
+        self.assertEqual(r['message'], 'Cadastro realizado com sucesso')
+        r = self.get('/api/base/pontoturistico/')
+        pk = r['output']['data'][0][0]
+        r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
+        self.assertEqual(r['output']['total'], 0)
+        data = dict(pontos_turisticos=pk)
+        self.post('/api/base/cidade/1/get_pontos_turisticos/add/', data=data)
+        r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
+        self.assertEqual(r['output']['total'], 1)
+
+        # many-to-many (remove)
+        data = dict(pontos_turisticos=pk)
+        r = self.post('/api/base/cidade/1/get_pontos_turisticos/remove/', data=data)
+        r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
+        self.assertEqual(r['output']['total'], 0)
+
+        # one-to-many (remove)
+        r = self.get('/api/base/estado/1/get_cidades/')
+        pk = r['output']['data'][0][0]
+        data = dict(cidade=pk)
+        r = self.get('/api/base/estado/1/get_cidades/remove/', data=data)
+        r = self.get('/api/base/estado/1/get_cidades/')
+        self.assertEqual(r['output']['total'], 0)
 
     def test_queryset(self):
         estado = Estado(nome='Rio Grande do Norte', sigla='RN')
