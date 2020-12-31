@@ -39,6 +39,13 @@ class RoleForeignKey(ForeignKey):
     pass
 
 
+class OneToManyField(ManyToManyField):
+    def formfield(self, *args, **kwargs):
+        field = super().formfield(*args, **kwargs)
+        setattr(field, '_is_one_to_many', True)
+        return field
+
+
 class RoleManyToManyField(models.ManyToManyField):
     pass
 
@@ -277,6 +284,7 @@ class QuerySet(query.QuerySet):
         self._related_manager = None
         self._related_attribute = None
         self._iterable_class = ModelIterable
+        self._lookups = ()
 
     def filter(self, *args, **kwargs):
         low_mark = self.query.low_mark
@@ -370,6 +378,7 @@ class QuerySet(query.QuerySet):
         clone._list_filter = self._list_filter
         clone._list_subsets = self._list_subsets
         clone._list_actions = self._list_actions
+        clone._lookups = self._lookups
         clone._page_size = self._page_size
         clone._list_search = self._list_search
         clone._page = self._page
@@ -428,38 +437,25 @@ class QuerySet(query.QuerySet):
     def get_by_natural_key(self, username):
         return self.get(**{self.model.USERNAME_FIELD: username})
 
-    def apply_list_lookups(self, user):
-        lookup_keys = self.model.get_metadata('list_lookups', None)
-        return self.apply_lookups(user, lookup_keys)
+    def lookups(self, *lookups):
+        self._lookups = lookups
+        return self
 
-    def apply_add_lookups(self, user):
-        lookup_keys = self.model.get_metadata('add_lookups', None)
-        return self.apply_lookups(user, lookup_keys)
-
-    def apply_edit_lookups(self, user):
-        lookup_keys = self.model.get_metadata('edit_lookups', None)
-        return self.apply_lookups(user, lookup_keys)
-
-    def apply_delete_lookups(self, user):
-        lookup_keys = self.model.get_metadata('delete_lookups', None)
-        return self.apply_lookups(user, lookup_keys)
-
-    def apply_lookups(self, user, lookups):
+    def apply_lookups(self, user):
         self._user = user
         if user.pk is None:
             queryset = self.all()
-        elif lookups is None:
-            queryset = self.filter(pk__isnull=True)
+        elif self._lookups is ():
+            queryset = self.all()
         else:
             filters = []
             group_lookups = []
-            for lookup_key in lookups:
+            for lookup_key in self._lookups:
                 if lookup_key.startswith('self'):  # self or self__<attr>
                     if lookup_key == 'self':  # self
                         lookup_key = 'pk'
                     else:  # self__<attr>
                         lookup_key = lookup_key[6:]
-                        field = self.model.get_field(lookup_key)
                     lookup = {lookup_key: user.pk}
                     filters.append(Q(**lookup))
                 else:  # group
@@ -708,7 +704,7 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
         fieldset_names = []
         default_category, category_names, fieldsets_metadata = self.get_fieldsets_metadata()
 
-        current_category_name = getattrr(self, '_current_category_name', None)
+        current_category_name = getattr(self, '_current_category_name', None)
         if current_category_name is None:
             current_category_name = default_category
 
@@ -793,31 +789,34 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
                         attr = getattr(model, attr_name)
                         return getattr(attr, '_metadata', {}).get('verbose_name')
 
-    @classmethod
-    def check_lookups(cls, user, lookups, groups_only=True):
-        group_lookups = {}
-        if lookups:
-            if user.pk:
-                for lookup_key in lookups or ():
-                    if lookup_key.startswith('self'):  # self or self__<attr>
-                        if lookup_key == 'self':
-                            group_lookup = user.get_metadata('model_name')
-                        else:  # group
-                            field = cls.get_field(lookup_key[6:])
-                            group_lookup = field.related_model.get_metadata('model_name')
-                    else:
-                        group_lookup = lookup_key
-                    group_lookups[group_lookup] = lookup_key
+    def check_lookups(self, attr_name, user):
+        self._user = user
+        attr = getattr(self, attr_name)
+        metadata = getattr(attr, '_metadata')
+        lookups = metadata['lookups']
 
-                    qs = user.groups.filter(lookup__in=group_lookups.keys())
-                    checked_lookups = qs.values_list('lookup', flat=True)
-                    return checked_lookups if groups_only else {
-                        group_lookup: group_lookups[group_lookup] for group_lookup in checked_lookups
-                    }
-            else:
-                return False if groups_only else group_lookups
-
-        return True if groups_only else group_lookups
+        if user.pk is None:
+            return True
+        elif not lookups:
+            return True
+        else:
+            filters = []
+            group_lookups = []
+            for lookup_key in lookups:
+                if lookup_key.startswith('self'):  # self or self__<attr>
+                    if lookup_key == 'self':  # self
+                        lookup_key = 'pk'
+                    else:  # self__<attr>
+                        lookup_key = lookup_key[6:]
+                    lookup = {lookup_key: user.pk}
+                    filters.append(Q(**lookup))
+                else:  # group
+                    group_lookups.append(lookup_key)
+            if group_lookups and user.groups.filter(lookup__in=group_lookups).exists():
+                return True
+            if filters and type(self).objects.filter(reduce(operator.__or__, filters)).exists():
+                return True
+        return False
 
 
 class Group(Model):

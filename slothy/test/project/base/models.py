@@ -4,12 +4,26 @@ from slothy.api import models
 from slothy.api.models.decorators import param, attr, action, role, user, fieldset
 
 
+class Telefone(models.Model):
+    ddd = models.IntegerField(verbose_name='DDD')
+    numero = models.CharField(verbose_name='Telefone', max_length=255)
+
+    class Meta:
+        verbose_name = 'Telefone'
+        verbose_name_plural = 'Telefones'
+
+    def __str__(self):
+        return '{}'.format(self.numero)
+
+
 @user('email')
 class Pessoa(models.AbstractUser):
 
     nome = models.CharField(verbose_name='Nome', max_length=255)
     email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255)
     foto = models.ImageField(verbose_name='Foto', null=True, blank=True, upload_to='fotos')
+
+    telefones = models.OneToManyField(Telefone, verbose_name='Telefones')
 
     class Meta:
         verbose_name = 'Pessoa'
@@ -42,9 +56,9 @@ class Pessoa(models.AbstractUser):
         self.save()
 
     @action('Alterar Senha')
-    @param(raw_password=models.CharField('Senha'))
-    def change_password(self, raw_password):
-        super().change_password(raw_password)
+    @param(senha=models.CharField('Senha'))
+    def alterar_senha(self, senha):
+        super().change_password(senha)
 
 
 class PontoTuristicoManager(models.DefaultManager):
@@ -98,6 +112,10 @@ class PontoTuristico(models.Model):
     def remove(self):
         self.delete()
 
+    @attr('Cidades')
+    def get_cidades(self):
+        return self.cidade_set.all()
+
 
 class EstadoManager(models.DefaultManager):
 
@@ -116,6 +134,9 @@ class EstadoManager(models.DefaultManager):
             'ativos', 'inativos'
         ).list_per_page(
             10
+        ).lookups(
+            'presidente',
+            'self__governador__pessoa'
         )
 
     @attr('Ativos')
@@ -259,9 +280,15 @@ class Governador(models.Model):
 
 class CidadeManager(models.DefaultManager):
 
-    @action('Listar')
+    @action('Listar', lookups=('governador', 'prefeito', 'presidente'))
     def list(self):
-        return self.all().list_filter('estado').list_display('id', 'get_dados_gerais')
+        return self.all().list_filter(
+            'estado'
+        ).list_display(
+            'id', 'get_dados_gerais'
+        ).lookups(
+            'self__estado__governador__pessoa', 'self__prefeito', 'presidente'
+        )
 
 
 class Cidade(models.Model):
@@ -282,7 +309,7 @@ class Cidade(models.Model):
     def add(self):
         self.save()
 
-    @action('Editar')
+    @action('Editar', lookups=('self__prefeito', 'self__estado__governador__pessoa', 'presidente'))
     def edit(self):
         self.save()
 

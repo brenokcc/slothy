@@ -42,6 +42,14 @@ class MainTestCase(TestCase):
     def setUp(self):
         Group.objects.all().delete()
 
+    def get(self, url, data=None):
+        response = self.client.get(url, data=data)
+        return json.loads(response.content)
+
+    def post(self, url, data=None):
+        response = self.client.post(url, data=data)
+        return json.loads(response.content)
+
     def test_direct_inherited_role(self):
         self.assertFalse(Group.objects.filter(name='Presidente').exists())
         presidente = Presidente.objects.create(nome='Jair Bolsonaro')
@@ -133,13 +141,30 @@ class MainTestCase(TestCase):
 
         self.assertTrue(1)
 
-    def get(self, url, data=None):
-        response = self.client.get(url, data=data)
-        return json.loads(response.content)
-
-    def post(self, url, data=None):
-        response = self.client.post(url, data=data)
-        return json.loads(response.content)
+    def test_login(self):
+        pessoa = Pessoa.objects.create(nome='Carlos Breno', email='brenokcc@yahoo.com.br')
+        pessoa.alterar_senha('senha')
+        # getting the metadata
+        r = self.get('/api/login')
+        data = r['input']['data']
+        # setting the data
+        data['username'] = 'brenokcc@yahoo.com.br'
+        data['password'] = 'senha'
+        r = self.post('/api/login', data=data)
+        self.assertEqual(r['message'], 'Login realizado com sucesso')
+        self.assertIsNotNone(r['output']['token'])
+        # getting authenticated user
+        r = self.get('/api/user')
+        self.assertIsNotNone(r['output'])
+        # logging out
+        r = self.get('/api/logout')
+        self.assertEqual(r['message'], 'Logout realizado com sucesso')
+        r = self.get('/api/user')
+        self.assertIsNone(r['output'])
+        # wrong password
+        data['password'] = '123'
+        r = self.post('/api/login', data=data)
+        self.assertEqual(r['errors'][0]['message'], 'Usuário não autenticado')
 
     def test_api(self):
         data = dict(nome='Parque do Povo')
@@ -187,13 +212,13 @@ class MainTestCase(TestCase):
         pk = r['output']['data'][0][0]
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
         self.assertEqual(r['output']['total'], 0)
-        data = dict(pontos_turisticos=pk)
+        data = dict(pontoturistico=pk)
         self.post('/api/base/cidade/1/get_pontos_turisticos/add/', data=data)
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
         self.assertEqual(r['output']['total'], 1)
 
         # many-to-many (remove)
-        data = dict(pontos_turisticos=pk)
+        data = dict(pontoturistico=pk)
         r = self.post('/api/base/cidade/1/get_pontos_turisticos/remove/', data=data)
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
         self.assertEqual(r['output']['total'], 0)
@@ -205,6 +230,14 @@ class MainTestCase(TestCase):
         r = self.get('/api/base/estado/1/get_cidades/remove/', data=data)
         r = self.get('/api/base/estado/1/get_cidades/')
         self.assertEqual(r['output']['total'], 0)
+
+        # many-to-many (reverse)
+        sp = Estado.objects.create(nome='São Paulo', sigla='SP')
+        guarulhos = Cidade.objects.create(nome='Guarulhos', estado=sp)
+        data = dict(cidade=guarulhos.pk)
+        r = self.get('/api/base/pontoturistico/2/get_cidades/add/', data=data)
+        r = self.get('/api/base/pontoturistico/2/get_cidades/')
+        self.assertEqual(r['output']['total'], 1)
 
     def test_queryset(self):
         estado = Estado(nome='Rio Grande do Norte', sigla='RN')
@@ -220,3 +253,33 @@ class MainTestCase(TestCase):
         )
         print(json.loads(response.content))
 
+    def test_lookups(self):
+        bolsonaro = Presidente.objects.create(nome='Jair Bolsonaro')
+        fatima = Pessoa.objects.create(nome='Fátima', email='fatima@mail.com')
+        alvaro_dias = Pessoa.objects.create(nome='Álvaro Dias', email='alvaro@mail.com')
+        kelps = Pessoa.objects.create(nome='Kelps', email='kelps@mail.com')
+
+        rn = Estado.objects.create(nome='Rio Grande do Norte', sigla='RN')
+        sp = Estado.objects.create(nome='São Paulo', sigla='SP')
+
+        Governador.objects.create(pessoa=fatima, estado=rn)
+
+        natal = Cidade.objects.create(nome='Natal', estado=rn, prefeito=alvaro_dias)
+        Cidade.objects.create(nome='Parnamirim', estado=rn)
+        Cidade.objects.create(nome='São Paulo', estado=sp)
+        Cidade.objects.create(nome='Guarulhos', estado=sp)
+
+        # states
+        self.assertEqual(Estado.objects.list().apply_lookups(bolsonaro).count(), 2)
+        self.assertEqual(Estado.objects.list().apply_lookups(fatima).count(), 1)
+
+        # cities
+        self.assertEqual(Cidade.objects.list().apply_lookups(bolsonaro).count(), 4)
+        self.assertEqual(Cidade.objects.list().apply_lookups(fatima).count(), 2)
+        self.assertEqual(Cidade.objects.list().apply_lookups(kelps).count(), 0)
+
+        # action lookups
+        self.assertTrue(natal.check_lookups('edit', bolsonaro))
+        self.assertTrue(natal.check_lookups('edit', fatima))
+        self.assertTrue(natal.check_lookups('edit', alvaro_dias))
+        self.assertFalse(natal.check_lookups('edit', kelps))

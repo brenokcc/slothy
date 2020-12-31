@@ -7,7 +7,7 @@ from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from django.forms import ModelForm
-from slothy.api.models import ValidationError
+from slothy.api.models import ValidationError, ManyToManyField
 
 
 class InputValidationError(BaseException):
@@ -81,7 +81,8 @@ class Api(APIView):
     def do(self, request, path, data):
         print('# {}'.format(path))
         data = request.POST or request.GET or data
-        response = dict(path='/{}'.format(path), message=None, exception=None, errors=[], input=dict(data={}, metadata={}), output=None)
+        input_dict = dict(data={}, metadata={})
+        response = dict(path='/{}'.format(path), message=None, exception=None, errors=[], input=input_dict, output=None)
         try:
             if path.endswith('/'):
                 path = path[0:-1]
@@ -89,18 +90,26 @@ class Api(APIView):
             if len(tokens) == 1:
                 if path == 'user':  # authenticated user
                     if request.user.is_authenticated:
-                        response['output']['data'] = request.user.values()
-                    else:
-                        response['errors'].append({None: 'Nenhum usuário autenticado'})
+                        response['output'] = request.user.values()
                 elif path == 'login':  # user login
-                    user = authenticate(request, username=request.POST['username'], password=request.POST['password'])
-                    if user:
-                        login(request, user)
-                        response['output']['data'] = dict(token=request.user.auth_token.key)
-                        response['message'] = 'Login realizado com sucesso'
-                    else:
-                        response['output']['data'] = dict(token=None)
-                        response['errors'].append({None: 'Usuário não autenticado'})
+                    if data:
+                        user = authenticate(request, username=data['username'], password=data['password'])
+                        if user:
+                            login(request, user)
+                            response['output'] = dict(token=request.user.auth_token.key)
+                            response['message'] = 'Login realizado com sucesso'
+                        else:
+                            response['output'] = dict(token=None)
+                            response['errors'].append({'message': 'Usuário não autenticado', 'field': None})
+                    response['input']['data'] = dict(username=None, password=None)
+                    response['input']['metadata']['username'] = dict(
+                        name='username', label='Login', required=True,
+                        mask=None, value=None, choices=None, help_text=None
+                    )
+                    response['input']['metadata']['password'] = dict(
+                        name='password', label='Senha', required=True,
+                        mask='*****', value=None, choices=None, help_text=None
+                    )
                 elif path == 'logout':  # user logout
                     logout(request)
                     response['message'] = 'Logout realizado com sucesso'
@@ -142,6 +151,7 @@ class Api(APIView):
                                                 exclude_field = field.name
                                             else:  # remove
                                                 name = qs.model.__name__.lower()
+
                                                 def func():  # add or remove
                                                     obj = qs.get(pk=data[name])
                                                     qs.remove(obj)
@@ -152,17 +162,19 @@ class Api(APIView):
                                                 setattr(func, '_metadata', metadata)
                                                 response['input']['data'] = {name: None}
                                         else:  # many-to-many
+                                            param_name = qs.model.__name__.lower()
+
                                             def func(**kwargs):  # add or remove
-                                                for obj in kwargs[related_attribute]:
+                                                for obj in kwargs[param_name]:
                                                     getattr(qs, tokens[4])(obj)
-                                            related_attribute = getattr(qs, '_related_attribute')
                                             metadata = dict(
                                                 name='_',
-                                                params=(related_attribute,),
-                                                message='Ação realizada com sucesso'
+                                                params=(param_name,),
+                                                message='Ação realizada com sucesso',
+                                                fields={param_name: ManyToManyField(qs.model, 'Ponto Turístico')}
                                             )
                                             setattr(func, '_metadata', metadata)
-                                            response['input']['data'] = {related_attribute: None}
+                                            response['input']['data'] = {param_name: None}
                                     else:
                                         func = None
                     else:
@@ -236,12 +248,24 @@ class Api(APIView):
                         self.fields[name] = field.formfield()
                     if exclude_field and exclude_field in self.fields:
                         del(self.fields[exclude_field])
+                    for name in self.get_one_to_many_field_names():
+                        del (self.fields[name])
+
+                def get_one_to_many_field_names(self):
+                    field_names = []
+                    for name in self.fields:
+                        if hasattr(self.fields[name], '_is_one_to_many'):
+                            field_names.append(name)
+                    return field_names
 
                 def get_field_metadata(self):
                     items = []
                     for name, field in self.fields.items():
                         choices = []
-                        item = dict(name=name, label=field.label, required=field.required, mask=None, value='', choices=choices, help_text=field.help_text)
+                        item = dict(
+                            name=name, label=field.label, required=field.required,
+                            mask=None, value=None, choices=choices, help_text=field.help_text
+                        )
                         items.append(item)
                     return items
 
