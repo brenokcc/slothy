@@ -13,7 +13,7 @@ class Telefone(models.Model):
         verbose_name_plural = 'Telefones'
 
     def __str__(self):
-        return '{}'.format(self.numero)
+        return '({}) {}'.format(self.ddd, self.numero)
 
 
 @user('email')
@@ -33,8 +33,8 @@ class Pessoa(models.AbstractUser):
     def __str__(self):
         return self.nome
 
-    @action('Cadastrar')
-    def add(self):
+    @action('Cadastrar', atomic=True)
+    def add(self, nome, email, foto, telefones):
         self.save()
 
     @action('Editar')

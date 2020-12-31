@@ -1,5 +1,5 @@
 from django.test import TestCase
-from base.models import Pessoa, Estado, Cidade, PontoTuristico, Presidente, Governador
+from base.models import Pessoa, Estado, Cidade, PontoTuristico, Presidente, Governador, Telefone
 from django.apps import apps
 from slothy.api.models import Group
 import json
@@ -43,11 +43,13 @@ class MainTestCase(TestCase):
         Group.objects.all().delete()
 
     def get(self, url, data=None):
-        response = self.client.get(url, data=data)
+        data = json.dumps(data) if data is not None else None
+        response = self.client.get(url, data=data, content_type='application/json')
         return json.loads(response.content)
 
     def post(self, url, data=None):
-        response = self.client.post(url, data=data)
+        data = json.dumps(data) if data is not None else None
+        response = self.client.post(url, data=data, content_type='application/json')
         return json.loads(response.content)
 
     def test_direct_inherited_role(self):
@@ -200,7 +202,7 @@ class MainTestCase(TestCase):
         r = self.get('/api/base/estado/1/get_cidades/')
         self.assertEqual(r['output']['total'], 0)
         data = dict(nome='Natal')
-        r = self.get('/api/base/estado/1/get_cidades/add/', data=data)
+        r = self.post('/api/base/estado/1/get_cidades/add/', data=data)
         r = self.get('/api/base/estado/1/get_cidades/')
         self.assertEqual(r['output']['total'], 1)
 
@@ -212,13 +214,13 @@ class MainTestCase(TestCase):
         pk = r['output']['data'][0][0]
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
         self.assertEqual(r['output']['total'], 0)
-        data = dict(pontoturistico=pk)
-        self.post('/api/base/cidade/1/get_pontos_turisticos/add/', data=data)
+        data = dict(ids=[pk])
+        r = self.post('/api/base/cidade/1/get_pontos_turisticos/add/', data=data)
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
         self.assertEqual(r['output']['total'], 1)
 
         # many-to-many (remove)
-        data = dict(pontoturistico=pk)
+        data = dict(ids=[pk])
         r = self.post('/api/base/cidade/1/get_pontos_turisticos/remove/', data=data)
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
         self.assertEqual(r['output']['total'], 0)
@@ -226,16 +228,16 @@ class MainTestCase(TestCase):
         # one-to-many (remove)
         r = self.get('/api/base/estado/1/get_cidades/')
         pk = r['output']['data'][0][0]
-        data = dict(cidade=pk)
-        r = self.get('/api/base/estado/1/get_cidades/remove/', data=data)
+        data = dict(id=pk)
+        r = self.post('/api/base/estado/1/get_cidades/remove/', data=data)
         r = self.get('/api/base/estado/1/get_cidades/')
         self.assertEqual(r['output']['total'], 0)
 
         # many-to-many (reverse)
         sp = Estado.objects.create(nome='São Paulo', sigla='SP')
         guarulhos = Cidade.objects.create(nome='Guarulhos', estado=sp)
-        data = dict(cidade=guarulhos.pk)
-        r = self.get('/api/base/pontoturistico/2/get_cidades/add/', data=data)
+        data = dict(ids=[guarulhos.pk])
+        r = self.post('/api/base/pontoturistico/2/get_cidades/add/', data=data)
         r = self.get('/api/base/pontoturistico/2/get_cidades/')
         self.assertEqual(r['output']['total'], 1)
 
@@ -283,3 +285,20 @@ class MainTestCase(TestCase):
         self.assertTrue(natal.check_lookups('edit', fatima))
         self.assertTrue(natal.check_lookups('edit', alvaro_dias))
         self.assertFalse(natal.check_lookups('edit', kelps))
+
+    def test_one_to_many(self):
+        telefones = [
+            dict(ddd=84, numero='99106-2760'),
+            dict(ddd=84, numero='')
+        ]
+        data = dict(nome='Carlos Breno', email='brenokcc@yahoo.com.br', telefones=telefones)
+        r = self.post('/api/base/pessoa/add/', data=data)
+        self.assertIsNone(Pessoa.objects.first())
+        error = dict(message='Este campo é obrigatório.', field='telefones', index=0, inner='numero')
+        self.assertEqual(r['errors'], [error])
+        telefones[1]['numero'] = '3272-3898'
+        r = self.post('/api/base/pessoa/add/', data=data)
+        self.assertIsNotNone(Pessoa.objects.first())
+        self.assertEqual(Telefone.objects.count(), 2)
+        self.assertEqual(r['message'], 'Cadastro realizado com sucesso')
+

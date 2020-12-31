@@ -159,3 +159,4 @@ def _getattr_rec(obj, attrs, request=None):
             value = attr
         return _getattr_rec(value, attrs, request=request) if attrs else value
     return None
+

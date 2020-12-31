@@ -64,7 +64,7 @@ def attr(verbose_name, condition=None, formatter=None, lookups=(), category=None
     return decorate
 
 
-def action(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None, message=None):
+def action(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None, message=None, atomic=False):
     def decorate(func):
         name = func.__name__
         metadata = getattr(func, '_metadata', {})
@@ -87,7 +87,8 @@ def action(verbose_name, condition=None, formatter=None, lookups=(), category=No
             icon=icon,
             formatter=formatter,
             lookups=lookups,
-            message=message or default_message
+            message=message or default_message,
+            atomic=atomic
         )
         setattr(func, '_metadata', metadata)
         return func

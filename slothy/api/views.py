@@ -2,11 +2,15 @@ import sys
 import json
 import traceback
 from django.apps import apps
+from django.db import transaction
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from django.forms import ModelForm
+from slothy.api import utils
+from django.forms import modelform_factory
+from collections import OrderedDict
 from slothy.api.models import ValidationError, ManyToManyField
 
 
@@ -150,31 +154,29 @@ class Api(APIView):
                                                 func = instance.add
                                                 exclude_field = field.name
                                             else:  # remove
-                                                name = qs.model.__name__.lower()
 
                                                 def func():  # add or remove
-                                                    obj = qs.get(pk=data[name])
-                                                    qs.remove(obj)
+                                                    pk = qs.get(pk=data['id'])
+                                                    qs.remove(pk)
                                                 metadata = dict(
                                                     name='_',
                                                     message='Ação realizada com sucesso'
                                                 )
                                                 setattr(func, '_metadata', metadata)
-                                                response['input']['data'] = {name: None}
+                                                response['input']['data'] = {'id': None}
                                         else:  # many-to-many
-                                            param_name = qs.model.__name__.lower()
 
-                                            def func(**kwargs):  # add or remove
-                                                for obj in kwargs[param_name]:
-                                                    getattr(qs, tokens[4])(obj)
+                                            def func(ids):  # add or remove
+                                                for pk in ids:
+                                                    getattr(qs, tokens[4])(pk)
                                             metadata = dict(
                                                 name='_',
-                                                params=(param_name,),
+                                                params=('ids',),
                                                 message='Ação realizada com sucesso',
-                                                fields={param_name: ManyToManyField(qs.model, 'Ponto Turístico')}
+                                                fields={'ids': ManyToManyField(qs.model, 'Pontos Turísticos')}
                                             )
                                             setattr(func, '_metadata', metadata)
-                                            response['input']['data'] = {param_name: None}
+                                            response['input']['data'] = {'ids': None}
                                     else:
                                         func = None
                     else:
@@ -188,8 +190,13 @@ class Api(APIView):
                         else:
                             response['output'] = output.serialize()
                     response['input']['metadata'] = metadata
-                    for item in metadata:
-                        response['input']['data'][item['name']] = None
+                    for field_name in metadata:
+                        value = None
+                        if type(metadata[field_name]) == list:
+                            value = [{}]
+                            for inner_field_name in metadata[field_name][0]:
+                                value[0][inner_field_name] = None
+                        response['input']['data'][field_name] = value
                     response['message'] = getattr(meta_func or func, '_metadata', {}).get('message')
 
         except InputValidationError as e:
@@ -244,49 +251,84 @@ class Api(APIView):
 
                 def __init__(self, *args, **kwargs):
                     super().__init__(*args, **kwargs)
+                    # custom fields
                     for name, field in custom_fields.items():
                         self.fields[name] = field.formfield()
+
+                    # exclude fields
                     if exclude_field and exclude_field in self.fields:
                         del(self.fields[exclude_field])
-                    for name in self.get_one_to_many_field_names():
-                        del (self.fields[name])
 
-                def get_one_to_many_field_names(self):
-                    field_names = []
-                    for name in self.fields:
-                        if hasattr(self.fields[name], '_is_one_to_many'):
-                            field_names.append(name)
-                    return field_names
-
-                def get_field_metadata(self):
-                    items = []
+                    # set metadata
+                    self.metadata = {}
                     for name, field in self.fields.items():
-                        choices = []
-                        item = dict(
-                            name=name, label=field.label, required=field.required,
+                        choices = None
+                        item = OrderedDict(
+                            label=field.label, required=field.required,
                             mask=None, value=None, choices=choices, help_text=field.help_text
                         )
-                        items.append(item)
-                    return items
+                        self.metadata[name] = item
+
+                    self.one_to_many_forms = {}
+                    one_to_many_field_names = [
+                        name for name in self.fields if hasattr(self.fields[name], '_is_one_to_many')
+                    ]
+                    for one_to_many_field_name in one_to_many_field_names:
+                        one_to_many_items = {}
+                        one_to_many_field = self.fields[one_to_many_field_name]
+                        del(self.fields[one_to_many_field_name])
+                        one_to_many_form = modelform_factory(one_to_many_field.queryset.model, exclude=())
+                        self.one_to_many_forms[one_to_many_field_name] = one_to_many_form
+                        for name, field in one_to_many_form.base_fields.items():
+                            choices = None
+                            item = OrderedDict(
+                                label=field.label, required=field.required,
+                                mask=None, value=None, choices=choices, help_text=field.help_text
+                            )
+                            one_to_many_items[name] = item
+                        self.metadata[one_to_many_field_name] = [one_to_many_items]
+
+                def save(self, *args, **kwargs):
+                    # print(data, form.cleaned_data)
+                    # print(form.fields.keys(), custom_fields.keys(), metadata['params'])
+                    params = {}
+                    for param in metadata['params']:
+                        params[param] = self.cleaned_data.get(param)
+                    result = func(**params)
+                    for one_to_many_field_name in self.one_to_many_forms:
+                        form_cls = self.one_to_many_forms[one_to_many_field_name]
+                        for inner_data in data[one_to_many_field_name]:
+                            inner_form = form_cls(data=inner_data)
+                            if inner_form.is_valid():
+                                inner_form.save()
+                                getattr(self.instance, one_to_many_field_name).add(inner_form.instance)
+                            elif inner_form.errors:
+                                inner_errors = []
+                                for i, (inner_field_name, messages) in enumerate(inner_form.errors.items()):
+                                    inner_errors.append(
+                                        {'message': ','.join(messages), 'field': one_to_many_field_name, 'index': i,
+                                         'inner': inner_field_name}
+                                    )
+                                raise InputValidationError(inner_errors, self.metadata)
+                    return result, self.metadata
 
             form = Form(data=data or None, instance=instance)
             if form.is_valid():
-                # print(data, form.cleaned_data)
-                # print(form.fields.keys(), custom_fields.keys(), metadata['params'])
-                params = {}
-                for param in metadata['params']:
-                    params[param] = form.cleaned_data.get(param)
                 try:
-                    return func(**params), form.get_field_metadata()
+                    if metadata.get('atomic'):
+                        with transaction.atomic():
+                            return form.save()
+                    else:
+                        return form.save()
                 except ValidationError as e:
-                    raise InputValidationError([{'message': e.message, 'field': None}], form.get_field_metadata())
+                    raise InputValidationError([{'message': e.message, 'field': None}], form.metadata)
             elif form.errors:
                 errors = []
                 for field_name, messages in form.errors.items():
                     errors.append({'message': ','.join(messages), 'field': field_name})
-                raise InputValidationError(errors, form.get_field_metadata())
+                raise InputValidationError(errors, form.metadata)
             else:
-                return None, form.get_field_metadata()
+                return None, form.metadata
 
         else:
             try:
