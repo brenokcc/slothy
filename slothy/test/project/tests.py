@@ -1,6 +1,5 @@
 from django.test import TestCase
 from base.models import Pessoa, Estado, Cidade, PontoTuristico, Presidente, Governador, Telefone
-from django.apps import apps
 from slothy.api.models import Group
 import json
 from slothy.api.utils import setup_signals
@@ -301,4 +300,3 @@ class MainTestCase(TestCase):
         self.assertIsNotNone(Pessoa.objects.first())
         self.assertEqual(Telefone.objects.count(), 2)
         self.assertEqual(r['message'], 'Cadastro realizado com sucesso')
-

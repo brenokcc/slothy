@@ -15,9 +15,10 @@ from slothy.api.models import ValidationError, ManyToManyField
 
 
 class InputValidationError(BaseException):
-    def __init__(self, errors, metadata):
+    def __init__(self, errors, metadata, initial_data):
         self.errors = errors
         self.metadata = metadata
+        self.initial_data = initial_data
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
@@ -202,10 +203,7 @@ class Api(APIView):
         except BaseException as e:
             traceback.print_exc(file=sys.stdout)
             response.update(exception=str(e))
-        # try:
-        #     print(json.dumps(response, indent=2, sort_keys=False, ensure_ascii=False))
-        # except BaseException:
-        #     print(response)
+
         response = Response(response)
         response["Access-Control-Allow-Origin"] = "*"
         return response
@@ -237,7 +235,7 @@ class Api(APIView):
                         try:
                             return func(), {}, {}
                         except ValidationError as e:
-                            raise InputValidationError([{'message': e.message, 'field': None}], {})
+                            raise InputValidationError([{'message': e.message, 'field': None}], {}, {})
 
             class Form(ModelForm):
 
@@ -326,7 +324,6 @@ class Api(APIView):
                                 instance=one_to_many_form_instance,
                                 data=one_to_many_form_data
                             )
-                            # import pdb; pdb.set_trace()
                             self.one_to_many_forms[one_to_many_field_name].append(one_to_many_form)
 
                     # initial data
@@ -349,60 +346,61 @@ class Api(APIView):
                             self.initial_data[one_to_many_field_name].append(one_to_many_initial_data)
 
                 def save(self, *args, **kwargs):
+                    result = None
+                    inner_errors = []
                     # print(data, form.cleaned_data)
                     # print(form.fields.keys(), custom_fields.keys(), metadata['params'])
 
-                    # one-to-one
-                    for one_to_one_field_name, one_to_one_form in self.one_to_one_forms.items():
-                        if one_to_one_form.is_valid():
-                            one_to_one_form.save()
-                            setattr(self.instance, one_to_one_field_name, one_to_one_form.instance)
-                        elif one_to_one_form.errors:
-                            inner_errors = []
-                            for i, (inner_field_name, inner_messages) in enumerate(one_to_one_form.errors.items()):
-                                inner_errors.append(
-                                    {'message': ','.join(inner_messages), 'field': one_to_one_field_name,
-                                     'index': i, 'inner': inner_field_name}
-                                )
-                            raise InputValidationError(inner_errors, self.metadata)
-
-                    params = {}
-                    for param in metadata['params']:
-                        params[param] = self.cleaned_data.get(param)
-                    result = func(**params)
-
-                    # one-to-many
-                    for one_to_many_field_name, one_to_many_forms in self.one_to_many_forms.items():
-                        for one_to_many_form in one_to_many_forms:
-                            if one_to_many_form.is_valid():
-                                one_to_many_form.save()
-                                getattr(self.instance, one_to_many_field_name).add(one_to_many_form.instance)
-                            elif one_to_many_form.errors:
-                                inner_errors = []
-                                for i, (inner_field_name, inner_messages) in enumerate(one_to_many_form.errors.items()):
+                    if self.errors:
+                        for inner_field_name, inner_messages in self.errors.items():
+                            inner_errors.append({'message': ','.join(inner_messages), 'field': inner_field_name})
+                    else:
+                        # one-to-one
+                        for one_to_one_field_name, one_to_one_form in self.one_to_one_forms.items():
+                            if one_to_one_form.is_valid():
+                                one_to_one_form.save()
+                                setattr(self.instance, one_to_one_field_name, one_to_one_form.instance)
+                            elif one_to_one_form.errors:
+                                for i, (inner_field_name, inner_messages) in enumerate(one_to_one_form.errors.items()):
                                     inner_errors.append(
-                                        {'message': ','.join(inner_messages), 'field': one_to_many_field_name,
+                                        {'message': ','.join(inner_messages), 'field': one_to_one_field_name,
                                          'index': i, 'inner': inner_field_name}
                                     )
-                                raise InputValidationError(inner_errors, self.metadata)
+                        # func
+                        params = {}
+                        for param in metadata['params']:
+                            params[param] = self.cleaned_data.get(param)
+                        try:
+                            result = func(**params)
+                        except ValidationError as ve:
+                            inner_errors.append({'message': ve.message, 'field': None})
 
-                    return result, self.metadata, self.initial_data
+                        # one-to-many
+                        for one_to_many_field_name, one_to_many_forms in self.one_to_many_forms.items():
+                            for one_to_many_form in one_to_many_forms:
+                                if one_to_many_form.is_valid():
+                                    one_to_many_form.save()
+                                    getattr(self.instance, one_to_many_field_name).add(one_to_many_form.instance)
+                                elif one_to_many_form.errors:
+                                    inner_errors = []
+                                    for i, (inner_field_name, inner_messages) in enumerate(one_to_many_form.errors.items()):
+                                        inner_errors.append(
+                                            {'message': ','.join(inner_messages), 'field': one_to_many_field_name,
+                                             'index': i, 'inner': inner_field_name}
+                                        )
+
+                    if inner_errors:
+                        raise InputValidationError(inner_errors, self.metadata, self.initial_data)
+                    else:
+                        return result, self.metadata, self.initial_data
 
             form = Form(data=data or None, instance=instance)
             if form.is_valid():
-                try:
-                    if metadata.get('atomic'):
-                        with transaction.atomic():
-                            return form.save()
-                    else:
+                if metadata.get('atomic'):
+                    with transaction.atomic():
                         return form.save()
-                except ValidationError as e:
-                    raise InputValidationError([{'message': e.message, 'field': None}], form.metadata)
-            elif form.errors:
-                errors = []
-                for field_name, messages in form.errors.items():
-                    errors.append({'message': ','.join(messages), 'field': field_name})
-                raise InputValidationError(errors, form.metadata)
+                else:
+                    return form.save()
             else:
                 return None, form.metadata, form.initial_data
 
@@ -410,4 +408,4 @@ class Api(APIView):
             try:
                 return func(), {}, {}
             except ValidationError as e:
-                raise InputValidationError([{'message': e.message, 'field': None}], {})
+                raise InputValidationError([{'message': e.message, 'field': None}], {}, {})
