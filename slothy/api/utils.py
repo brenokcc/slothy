@@ -112,6 +112,23 @@ def pre_delete(instance):
                     user.groups.remove(group)
 
 
+def format_value(value):
+    from slothy.api.models import QuerySet
+    if value is not None:
+        if isinstance(value, datetime.datetime):
+            return value.strftime('%d/%m/%Y %H:%M')
+        elif isinstance(value, datetime.date):
+            return value.strftime('%d/%m/%Y')
+        elif isinstance(value, bool):
+            return 'Sim' if value else 'Não'
+        elif isinstance(value, QuerySet) or isinstance(value, list):
+            if value:
+                return ','.join([str(obj) for obj in value])
+        else:
+            return str(value)
+    return None
+
+
 def custom_serialize(obj):
     from slothy.api.models import QuerySet, ValueSet, Model
     if isinstance(obj, datetime.datetime):
@@ -125,6 +142,28 @@ def custom_serialize(obj):
     elif isinstance(obj, Model):
         return str(obj)
     return obj
+
+
+def make_choices(name, field, custom_choices):
+    from django.forms.fields import BooleanField
+    if name in custom_choices:
+        choices = []
+        for obj in custom_choices[name]:
+            choices.append([obj.id, str(obj)])
+        return choices
+    elif hasattr(field, 'choices'):
+        if hasattr(field.choices, 'queryset'):
+            if field.choices.queryset.count() < 25:
+                choices = []
+                for obj in field.choices.queryset:
+                    choices.append([obj.id, str(obj)])
+                return choices
+        else:
+            return field.choices
+    else:
+        if isinstance(field, BooleanField):
+            return [[True, 'Sim'], [False, 'Não']]
+    return None
 
 
 def getattrr(obj, args, request=None):

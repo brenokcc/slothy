@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-import datetime
 from slothy.api import models
 from slothy.api.models.decorators import param, attr, action, role, user, fieldset
 
@@ -14,128 +13,6 @@ class Telefone(models.Model):
 
     def __str__(self):
         return '({}) {}'.format(self.ddd, self.numero)
-
-
-class Endereco(models.Model):
-    logradouro = models.CharField(verbose_name='Logradouro', max_length=100)
-    numero = models.IntegerField(verbose_name='Número')
-
-    class Meta:
-        verbose_name = 'Endereço'
-        verbose_name_plural = 'Endereços'
-
-    def __str__(self):
-        return '({}) {}'.format(self.logradouro, self.numero)
-
-
-class PessoaManager(models.DefaultManager):
-
-    @action('Todas')
-    def list(self):
-        return self.list_display('id', 'nome')
-
-
-@user('email')
-class Pessoa(models.AbstractUser):
-
-    nome = models.CharField(verbose_name='Nome', max_length=255)
-    email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255)
-    foto = models.ImageField(verbose_name='Foto', null=True, blank=True, upload_to='fotos')
-
-    endereco = models.OneToOneField(Endereco, verbose_name='Endereço', null=True, blank=True)
-
-    telefones = models.OneToManyField(Telefone, verbose_name='Telefones')
-
-    class Meta:
-        verbose_name = 'Pessoa'
-        verbose_name_plural = 'Pessoas'
-        list_display = 'nome', 'email'
-
-    def __str__(self):
-        return self.nome
-
-    @action('Cadastrar', atomic=True)
-    def add(self, nome, email, foto, endereco, telefones):
-        self.save()
-
-    @action('Editar')
-    def edit(self):
-        self.save()
-
-    @action('Excluir')
-    def remove(self):
-        self.delete()
-
-    @action('Visualizar')
-    def view(self):
-        return self.values()
-
-    @action('Atualizar Nome')
-    @param(data_atualizacao=models.DateField())
-    def atualizar_nome(self, nome):
-        self.nome = nome
-        self.save()
-
-    @action('Alterar Senha')
-    @param(senha=models.CharField('Senha'))
-    def alterar_senha(self, senha):
-        super().change_password(senha)
-
-
-class PontoTuristicoManager(models.DefaultManager):
-
-    @action('Todos')
-    def list(self):
-        return self.all()
-
-    @attr('Referenciados')
-    def referenciados(self):
-        return self.filter(cidade__isnull=False)
-
-    @attr('Referenciados')
-    @param(sigla=models.CharField())
-    def referenciados_no_estado(self, sigla):
-        return self.filter(cidade__estado__sigla=sigla)
-
-    @classmethod
-    @action('Remover Tudo')
-    def remover_tudo(cls):
-        PontoTuristico.objects.all().delete()
-
-
-class PontoTuristico(models.Model):
-    nome = models.CharField(verbose_name='Nome', max_length=255)
-
-    class Meta:
-        verbose_name = 'Ponto Turístico'
-        verbose_name_plural = 'Pontos Turísticos'
-
-    def __str__(self):
-        return '{}'.format(self.nome)
-
-    @action('Cadastrar')
-    def add(self):
-        self.save()
-
-    @action('Editar')
-    def edit(self):
-        self.save()
-
-    @action('Atualizar Nome')
-    def atualizar_nome(self, nome):
-        raise models.ValidationError('Período de edição ainda não está aberto')
-
-    @action('Visualizar')
-    def view(self):
-        return self.values()
-
-    @action('Remover')
-    def remove(self):
-        self.delete()
-
-    @attr('Cidades')
-    def get_cidades(self):
-        return self.cidade_set.all()
 
 
 class EstadoManager(models.DefaultManager):
@@ -263,42 +140,6 @@ class Estado(models.Model):
         pass
 
 
-class PresidenteManager(models.DefaultManager):
-    @action('Presidentes')
-    def list(self):
-        return self.all()
-
-
-@role()
-class Presidente(Pessoa):
-
-    class Meta:
-        verbose_name = 'Presidente'
-        verbose_name_plural = 'Presidentes'
-
-    def __str__(self):
-        return '{}'.format(self.nome)
-
-
-class GovernadorManager(models.DefaultManager):
-    @action('Listar')
-    def list(self):
-        return self.all()
-
-
-@role('pessoa')
-class Governador(models.Model):
-    pessoa = models.ForeignKey(Pessoa, verbose_name='Pessoa')
-    estado = models.ForeignKey(Estado, verbose_name='Estado')
-
-    class Meta:
-        verbose_name = 'Governador'
-        verbose_name_plural = 'Governadores'
-
-    def __str__(self):
-        return '{} - {}'.format(self.pessoa, self.estado)
-
-
 class CidadeManager(models.DefaultManager):
 
     @action('Listar', lookups=('governador', 'prefeito', 'presidente'))
@@ -315,9 +156,9 @@ class CidadeManager(models.DefaultManager):
 class Cidade(models.Model):
     nome = models.CharField(verbose_name='Nome', max_length=255)
     estado = models.ForeignKey(Estado, verbose_name='Estado', on_delete=models.CASCADE, filter_display=('nome', 'sigla'))
-    prefeito = models.RoleForeignKey(Pessoa, verbose_name='Prefeito', null=True, blank=True)
-    vereadores = models.RoleManyToManyField(Pessoa, verbose_name='Vereadores', blank=True, related_name='cidades_legisladas')
-    pontos_turisticos = models.ManyToManyField(PontoTuristico, verbose_name='Pontos Turísticos', blank=True)
+    prefeito = models.RoleForeignKey('base.Pessoa', verbose_name='Prefeito', null=True, blank=True)
+    vereadores = models.RoleManyToManyField('base.Pessoa', verbose_name='Vereadores', blank=True, related_name='cidades_legisladas')
+    pontos_turisticos = models.ManyToManyField('base.PontoTuristico', verbose_name='Pontos Turísticos', blank=True)
 
     class Meta:
         verbose_name = 'Estado'
@@ -329,6 +170,12 @@ class Cidade(models.Model):
     @action('Adicionar')
     def add(self):
         self.save()
+
+    @staticmethod
+    def add_choices():
+        return dict(
+            prefeito=Pessoa.objects.filter(id__lt=3)
+        )
 
     @action('Editar', lookups=('self__prefeito', 'self__estado__governador__pessoa', 'presidente'))
     def edit(self):
@@ -369,3 +216,162 @@ class Cidade(models.Model):
     def set_prefeito(self, prefeito):
         self.prefeito = prefeito
         self.save()
+
+
+class Endereco(models.Model):
+    logradouro = models.CharField(verbose_name='Logradouro', max_length=100)
+    numero = models.IntegerField(verbose_name='Número')
+    cidade = models.ForeignKey(Cidade, verbose_name='Cidade', null=True)
+
+    class Meta:
+        verbose_name = 'Endereço'
+        verbose_name_plural = 'Endereços'
+
+    def __str__(self):
+        return '{}, {}, {}'.format(self.logradouro, self.numero, self.cidade)
+
+
+class PessoaManager(models.DefaultManager):
+
+    @action('Todas')
+    def list(self):
+        return self.list_display('id', 'nome')
+
+
+@user('email')
+class Pessoa(models.AbstractUser):
+
+    nome = models.CharField(verbose_name='Nome', max_length=255)
+    email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255)
+    foto = models.ImageField(verbose_name='Foto', null=True, blank=True, upload_to='fotos')
+
+    endereco = models.OneToOneField(Endereco, verbose_name='Endereço', null=True, blank=True)
+
+    telefones = models.OneToManyField(Telefone, verbose_name='Telefones')
+
+    class Meta:
+        verbose_name = 'Pessoa'
+        verbose_name_plural = 'Pessoas'
+        list_display = 'nome', 'email'
+
+    def __str__(self):
+        return self.nome
+
+    @action('Cadastrar', atomic=True)
+    def add(self, nome, email, foto, endereco, telefones):
+        self.save()
+
+    @action('Editar')
+    def edit(self):
+        self.save()
+
+    @action('Excluir')
+    def remove(self):
+        self.delete()
+
+    @action('Visualizar')
+    def view(self):
+        return self.values()
+
+    @action('Atualizar Nome')
+    @param(data_atualizacao=models.DateField())
+    def atualizar_nome(self, nome):
+        self.nome = nome
+        self.save()
+
+    @action('Alterar Senha')
+    @param(senha=models.CharField('Senha'))
+    def alterar_senha(self, senha):
+        super().change_password(senha)
+
+
+class PontoTuristicoManager(models.DefaultManager):
+
+    @action('Todos')
+    def list(self):
+        return self.all()
+
+    @attr('Referenciados')
+    def referenciados(self):
+        return self.filter(cidade__isnull=False)
+
+    @attr('Referenciados')
+    @param(sigla=models.CharField())
+    def referenciados_no_estado(self, sigla):
+        return self.filter(cidade__estado__sigla=sigla)
+
+    @classmethod
+    @action('Remover Tudo')
+    def remover_tudo(cls):
+        PontoTuristico.objects.all().delete()
+
+
+class PontoTuristico(models.Model):
+    nome = models.CharField(verbose_name='Nome', max_length=255)
+
+    class Meta:
+        verbose_name = 'Ponto Turístico'
+        verbose_name_plural = 'Pontos Turísticos'
+
+    def __str__(self):
+        return '{}'.format(self.nome)
+
+    @action('Cadastrar')
+    def add(self):
+        self.save()
+
+    @action('Editar')
+    def edit(self):
+        self.save()
+
+    @action('Atualizar Nome')
+    def atualizar_nome(self, nome):
+        raise models.ValidationError('Período de edição ainda não está aberto')
+
+    @action('Visualizar')
+    def view(self):
+        return self.values()
+
+    @action('Remover')
+    def remove(self):
+        self.delete()
+
+    @attr('Cidades')
+    def get_cidades(self):
+        return self.cidade_set.all()
+
+
+class PresidenteManager(models.DefaultManager):
+    @action('Presidentes')
+    def list(self):
+        return self.all()
+
+
+@role()
+class Presidente(Pessoa):
+
+    class Meta:
+        verbose_name = 'Presidente'
+        verbose_name_plural = 'Presidentes'
+
+    def __str__(self):
+        return '{}'.format(self.nome)
+
+
+class GovernadorManager(models.DefaultManager):
+    @action('Listar')
+    def list(self):
+        return self.all()
+
+
+@role('pessoa')
+class Governador(models.Model):
+    pessoa = models.ForeignKey(Pessoa, verbose_name='Pessoa')
+    estado = models.ForeignKey(Estado, verbose_name='Estado')
+
+    class Meta:
+        verbose_name = 'Governador'
+        verbose_name_plural = 'Governadores'
+
+    def __str__(self):
+        return '{} - {}'.format(self.pessoa, self.estado)

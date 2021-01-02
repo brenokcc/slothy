@@ -12,6 +12,7 @@ from django.db.models.fields.files import FieldFile
 from django.forms import modelform_factory
 from collections import OrderedDict
 from slothy.api.models import ValidationError, ManyToManyField
+from slothy.api.utils import format_value, make_choices
 
 
 class InputValidationError(BaseException):
@@ -184,7 +185,9 @@ class Api(APIView):
                         func = model.objects.list
                         meta_func = getattr(model.objects, '_queryset_class').list
 
-                    output, metadata, initial_data = self.apply(model, func, meta_func or func, instance, data, exclude_field)
+                    output, metadata, initial_data, message = self.apply(
+                        model, func, meta_func or func, instance, data, exclude_field
+                    )
                     # output
                     if output is not None:
                         if isinstance(output, dict):
@@ -195,7 +198,7 @@ class Api(APIView):
                     response['input']['metadata'] = metadata
                     # data
                     response['input']['data'] = initial_data
-                    response['message'] = getattr(meta_func or func, '_metadata', {}).get('message')
+                    response['message'] = message
 
         except InputValidationError as e:
             response['errors'] = e.errors
@@ -211,6 +214,7 @@ class Api(APIView):
     def apply(self, _model, func, meta_func, instance, data, exclude_field):
         metadata = getattr(meta_func, '_metadata')
         custom_fields = metadata.get('fields', {})
+        message = metadata.get('message')
         # print(metadata)
         if 'params' in metadata:
             if metadata['params']:
@@ -233,7 +237,7 @@ class Api(APIView):
                         _exclude = None
                     else:  # lets return because no form is needed
                         try:
-                            return func(), {}, {}
+                            return func(), {}, {}, message
                         except ValidationError as e:
                             raise InputValidationError([{'message': e.message, 'field': None}], {}, {})
 
@@ -254,12 +258,20 @@ class Api(APIView):
                     if exclude_field and exclude_field in self.fields:
                         del(self.fields[exclude_field])
 
+                    # choices
+                    custom_choices_method_name = '{}_choices'.format(metadata['name'])
+                    if hasattr(instance, custom_choices_method_name):
+                        custom_choices = getattr(instance, custom_choices_method_name)()
+                    else:
+                        custom_choices = {}
+
                     # metadata
                     self.metadata = {}
                     for name, field in self.fields.items():
-                        choices = None
+                        choices = make_choices(name, field, custom_choices)
+                        field_type = type(field).__name__.replace('Field', '').lower()
                         item = OrderedDict(
-                            label=field.label, required=field.required,
+                            label=field.label, type=field_type, required=field.required,
                             mask=None, value=None, choices=choices, help_text=field.help_text
                         )
                         self.metadata[name] = item
@@ -275,9 +287,10 @@ class Api(APIView):
                         del (self.fields[one_to_one_field_name])
                         one_to_one_form_cls = modelform_factory(one_to_one_field.queryset.model, exclude=())
                         for name, field in one_to_one_form_cls.base_fields.items():
-                            choices = None
+                            choices = make_choices(name, field, custom_choices)
+                            field_type = type(field).__name__.replace('Field', '').lower()
                             item = OrderedDict(
-                                label=field.label, required=field.required,
+                                label=field.label, type=field_type, required=field.required,
                                 mask=None, value=None, choices=choices, help_text=field.help_text
                             )
                             one_to_one_items[name] = item
@@ -301,9 +314,10 @@ class Api(APIView):
                         del(self.fields[one_to_many_field_name])
                         one_to_many_form_cls = modelform_factory(one_to_many_field.queryset.model, exclude=())
                         for name, field in one_to_many_form_cls.base_fields.items():
-                            choices = None
+                            choices = make_choices(name, field, custom_choices)
+                            field_type = type(field).__name__.replace('Field', '').lower()
                             item = OrderedDict(
-                                label=field.label, required=field.required,
+                                label=field.label, type=field_type, required=field.required,
                                 mask=None, value=None, choices=choices, help_text=field.help_text
                             )
                             one_to_many_items[name] = item
@@ -333,10 +347,13 @@ class Api(APIView):
                         if isinstance(value, FieldFile):
                             value = value.name or None
                         self.initial_data[name] = value
+                        self.metadata[name]['value'] = format_value(field.to_python(value))
                     for one_to_one_field_name, one_to_one_form in self.one_to_one_forms.items():
                         self.initial_data[one_to_one_field_name] = {}
-                        for name in one_to_one_form.fields:
-                            self.initial_data[one_to_one_field_name][name] = one_to_one_form.initial.get(name)
+                        for name, field in one_to_one_form.fields.items():
+                            value = one_to_one_form.initial.get(name)
+                            self.initial_data[one_to_one_field_name][name] = value
+                            self.metadata[one_to_one_field_name][name]['value'] = format_value(field.to_python(value))
                     for one_to_many_field_name, one_to_many_forms in self.one_to_many_forms.items():
                         self.initial_data[one_to_many_field_name] = []
                         for one_to_many_form in one_to_many_forms:
@@ -392,7 +409,7 @@ class Api(APIView):
                     if inner_errors:
                         raise InputValidationError(inner_errors, self.metadata, self.initial_data)
                     else:
-                        return result, self.metadata, self.initial_data
+                        return result, self.metadata, self.initial_data, message
 
             form = Form(data=data or None, instance=instance)
             if form.is_valid():
@@ -402,10 +419,10 @@ class Api(APIView):
                 else:
                     return form.save()
             else:
-                return None, form.metadata, form.initial_data
+                return None, form.metadata, form.initial_data, None
 
         else:
             try:
-                return func(), {}, {}
+                return func(), {}, {}, message
             except ValidationError as e:
                 raise InputValidationError([{'message': e.message, 'field': None}], {}, {})
