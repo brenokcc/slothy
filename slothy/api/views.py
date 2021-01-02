@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from django.forms import ModelForm
-from slothy.api import utils
+from django.db.models.fields.files import FieldFile
 from django.forms import modelform_factory
 from collections import OrderedDict
 from slothy.api.models import ValidationError, ManyToManyField
@@ -183,20 +183,17 @@ class Api(APIView):
                         func = model.objects.list
                         meta_func = getattr(model.objects, '_queryset_class').list
 
-                    output, metadata = self.apply(model, func, meta_func or func, instance, data, exclude_field)
+                    output, metadata, initial_data = self.apply(model, func, meta_func or func, instance, data, exclude_field)
+                    # output
                     if output is not None:
                         if isinstance(output, dict):
                             response['output'] = output
                         else:
                             response['output'] = output.serialize()
+                    # metadata
                     response['input']['metadata'] = metadata
-                    for field_name in metadata:
-                        value = None
-                        if type(metadata[field_name]) == list:
-                            value = [{}]
-                            for inner_field_name in metadata[field_name][0]:
-                                value[0][inner_field_name] = None
-                        response['input']['data'][field_name] = value
+                    # data
+                    response['input']['data'] = initial_data
                     response['message'] = getattr(meta_func or func, '_metadata', {}).get('message')
 
         except InputValidationError as e:
@@ -238,7 +235,7 @@ class Api(APIView):
                         _exclude = None
                     else:  # lets return because no form is needed
                         try:
-                            return func(), {}
+                            return func(), {}, {}
                         except ValidationError as e:
                             raise InputValidationError([{'message': e.message, 'field': None}], {})
 
@@ -259,7 +256,7 @@ class Api(APIView):
                     if exclude_field and exclude_field in self.fields:
                         del(self.fields[exclude_field])
 
-                    # set metadata
+                    # metadata
                     self.metadata = {}
                     for name, field in self.fields.items():
                         choices = None
@@ -269,6 +266,33 @@ class Api(APIView):
                         )
                         self.metadata[name] = item
 
+                    # one-to-one
+                    self.one_to_one_forms = {}
+                    one_to_one_field_names = [
+                        name for name in self.fields if hasattr(self.fields[name], '_is_one_to_one')
+                    ]
+                    for one_to_one_field_name in one_to_one_field_names:
+                        one_to_one_items = {}
+                        one_to_one_field = self.fields[one_to_one_field_name]
+                        del (self.fields[one_to_one_field_name])
+                        one_to_one_form_cls = modelform_factory(one_to_one_field.queryset.model, exclude=())
+                        for name, field in one_to_one_form_cls.base_fields.items():
+                            choices = None
+                            item = OrderedDict(
+                                label=field.label, required=field.required,
+                                mask=None, value=None, choices=choices, help_text=field.help_text
+                            )
+                            one_to_one_items[name] = item
+                        self.metadata[one_to_one_field_name] = one_to_one_items
+                        one_to_one_form_instance = getattr(self.instance, one_to_one_field_name)
+                        one_to_one_form_data = data.get(one_to_one_field_name)
+                        one_to_one_form = one_to_one_form_cls(
+                            data=one_to_one_form_data,
+                            instance=one_to_one_form_instance
+                        )
+                        self.one_to_one_forms[one_to_one_field_name] = one_to_one_form
+
+                    # one-to-many
                     self.one_to_many_forms = {}
                     one_to_many_field_names = [
                         name for name in self.fields if hasattr(self.fields[name], '_is_one_to_many')
@@ -277,9 +301,8 @@ class Api(APIView):
                         one_to_many_items = {}
                         one_to_many_field = self.fields[one_to_many_field_name]
                         del(self.fields[one_to_many_field_name])
-                        one_to_many_form = modelform_factory(one_to_many_field.queryset.model, exclude=())
-                        self.one_to_many_forms[one_to_many_field_name] = one_to_many_form
-                        for name, field in one_to_many_form.base_fields.items():
+                        one_to_many_form_cls = modelform_factory(one_to_many_field.queryset.model, exclude=())
+                        for name, field in one_to_many_form_cls.base_fields.items():
                             choices = None
                             item = OrderedDict(
                                 label=field.label, required=field.required,
@@ -287,30 +310,83 @@ class Api(APIView):
                             )
                             one_to_many_items[name] = item
                         self.metadata[one_to_many_field_name] = [one_to_many_items]
+                        self.one_to_many_forms[one_to_many_field_name] = []
+                        one_to_many_data = data.get(one_to_many_field_name, [])
+                        one_to_many_instances = self.instance.pk and getattr(
+                            self.instance, one_to_many_field_name).order_by('id') or []
+
+                        for i in range(0, max(len(one_to_many_data), len(one_to_many_instances))):
+                            one_to_many_form_data = None
+                            one_to_many_form_instance = None
+                            if len(one_to_many_data) > i:
+                                one_to_many_form_data = one_to_many_data[i]
+                            if len(one_to_many_instances) > i:
+                                one_to_many_form_instance = one_to_many_instances[i]
+                            one_to_many_form = one_to_many_form_cls(
+                                instance=one_to_many_form_instance,
+                                data=one_to_many_form_data
+                            )
+                            # import pdb; pdb.set_trace()
+                            self.one_to_many_forms[one_to_many_field_name].append(one_to_many_form)
+
+                    # initial data
+                    self.initial_data = {}
+                    for name, field in self.fields.items():
+                        value = self.initial.get(name)
+                        if isinstance(value, FieldFile):
+                            value = value.name or None
+                        self.initial_data[name] = value
+                    for one_to_one_field_name, one_to_one_form in self.one_to_one_forms.items():
+                        self.initial_data[one_to_one_field_name] = {}
+                        for name in one_to_one_form.fields:
+                            self.initial_data[one_to_one_field_name][name] = one_to_one_form.initial.get(name)
+                    for one_to_many_field_name, one_to_many_forms in self.one_to_many_forms.items():
+                        self.initial_data[one_to_many_field_name] = []
+                        for one_to_many_form in one_to_many_forms:
+                            one_to_many_initial_data = {}
+                            for name in one_to_many_form.fields:
+                                one_to_many_initial_data[name] = one_to_many_form.initial.get(name)
+                            self.initial_data[one_to_many_field_name].append(one_to_many_initial_data)
 
                 def save(self, *args, **kwargs):
                     # print(data, form.cleaned_data)
                     # print(form.fields.keys(), custom_fields.keys(), metadata['params'])
+
+                    # one-to-one
+                    for one_to_one_field_name, one_to_one_form in self.one_to_one_forms.items():
+                        if one_to_one_form.is_valid():
+                            one_to_one_form.save()
+                            setattr(self.instance, one_to_one_field_name, one_to_one_form.instance)
+                        elif one_to_one_form.errors:
+                            inner_errors = []
+                            for i, (inner_field_name, inner_messages) in enumerate(one_to_one_form.errors.items()):
+                                inner_errors.append(
+                                    {'message': ','.join(inner_messages), 'field': one_to_one_field_name,
+                                     'index': i, 'inner': inner_field_name}
+                                )
+                            raise InputValidationError(inner_errors, self.metadata)
+
                     params = {}
                     for param in metadata['params']:
                         params[param] = self.cleaned_data.get(param)
                     result = func(**params)
-                    for one_to_many_field_name in self.one_to_many_forms:
-                        form_cls = self.one_to_many_forms[one_to_many_field_name]
-                        for inner_data in data[one_to_many_field_name]:
-                            inner_form = form_cls(data=inner_data)
-                            if inner_form.is_valid():
-                                inner_form.save()
-                                getattr(self.instance, one_to_many_field_name).add(inner_form.instance)
-                            elif inner_form.errors:
+
+                    # one-to-many
+                    for one_to_many_field_name, one_to_many_forms in self.one_to_many_forms.items():
+                        for one_to_many_form in one_to_many_forms:
+                            if one_to_many_form.is_valid():
+                                one_to_many_form.save()
+                                getattr(self.instance, one_to_many_field_name).add(one_to_many_form.instance)
+                            elif one_to_many_form.errors:
                                 inner_errors = []
-                                for i, (inner_field_name, messages) in enumerate(inner_form.errors.items()):
+                                for i, (inner_field_name, inner_messages) in enumerate(one_to_many_form.errors.items()):
                                     inner_errors.append(
-                                        {'message': ','.join(messages), 'field': one_to_many_field_name, 'index': i,
-                                         'inner': inner_field_name}
+                                        {'message': ','.join(inner_messages), 'field': one_to_many_field_name,
+                                         'index': i, 'inner': inner_field_name}
                                     )
                                 raise InputValidationError(inner_errors, self.metadata)
-                    return result, self.metadata
+
+                    return result, self.metadata, self.initial_data
 
             form = Form(data=data or None, instance=instance)
             if form.is_valid():
@@ -328,10 +404,10 @@ class Api(APIView):
                     errors.append({'message': ','.join(messages), 'field': field_name})
                 raise InputValidationError(errors, form.metadata)
             else:
-                return None, form.metadata
+                return None, form.metadata, form.initial_data
 
         else:
             try:
-                return func(), {}
+                return func(), {}, {}
             except ValidationError as e:
                 raise InputValidationError([{'message': e.message, 'field': None}], {})

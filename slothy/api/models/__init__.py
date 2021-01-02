@@ -35,6 +35,17 @@ class ForeignKey(models.ForeignKey):
         super().__init__(to, on_delete, **kwargs)
 
 
+class OneToOneField(models.OneToOneField):
+    def __init__(self, to, **kwargs):
+        on_delete = kwargs.pop('on_delete', models.SET_NULL)
+        super().__init__(to, on_delete, **kwargs)
+
+    def formfield(self, *args, **kwargs):
+        field = super().formfield(*args, **kwargs)
+        setattr(field, '_is_one_to_one', True)
+        return field
+
+
 class RoleForeignKey(ForeignKey):
     pass
 
@@ -312,7 +323,7 @@ class QuerySet(query.QuerySet):
             if not list_display:
                 local_fields = self.model.get_metadata('local_fields')
                 list_display = [field.name for field in local_fields
-                                if field.name not in exclude]
+                                if field.name not in exclude or field.name == 'id']
             self._list_display = list_display
         return self._list_display
 

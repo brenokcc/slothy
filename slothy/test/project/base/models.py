@@ -16,12 +16,33 @@ class Telefone(models.Model):
         return '({}) {}'.format(self.ddd, self.numero)
 
 
+class Endereco(models.Model):
+    logradouro = models.CharField(verbose_name='Logradouro', max_length=100)
+    numero = models.IntegerField(verbose_name='Número')
+
+    class Meta:
+        verbose_name = 'Endereço'
+        verbose_name_plural = 'Endereços'
+
+    def __str__(self):
+        return '({}) {}'.format(self.logradouro, self.numero)
+
+
+class PessoaManager(models.DefaultManager):
+
+    @action('Todas')
+    def list(self):
+        return self.list_display('id', 'nome')
+
+
 @user('email')
 class Pessoa(models.AbstractUser):
 
     nome = models.CharField(verbose_name='Nome', max_length=255)
     email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255)
     foto = models.ImageField(verbose_name='Foto', null=True, blank=True, upload_to='fotos')
+
+    endereco = models.OneToOneField(Endereco, verbose_name='Endereço', null=True, blank=True)
 
     telefones = models.OneToManyField(Telefone, verbose_name='Telefones')
 
@@ -34,7 +55,7 @@ class Pessoa(models.AbstractUser):
         return self.nome
 
     @action('Cadastrar', atomic=True)
-    def add(self, nome, email, foto, telefones):
+    def add(self, nome, email, foto, endereco, telefones):
         self.save()
 
     @action('Editar')
