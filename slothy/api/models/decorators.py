@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from collections import OrderedDict
 
 order = 0
 
@@ -21,19 +22,34 @@ def role(field='id'):
     return decorate
 
 
-def fieldset(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None):
+def fieldset(verbose_name, fields):
+    def decorate(func):
+        metadata = getattr(func, '_metadata', {})
+        fieldsets = metadata.get('fieldsets', OrderedDict())
+        fieldsets[verbose_name] = type(fields) != str and [
+            type(str_or_tuple) == str and (str_or_tuple,) or str_or_tuple for str_or_tuple in fields
+        ] or fields
+        metadata.update(
+            fieldsets=fieldsets
+        )
+        setattr(func, '_metadata', metadata)
+        return func
+
+    return decorate
+
+
+def viewset(verbose_name, condition=None, lookups=(), category=None, icon=None):
     def decorate(func):
         global order
         order += 1
         metadata = getattr(func, '_metadata', {})
         metadata.update(
             name=func.__name__,
-            type='fieldset',
+            type='viewset',
             verbose_name=verbose_name,
             condition=condition,
             category=category,
             icon=icon,
-            formatter=formatter,
             lookups=lookups,
             order=order
         )

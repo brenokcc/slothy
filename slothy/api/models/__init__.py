@@ -8,7 +8,7 @@ from django.db.models.fields import *
 from django.db.models.fields.files import *
 from django.db.models.fields.related import *
 
-from slothy.api.models.decorators import fieldset
+from slothy.api.models.decorators import viewset
 from slothy.api.utils import getattrr
 from slothy.api import utils
 import zlib
@@ -687,46 +687,46 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
                 satisfied = not satisfied
         return satisfied
 
-    def get_fieldsets_metadata(self):
+    def get_viewset_metadata(self):
         cls = type(self)
-        if not hasattr(cls, '_fieldsets_metadata'):
+        if not hasattr(cls, '_viewset_metadata'):
             default_category = None
-            fieldsets_metadata = []
+            viewset_metadata = []
             categories_names = []
             for attr_name in dir(cls):
                 if attr_name[0] != '_':
                     attr = getattr(cls, attr_name)
                     if hasattr(attr, '_metadata'):
                         metadata = getattr(attr, '_metadata')
-                        if metadata['type'] == 'fieldset':
-                            fieldsets_metadata.append(metadata)
-            fieldsets_metadata = sorted(fieldsets_metadata, key=lambda k: k['order'])
-            for metadata in fieldsets_metadata:
+                        if metadata.get('type') == 'viewset':
+                            viewset_metadata.append(metadata)
+            viewset_metadata = sorted(viewset_metadata, key=lambda k: k['order'])
+            for metadata in viewset_metadata:
                 if metadata['category'] and metadata['category'] not in categories_names:
                     categories_names.append(metadata['category'])
                 if default_category is None:
                     default_category = metadata['category']
-            setattr(cls, '_fieldsets_metadata', fieldsets_metadata)
+            setattr(cls, '_viewset_metadata', viewset_metadata)
             setattr(cls, '_default_category', default_category)
             setattr(cls, '_categories_names', categories_names)
-        return getattr(cls, '_default_category'), getattr(cls, '_categories_names'), getattr(cls, '_fieldsets_metadata')
+        return getattr(cls, '_default_category'), getattr(cls, '_categories_names'), getattr(cls, '_viewset_metadata')
 
     def serialize(self):
         fieldset_names = []
-        default_category, category_names, fieldsets_metadata = self.get_fieldsets_metadata()
+        default_category, category_names, viewset_metadata = self.get_viewset_metadata()
 
         current_category_name = getattr(self, '_current_category_name', None)
         if current_category_name is None:
             current_category_name = default_category
 
-        for metadata in fieldsets_metadata:
+        for metadata in viewset_metadata:
             if metadata['category'] is None:
                 fieldset_names.append(metadata['name'])
 
         categories = {}
         for category_name in category_names:
             category_fieldset_names = []
-            for metadata in fieldsets_metadata:
+            for metadata in viewset_metadata:
                 if metadata['category'] == category_name and category_name == current_category_name:
                     category_fieldset_names.append(metadata['name'])
             if category_fieldset_names:
@@ -735,7 +735,7 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
                 categories[category_name] = []
 
         if not fieldset_names:
-            fieldset_names.append('default_fieldset')
+            fieldset_names.append('default_viewset')
         data = dict(
             fieldsets=self.values(*fieldset_names, verbose=True),
             categories=categories
@@ -748,8 +748,8 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             return self.serialize()
         return ValueSet(self, *lookups, verbose=verbose)
 
-    @fieldset('Dados Gerais')
-    def default_fieldset(self):
+    @viewset('Dados Gerais')
+    def default_viewset(self):
         lookups = self.get_metadata('list_display')
         return self.values(*lookups)
 
@@ -837,7 +837,6 @@ class Group(Model):
     class Meta:
         verbose_name = 'Grupo'
         verbose_name_plural = 'Grupos'
-        list_display = 'name',
 
     def get_users(self):
         from django.conf import settings

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from slothy.api import models
-from slothy.api.models.decorators import param, attr, action, role, user, fieldset
+from slothy.api.models.decorators import param, attr, action, role, user, viewset, fieldset
 
 
 class Telefone(models.Model):
@@ -103,15 +103,15 @@ class Estado(models.Model):
     def view(self):
         return self.values()
 
-    @fieldset('Dados Gerais')
+    @viewset('Dados Gerais')
     def dados_gerais(self):
         return self.values('nome', ('sigla', 'ativo'))
 
-    @fieldset('Dados Populacionais')
+    @viewset('Dados Populacionais')
     def dados_populacionais(self):
         return self.values('get_populacao')
 
-    @fieldset('Cidades')
+    @viewset('Cidades')
     def get_cidades(self):
         return self.cidade_set.all().list_filter('estado')
 
@@ -177,6 +177,10 @@ class Cidade(models.Model):
             prefeito=Pessoa.objects.filter(id__lt=3)
         )
 
+    @staticmethod
+    def add_initial():
+        return dict(nome='Rio Grande do Norte')
+
     @action('Editar', lookups=('self__prefeito', 'self__estado__governador__pessoa', 'presidente'))
     def edit(self):
         self.save()
@@ -185,27 +189,27 @@ class Cidade(models.Model):
     def view(self):
         return self.values()
 
-    @fieldset('Dados Gerais')
+    @viewset('Dados Gerais')
     def get_dados_gerais(self):
         return self.values('nome', ('estado', 'get_qtd_pontos_turisticos')).allow('edit')
 
-    @fieldset('Prefeito', category='Administração')
+    @viewset('Prefeito', category='Administração')
     def get_prefeito(self):
         return self.values('prefeito__nome', 'prefeito__email').allow('set_prefeito')
 
-    @fieldset('Vereadores', category='Administração')
+    @viewset('Vereadores', category='Administração')
     def get_vereadores(self):
         return self.vereadores
 
-    @fieldset('Quantidade de Pontos Turísticos', category='Turismo')
+    @viewset('Quantidade de Pontos Turísticos', category='Turismo')
     def get_qtd_pontos_turisticos(self):
         return self.pontos_turisticos.count()
 
-    @fieldset('Pontos Turísticos', category='Turismo')
+    @viewset('Pontos Turísticos', category='Turismo')
     def get_pontos_turisticos(self):
         return self.pontos_turisticos
 
-    @fieldset('Estatística Populacional', category='Estatística')
+    @viewset('Estatística Populacional', category='Estatística')
     def get_estatisticas(self):
         return {
             'Polulação Infantil': 288989,
@@ -252,12 +256,14 @@ class Pessoa(models.AbstractUser):
     class Meta:
         verbose_name = 'Pessoa'
         verbose_name_plural = 'Pessoas'
-        list_display = 'nome', 'email'
 
     def __str__(self):
         return self.nome
 
     @action('Cadastrar', atomic=True)
+    @fieldset('Dados Gerais', ('nome', ('email', 'foto')))
+    @fieldset('Endereço', 'endereco')
+    @fieldset('Telefones', 'telefones')
     def add(self, nome, email, foto, endereco, telefones):
         self.save()
 

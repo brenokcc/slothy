@@ -130,6 +130,7 @@ def format_value(value):
 
 
 def custom_serialize(obj):
+    from django.db.models.fields.files import FieldFile
     from slothy.api.models import QuerySet, ValueSet, Model
     if isinstance(obj, datetime.datetime):
         return obj.strftime('%d/%m/%Y %H:%M')
@@ -141,6 +142,8 @@ def custom_serialize(obj):
         return dict(fields=obj.get_nested_values(), actions=obj.actions)
     elif isinstance(obj, Model):
         return str(obj)
+    elif isinstance(obj, FieldFile):
+        return obj.name or None
     return obj
 
 

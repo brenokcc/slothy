@@ -249,7 +249,17 @@ class Api(APIView):
                     exclude = _exclude
 
                 def __init__(self, *args, **kwargs):
+
+                    # custom initial
+                    method_name = '{}_initial'.format(metadata['name'])
+                    custom_initial = getattr(instance, method_name)() if hasattr(instance, method_name) else {}
+                    initial = kwargs.pop('initial', {})
+                    for key in custom_initial:
+                        initial[key] = custom_initial[key]
+                    kwargs['initial'] = initial
+
                     super().__init__(*args, **kwargs)
+
                     # custom fields
                     for name, field in custom_fields.items():
                         self.fields[name] = field.formfield()
@@ -258,12 +268,9 @@ class Api(APIView):
                     if exclude_field and exclude_field in self.fields:
                         del(self.fields[exclude_field])
 
-                    # choices
-                    custom_choices_method_name = '{}_choices'.format(metadata['name'])
-                    if hasattr(instance, custom_choices_method_name):
-                        custom_choices = getattr(instance, custom_choices_method_name)()
-                    else:
-                        custom_choices = {}
+                    # custom choices
+                    method_name = '{}_choices'.format(metadata['name'])
+                    custom_choices = getattr(instance, method_name)() if hasattr(instance, method_name) else {}
 
                     # metadata
                     self.metadata = {}
