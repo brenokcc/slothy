@@ -8,7 +8,7 @@ from django.db.models.fields import *
 from django.db.models.fields.files import *
 from django.db.models.fields.related import *
 
-from slothy.api.models.decorators import viewset
+from slothy.api.models.decorators import attr
 from slothy.api.utils import getattrr
 from slothy.api import utils
 import zlib
@@ -222,7 +222,7 @@ class QuerySetStatistic(object):
 
 class ValueSet(UserDict):
 
-    def __init__(self, obj, *lookups, verbose=True):
+    def __init__(self, obj, *lookups, verbose=True, detail=False):
         self.obj = obj
         self.thumbnail = None
         self.actions = []
@@ -242,7 +242,7 @@ class ValueSet(UserDict):
                 value = getattrr(obj, attr)
                 if callable(value):
                     value = value()
-                value = utils.custom_serialize(value)
+                value = utils.custom_serialize(value, detail)
                 self[verbose_name] = value
                 keys.append(verbose_name)
             self.nested_keys.append(keys)
@@ -690,65 +690,76 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
     def get_viewset_metadata(self):
         cls = type(self)
         if not hasattr(cls, '_viewset_metadata'):
-            default_category = None
+            default_display = None
             viewset_metadata = []
-            categories_names = []
+            display_names = []
             for attr_name in dir(cls):
                 if attr_name[0] != '_':
                     attr = getattr(cls, attr_name)
                     if hasattr(attr, '_metadata'):
                         metadata = getattr(attr, '_metadata')
-                        if metadata.get('type') == 'viewset':
+                        if metadata.get('type') == 'attr' and metadata.get('display'):
                             viewset_metadata.append(metadata)
             viewset_metadata = sorted(viewset_metadata, key=lambda k: k['order'])
             for metadata in viewset_metadata:
-                if metadata['category'] and metadata['category'] not in categories_names:
-                    categories_names.append(metadata['category'])
-                if default_category is None:
-                    default_category = metadata['category']
+                if metadata.get('display') is not True:
+                    if metadata.get('display') not in display_names:
+                        display_names.append(metadata.get('display'))
+                        if default_display is None:
+                            default_display = metadata.get('display')
             setattr(cls, '_viewset_metadata', viewset_metadata)
-            setattr(cls, '_default_category', default_category)
-            setattr(cls, '_categories_names', categories_names)
-        return getattr(cls, '_default_category'), getattr(cls, '_categories_names'), getattr(cls, '_viewset_metadata')
+            setattr(cls, '_default_display', default_display)
+            setattr(cls, '_display_names', display_names)
+        return getattr(cls, '_default_display'), getattr(cls, '_display_names'), getattr(cls, '_viewset_metadata')
 
     def serialize(self):
         fieldset_names = []
-        default_category, category_names, viewset_metadata = self.get_viewset_metadata()
+        default_display, display_names, viewset_metadata = self.get_viewset_metadata()
 
-        current_category_name = getattr(self, '_current_category_name', None)
-        if current_category_name is None:
-            current_category_name = default_category
+        current_display_name = getattr(self, '_current_display_name', None)
+        if current_display_name is None:
+            current_display_name = default_display
 
         for metadata in viewset_metadata:
-            if metadata['category'] is None:
+            if metadata.get('display') is True:
                 fieldset_names.append(metadata['name'])
 
-        categories = {}
-        for category_name in category_names:
-            category_fieldset_names = []
+        display = {}
+        for display_name in display_names:
+            display_fieldset_names = []
             for metadata in viewset_metadata:
-                if metadata['category'] == category_name and category_name == current_category_name:
-                    category_fieldset_names.append(metadata['name'])
-            if category_fieldset_names:
-                categories[category_name] = self.values(*category_fieldset_names, verbose=True)
+                if metadata['display'] == display_name and display_name == current_display_name:
+                    display_fieldset_names.append(metadata['name'])
+            if display_fieldset_names:
+                display[display_name] = self.values(*display_fieldset_names, verbose=True)
             else:
-                categories[category_name] = []
+                display[display_name] = []
 
         if not fieldset_names:
             fieldset_names.append('default_viewset')
         data = dict(
-            fieldsets=self.values(*fieldset_names, verbose=True),
-            categories=categories
+            fieldsets=self.values(*fieldset_names, verbose=True, detail=True),
+            display=display
         )
 
-        return {'type': 'valueset', 'title': str(self), 'metadata': {'category': None}, 'data': data}
+        return {'type': 'valueset', 'title': str(self), 'metadata': {'display': None}, 'data': data}
 
-    def values(self, *lookups, verbose=True):
+    def values(self, *lookups, verbose=True, detail=False):
+        return ValueSet(self, *lookups, verbose=verbose, detail=detail)
+
+    def view(self, *lookups):
         if not lookups:
             return self.serialize()
-        return ValueSet(self, *lookups, verbose=verbose)
+        else:
+            return self.values(self, *lookups, verbose=True, detail=True)
 
-    @viewset('Dados Gerais')
+    def add(self):
+        self.save()
+
+    def edit(self):
+        self.save()
+
+    @attr('Dados Gerais')
     def default_viewset(self):
         lookups = self.get_metadata('list_display')
         return self.values(*lookups)

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from slothy.api import models
-from slothy.api.models.decorators import param, attr, action, role, user, viewset, fieldset
+from slothy.api.models.decorators import param, attr, action, role, user, fieldset
 
 
 class Telefone(models.Model):
@@ -89,29 +89,29 @@ class Estado(models.Model):
 
     @action('Cadastrar')
     def add(self):
-        self.save()
+        super().add()
 
     @action('Editar')
     def edit(self):
-        self.save()
+        super().edit()
 
     @action('Excluir')
-    def remove(self):
-        self.delete()
+    def delete(self):
+        super().delete()
 
     @action('Visualizar')
     def view(self):
-        return self.values()
+        return super().view()
 
-    @viewset('Dados Gerais')
+    @attr('Dados Gerais', display=True)
     def dados_gerais(self):
         return self.values('nome', ('sigla', 'ativo'))
 
-    @viewset('Dados Populacionais')
+    @attr('Dados Populacionais', display=True)
     def dados_populacionais(self):
         return self.values('get_populacao')
 
-    @viewset('Cidades')
+    @attr('Cidades', display=True)
     def get_cidades(self):
         return self.cidade_set.all().list_filter('estado')
 
@@ -168,8 +168,12 @@ class Cidade(models.Model):
         return '{}/{}'.format(self.nome, self.estado)
 
     @action('Adicionar')
+    @fieldset({
+        'Dados Gerais': ('nome', 'estado'),
+        'Administração': ('prefeito', 'vereadores')
+    })
     def add(self):
-        self.save()
+        super().add()
 
     @staticmethod
     def add_choices():
@@ -183,33 +187,33 @@ class Cidade(models.Model):
 
     @action('Editar', lookups=('self__prefeito', 'self__estado__governador__pessoa', 'presidente'))
     def edit(self):
-        self.save()
+        super().edit()
 
     @action('Visualizar')
     def view(self):
-        return self.values()
+        return super().view()
 
-    @viewset('Dados Gerais')
+    @attr('Dados Gerais', display=True)
     def get_dados_gerais(self):
         return self.values('nome', ('estado', 'get_qtd_pontos_turisticos')).allow('edit')
 
-    @viewset('Prefeito', category='Administração')
+    @attr('Prefeito', display='Administração')
     def get_prefeito(self):
         return self.values('prefeito__nome', 'prefeito__email').allow('set_prefeito')
 
-    @viewset('Vereadores', category='Administração')
+    @attr('Vereadores', display='Administração')
     def get_vereadores(self):
         return self.vereadores
 
-    @viewset('Quantidade de Pontos Turísticos', category='Turismo')
+    @attr('Quantidade de Pontos Turísticos', display='Turismo')
     def get_qtd_pontos_turisticos(self):
         return self.pontos_turisticos.count()
 
-    @viewset('Pontos Turísticos', category='Turismo')
+    @attr('Pontos Turísticos', display='Turismo')
     def get_pontos_turisticos(self):
         return self.pontos_turisticos
 
-    @viewset('Estatística Populacional', category='Estatística')
+    @attr('Estatística Populacional', display='Estatística')
     def get_estatisticas(self):
         return {
             'Polulação Infantil': 288989,
@@ -233,6 +237,14 @@ class Endereco(models.Model):
 
     def __str__(self):
         return '{}, {}, {}'.format(self.logradouro, self.numero, self.cidade)
+
+    @fieldset({'Dados Gerais': ('logradouro', ('numero', 'cidade'))})
+    def add(self):
+        super().add()
+
+    @action('Visualizar')
+    def view(self):
+        return super().view()
 
 
 class PessoaManager(models.DefaultManager):
@@ -261,23 +273,37 @@ class Pessoa(models.AbstractUser):
         return self.nome
 
     @action('Cadastrar', atomic=True)
-    @fieldset('Dados Gerais', ('nome', ('email', 'foto')))
-    @fieldset('Endereço', 'endereco')
-    @fieldset('Telefones', 'telefones')
-    def add(self, nome, email, foto, endereco, telefones):
-        self.save()
+    @fieldset({
+        'Dados Gerais': ('nome', ('email', 'foto')),
+        'Endereço': 'endereco',
+        'Telefones': 'telefones'
+    })
+    def add(self):
+        super().add()
 
     @action('Editar')
     def edit(self):
-        self.save()
+        super().edit()
 
     @action('Excluir')
-    def remove(self):
-        self.delete()
+    def delete(self):
+        super().delete()
 
     @action('Visualizar')
     def view(self):
-        return self.values()
+        return super().view()
+
+    @attr('Dados Gerais', display=True)
+    def dados_gerais(self):
+        return self.values('nome', ('email', 'foto'))
+
+    @attr('Dados de Acesso', display=True)
+    def dados_acesso(self):
+        return self.values(('last_login', 'password'), 'groups')
+
+    @attr('Grupos', display=True)
+    def get_grupos(self):
+        return self.groups
 
     @action('Atualizar Nome')
     @param(data_atualizacao=models.DateField())
@@ -322,25 +348,25 @@ class PontoTuristico(models.Model):
     def __str__(self):
         return '{}'.format(self.nome)
 
+    @action('Visualizar')
+    def view(self):
+        return super().view()
+
     @action('Cadastrar')
     def add(self):
-        self.save()
+        super().add()
 
     @action('Editar')
     def edit(self):
-        self.save()
+        super().edit()
 
     @action('Atualizar Nome')
     def atualizar_nome(self, nome):
         raise models.ValidationError('Período de edição ainda não está aberto')
 
-    @action('Visualizar')
-    def view(self):
-        return self.values()
-
-    @action('Remover')
-    def remove(self):
-        self.delete()
+    @action('Excluir')
+    def delete(self):
+        super().delete()
 
     @attr('Cidades')
     def get_cidades(self):

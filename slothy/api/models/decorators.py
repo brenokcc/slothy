@@ -22,15 +22,28 @@ def role(field='id'):
     return decorate
 
 
-def fieldset(verbose_name, fields):
+def fieldset(dictionary):
     def decorate(func):
         metadata = getattr(func, '_metadata', {})
-        fieldsets = metadata.get('fieldsets', OrderedDict())
-        fieldsets[verbose_name] = type(fields) != str and [
-            type(str_or_tuple) == str and (str_or_tuple,) or str_or_tuple for str_or_tuple in fields
-        ] or fields
+        fieldsets = {}
+        field_width = {}
+        for verbose_name, str_or_tuples in dictionary.items():
+            fieldsets[verbose_name] = []
+            if isinstance(str_or_tuples, str):  # sigle field
+                fieldsets[verbose_name].append((str_or_tuples,))
+                field_width[str_or_tuples] = 100
+            else:  # multiple fields
+                for str_or_tuple in str_or_tuples:
+                    if isinstance(str_or_tuple, str):  # string
+                        fieldsets[verbose_name].append((str_or_tuple,))
+                        field_width[str_or_tuple] = 100
+                    else:  # tuple
+                        fieldsets[verbose_name].append(str_or_tuple)
+                        for field_name in str_or_tuple:
+                            field_width[field_name] = 100//len(str_or_tuple)
         metadata.update(
-            fieldsets=fieldsets
+            fieldsets=fieldsets,
+            field_width=field_width
         )
         setattr(func, '_metadata', metadata)
         return func
@@ -38,29 +51,10 @@ def fieldset(verbose_name, fields):
     return decorate
 
 
-def viewset(verbose_name, condition=None, lookups=(), category=None, icon=None):
+def attr(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None, display=False):
     def decorate(func):
         global order
         order += 1
-        metadata = getattr(func, '_metadata', {})
-        metadata.update(
-            name=func.__name__,
-            type='viewset',
-            verbose_name=verbose_name,
-            condition=condition,
-            category=category,
-            icon=icon,
-            lookups=lookups,
-            order=order
-        )
-        setattr(func, '_metadata', metadata)
-        return func
-
-    return decorate
-
-
-def attr(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None):
-    def decorate(func):
         metadata = getattr(func, '_metadata', {})
         params = func.__code__.co_varnames[1:func.__code__.co_argcount]
         metadata.update(
@@ -72,7 +66,9 @@ def attr(verbose_name, condition=None, formatter=None, lookups=(), category=None
             category=category,
             icon=icon,
             formatter=formatter,
-            lookups=lookups
+            lookups=lookups,
+            order=order,
+            display=display
         )
         setattr(func, '_metadata', metadata)
         return func
@@ -89,7 +85,7 @@ def action(verbose_name, condition=None, formatter=None, lookups=(), category=No
             default_message = 'Cadastro realizado com sucesso'
         elif name == 'edit':
             default_message = 'Edição realizada com sucesso'
-        elif name == 'remove':
+        elif name == 'delete':
             default_message = 'Exclusão realizada com sucesso'
         else:
             default_message = None

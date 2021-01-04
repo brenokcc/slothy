@@ -11,19 +11,19 @@ from slothy.api.utils import setup_signals
 # /login
 # /logout
 
-# /base/estado/list
+# /base/estado
 # /base/estado/ativos
 # /base/estado/inativar
 # /base/estado/inativar_todos
 # /base/estado/<id>/view
-# /base/estado/<id>/edit/
-# /base/estado/<id>/remove/
-# /base/estado/<id>/altualizar_sigla/
-# /base/estado/<id>/get_cidades/
-# /base/estado/<id>/get_cidades/add/
-# /base/estado/<id>/get_cidades/remove/
-# /base/estado/<id>/get_pontos_turisticos/add/
-# /base/estado/<id>/get_pontos_turisticos/remove/
+# /base/estado/<id>/edit
+# /base/estado/<id>/delete
+# /base/estado/<id>/altualizar_sigla
+# /base/estado/<id>/get_cidades
+# /base/estado/<id>/get_cidades/add
+# /base/estado/<id>/get_cidades/remove
+# /base/estado/<id>/get_pontos_turisticos/add
+# /base/estado/<id>/get_pontos_turisticos/remove
 
 # curl -H "Content-Type: application/json" -X POST http://localhost:8000/api/login/ -d '{"username": "brenokcc@yahoo.com.br", "password": "senha"}'
 # curl -H "Content-Type: application/json" -H "Authorization: Token 3853ded71e2cb8299a1e1c7e45c4722a787a45e9" -X GET http://localhost:8000/api/base/estado/
@@ -190,8 +190,8 @@ class MainTestCase(TestCase):
         data = dict(nome='Parque da Cidade')
         r = self.post('/api/base/pontoturistico/1/atualizar_nome/', data=data)
         self.assertIn({'message': 'Período de edição ainda não está aberto', 'field': None}, r['errors'])
-        # remove
-        r = self.post('/api/base/pontoturistico/1/remove/')
+        # delete
+        r = self.post('/api/base/pontoturistico/1/delete/')
         self.assertEqual(r['message'], 'Exclusão realizada com sucesso')
         self.assertEqual(PontoTuristico.objects.count(), 0)
 

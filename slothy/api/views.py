@@ -138,7 +138,7 @@ class Api(APIView):
                         else:
                             instance = model.objects.get(pk=tokens[2])
                             if len(tokens) == 3:  # view object
-                                setattr(instance, '_current_category_name', request.GET.get('category'))
+                                setattr(instance, '_current_display_name', request.GET.get('display'))
                                 func = instance.view
                             else:
                                 if len(tokens) == 4:  # object subset, meta or action
@@ -214,13 +214,15 @@ class Api(APIView):
     def apply(self, _model, func, meta_func, instance, data, exclude_field):
         metadata = getattr(meta_func, '_metadata')
         custom_fields = metadata.get('fields', {})
+        fieldsets = metadata.get('fieldsets', {})
+        field_width = metadata.get('field_width', {})
         message = metadata.get('message')
         # print(metadata)
         if 'params' in metadata:
             if metadata['params']:
                 # we are adding or editing an object and all params are custom fields
                 if metadata['name'] in ('add', 'edit') and len(metadata['params']) == len(custom_fields):
-                    _fields = None
+                    _fields = field_width.keys() or None
                     _exclude = ()
                 # the params are both own and custom fields, so lets explicitally specify the form fields
                 else:
@@ -229,7 +231,7 @@ class Api(APIView):
             else:
                 # lets include all model fields
                 if metadata['name'] in ('add', 'edit'):
-                    _fields = None
+                    _fields = field_width.keys() or None
                     _exclude = ()
                 else:  # lets include no model fields
                     if custom_fields:
@@ -279,7 +281,8 @@ class Api(APIView):
                         field_type = type(field).__name__.replace('Field', '').lower()
                         item = OrderedDict(
                             label=field.label, type=field_type, required=field.required,
-                            mask=None, value=None, choices=choices, help_text=field.help_text
+                            mask=None, value=None, choices=choices, help_text=field.help_text,
+                            width=field_width.get(name, 100)
                         )
                         self.metadata[name] = item
 
@@ -293,12 +296,19 @@ class Api(APIView):
                         one_to_one_field = self.fields[one_to_one_field_name]
                         del (self.fields[one_to_one_field_name])
                         one_to_one_form_cls = modelform_factory(one_to_one_field.queryset.model, exclude=())
+                        if hasattr(one_to_one_field.queryset.model, 'add'):
+                            one_to_one_field_width = getattr(
+                                one_to_one_field.queryset.model.add, '_metadata', {}
+                            ).get('field_width', {})
+                        else:
+                            one_to_one_field_width = {}
                         for name, field in one_to_one_form_cls.base_fields.items():
                             choices = make_choices(name, field, custom_choices)
                             field_type = type(field).__name__.replace('Field', '').lower()
                             item = OrderedDict(
                                 label=field.label, type=field_type, required=field.required,
-                                mask=None, value=None, choices=choices, help_text=field.help_text
+                                mask=None, value=None, choices=choices, help_text=field.help_text,
+                                width=one_to_one_field_width.get(name, 100)
                             )
                             one_to_one_items[name] = item
                         self.metadata[one_to_one_field_name] = one_to_one_items
@@ -325,14 +335,15 @@ class Api(APIView):
                             field_type = type(field).__name__.replace('Field', '').lower()
                             item = OrderedDict(
                                 label=field.label, type=field_type, required=field.required,
-                                mask=None, value=None, choices=choices, help_text=field.help_text
+                                mask=None, value=None, choices=choices, help_text=field.help_text,
+                                width=100//len(one_to_many_form_cls.base_fields)
                             )
                             one_to_many_items[name] = item
                         self.metadata[one_to_many_field_name] = [one_to_many_items]
                         self.one_to_many_forms[one_to_many_field_name] = []
                         one_to_many_data = data.get(one_to_many_field_name, [])
                         one_to_many_instances = self.instance.pk and getattr(
-                            self.instance, one_to_many_field_name).order_by('id') or []
+                            self.instance, one_to_many_field_name).order_by('id') or [None]
 
                         for i in range(0, max(len(one_to_many_data), len(one_to_many_instances))):
                             one_to_many_form_data = None
@@ -368,6 +379,20 @@ class Api(APIView):
                             for name in one_to_many_form.fields:
                                 one_to_many_initial_data[name] = one_to_many_form.initial.get(name)
                             self.initial_data[one_to_many_field_name].append(one_to_many_initial_data)
+
+                    # fieldsets
+                    self.fieldsets = {}
+                    for verbose_name, field_lists in fieldsets.items():
+                        self.fieldsets[verbose_name] = {}
+                        for field_list in field_lists:
+                            for field_name in field_list:
+                                if field_name in self.one_to_one_forms:
+                                    for inner_field_name, inner_field in self.metadata[field_name].items():
+                                        self.fieldsets[verbose_name][inner_field_name] = inner_field
+                                elif field_name in self.one_to_many_forms:
+                                    self.fieldsets[verbose_name] = self.metadata[field_name]
+                                elif field_name in self.metadata:
+                                    self.fieldsets[verbose_name][field_name] = self.metadata[field_name]
 
                 def save(self, *args, **kwargs):
                     result = None
@@ -426,7 +451,7 @@ class Api(APIView):
                 else:
                     return form.save()
             else:
-                return None, form.metadata, form.initial_data, None
+                return None, form.fieldsets, form.initial_data, None
 
         else:
             try:
