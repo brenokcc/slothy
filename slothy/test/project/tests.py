@@ -175,7 +175,7 @@ class MainTestCase(TestCase):
         self.assertEqual(PontoTuristico.objects.count(), 1)
         # list
         r = self.get('/api/base/pontoturistico/')
-        self.assertEqual(len(r['output']['data']), 1)
+        self.assertEqual(len(r['output']['data']['data']), 1)
         # view
         r = self.get('/api/base/pontoturistico/1/')
         self.assertIn([{'Nome': 'Parque do Povo'}], r['output']['data']['fieldsets']['Dados Gerais']['fields'])
@@ -199,38 +199,38 @@ class MainTestCase(TestCase):
         data = dict(nome='Rio Grande do Norte', sigla='RN')
         self.post('/api/base/estado/add/', data=data)
         r = self.get('/api/base/estado/1/get_cidades/')
-        self.assertEqual(r['output']['total'], 0)
+        self.assertEqual(r['output']['data']['total'], 0)
         data = dict(nome='Natal')
         r = self.post('/api/base/estado/1/get_cidades/add/', data=data)
         r = self.get('/api/base/estado/1/get_cidades/')
-        self.assertEqual(r['output']['total'], 1)
+        self.assertEqual(r['output']['data']['total'], 1)
 
         # many-to-many (add)
         data = dict(nome='Morro do Careca')
         r = self.post('/api/base/pontoturistico/add/', data=data)
         self.assertEqual(r['message'], 'Cadastro realizado com sucesso')
         r = self.get('/api/base/pontoturistico/')
-        pk = r['output']['data'][0][0]
+        pk = r['output']['data']['data'][0][0]
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
-        self.assertEqual(r['output']['total'], 0)
+        self.assertEqual(r['output']['data']['total'], 0)
         data = dict(ids=[pk])
         r = self.post('/api/base/cidade/1/get_pontos_turisticos/add/', data=data)
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
-        self.assertEqual(r['output']['total'], 1)
+        self.assertEqual(r['output']['data']['total'], 1)
 
         # many-to-many (remove)
         data = dict(ids=[pk])
         r = self.post('/api/base/cidade/1/get_pontos_turisticos/remove/', data=data)
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
-        self.assertEqual(r['output']['total'], 0)
+        self.assertEqual(r['output']['data']['total'], 0)
 
         # one-to-many (remove)
         r = self.get('/api/base/estado/1/get_cidades/')
-        pk = r['output']['data'][0][0]
+        pk = r['output']['data']['data'][0][0]
         data = dict(id=pk)
         r = self.post('/api/base/estado/1/get_cidades/remove/', data=data)
         r = self.get('/api/base/estado/1/get_cidades/')
-        self.assertEqual(r['output']['total'], 0)
+        self.assertEqual(r['output']['data']['total'], 0)
 
         # many-to-many (reverse)
         sp = Estado.objects.create(nome='São Paulo', sigla='SP')
@@ -238,7 +238,7 @@ class MainTestCase(TestCase):
         data = dict(ids=[guarulhos.pk])
         r = self.post('/api/base/pontoturistico/2/get_cidades/add/', data=data)
         r = self.get('/api/base/pontoturistico/2/get_cidades/')
-        self.assertEqual(r['output']['total'], 1)
+        self.assertEqual(r['output']['data']['total'], 1)
 
     def test_queryset(self):
         estado = Estado(nome='Rio Grande do Norte', sigla='RN')
@@ -246,10 +246,10 @@ class MainTestCase(TestCase):
         estado.get_cidades().add(Cidade(nome='Macaíba'))
         estado.get_cidades().add(Cidade(nome='Natal'))
         response = self.client.get('/api/base/cidade/')
-        metadata = response.data['output']['metadata']
+        metadata = response.data['output']['data']['metadata']
         metadata['q'] = 'Maca'
         response = self.client.post(
-            response.data['output']['path'],
+            response.data['output']['data']['path'],
             data=dict(metadata=json.dumps(metadata))
         )
         print(json.loads(response.content))

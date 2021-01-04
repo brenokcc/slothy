@@ -161,8 +161,8 @@ class Cidade(models.Model):
     pontos_turisticos = models.ManyToManyField('base.PontoTuristico', verbose_name='Pontos Turísticos', blank=True)
 
     class Meta:
-        verbose_name = 'Estado'
-        verbose_name_plural = 'Estados'
+        verbose_name = 'Cidade'
+        verbose_name_plural = 'Cidades'
 
     def __str__(self):
         return '{}/{}'.format(self.nome, self.estado)

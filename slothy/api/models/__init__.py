@@ -504,7 +504,7 @@ class QuerySet(query.QuerySet):
         qs._deserialized = True
         return qs
 
-    def serialize(self):
+    def serialize(self, as_view=False):
         data = []
         serialized_str = base64.b64encode(zlib.compress(cpickle.dumps(self.query))).decode()
 
@@ -581,7 +581,11 @@ class QuerySet(query.QuerySet):
             'data': data,
             'total': self.count()
         }
-        return payload
+
+        if as_view:
+            return {'type': 'listview', 'title': self.model.get_metadata('verbose_name_plural'), 'data': payload}
+        else:
+            return payload
 
     def dumps(self):
         return json.dumps(self.serialize())
@@ -712,8 +716,8 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             setattr(cls, '_display_names', display_names)
         return getattr(cls, '_default_display'), getattr(cls, '_display_names'), getattr(cls, '_viewset_metadata')
 
-    def serialize(self):
-        fieldset_names = []
+    def serialize(self, *lookups, as_view=False):
+        fieldset_names = [lookup for lookup in lookups]
         default_display, display_names, viewset_metadata = self.get_viewset_metadata()
 
         current_display_name = getattr(self, '_current_display_name', None)
@@ -738,20 +742,20 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
         if not fieldset_names:
             fieldset_names.append('default_viewset')
         data = dict(
+            type='object',
             fieldsets=self.values(*fieldset_names, verbose=True, detail=True),
             display=display
         )
-
-        return {'type': 'valueset', 'title': str(self), 'metadata': {'display': None}, 'data': data}
+        if as_view:
+            return {'type': 'objectview', 'title': str(self), 'data': data}
+        else:
+            return data
 
     def values(self, *lookups, verbose=True, detail=False):
         return ValueSet(self, *lookups, verbose=verbose, detail=detail)
 
     def view(self, *lookups):
-        if not lookups:
-            return self.serialize()
-        else:
-            return self.values(self, *lookups, verbose=True, detail=True)
+        return self.serialize(*lookups, as_view=True)
 
     def add(self):
         self.save()

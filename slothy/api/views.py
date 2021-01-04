@@ -190,10 +190,11 @@ class Api(APIView):
                     )
                     # output
                     if output is not None:
+                        # print(type(output))
                         if isinstance(output, dict):
                             response['output'] = output
                         else:
-                            response['output'] = output.serialize()
+                            response['output'] = output.serialize(as_view=True)
                     # metadata
                     response['input']['metadata'] = metadata
                     # data
