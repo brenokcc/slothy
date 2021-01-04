@@ -558,7 +558,7 @@ class QuerySet(query.QuerySet):
                 item.append(value)
             data.append(item)
 
-        payload = {
+        serialized = {
             'type': 'queryset',
             'path': '/util/queryset/{}/{}/'.format(
                 getattr(self.model, '_meta').app_label.lower(),
@@ -583,9 +583,13 @@ class QuerySet(query.QuerySet):
         }
 
         if as_view:
-            return {'type': 'list_view', 'title': self.model.get_metadata('verbose_name_plural'), 'data': payload}
+            return {
+                'type': 'list_view',
+                'title': self.model.get_metadata('verbose_name_plural'),
+                'queryset': serialized
+            }
         else:
-            return payload
+            return serialized
 
     def dumps(self):
         return json.dumps(self.serialize())
@@ -747,7 +751,7 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             display=display
         )
         if as_view:
-            return {'type': 'object_view', 'title': str(self), 'data': data}
+            return {'type': 'object_view', 'title': str(self), 'object': data}
         else:
             return data
 

@@ -194,6 +194,7 @@ class Api(APIView):
                     output, message = self.apply(
                         model, func, meta_func or func, instance, data, exclude_field
                     )
+                    
                     # output
                     if output is not None:
                         # print(type(output))
@@ -215,12 +216,11 @@ class Api(APIView):
 
     def apply(self, _model, func, meta_func, instance, data, exclude_field):
         metadata = getattr(meta_func, '_metadata')
-        custom_fields = metadata.get('fields', {})
-        fieldsets = metadata.get('fieldsets', {})
-        field_width = metadata.get('field_width', {})
-        message = metadata.get('message')
         # print(metadata)
         if 'params' in metadata:
+            custom_fields = metadata.get('fields', {})
+            fieldsets = metadata.get('fieldsets', {})
+            field_width = metadata.get('field_width', {})
             if metadata['params']:
                 # we are adding or editing an object and all params are custom fields
                 if metadata['name'] in ('add', 'edit') and len(metadata['params']) == len(custom_fields):
@@ -241,7 +241,7 @@ class Api(APIView):
                         _exclude = None
                     else:  # lets return because no form is needed
                         try:
-                            return func(), message
+                            return func(), metadata.get('message')
                         except ValidationError as e:
                             raise InputValidationError([{'message': e.message, 'field': None}], {}, {})
 
@@ -455,7 +455,7 @@ class Api(APIView):
                         return dict(
                             type='form_view',
                             title=metadata['verbose_name'],
-                            data=serialized
+                            form=serialized
                         )
                     else:
                         return serialized
@@ -467,12 +467,12 @@ class Api(APIView):
                         form.save()
                 else:
                     form.save()
-                return form, message
+                return form, metadata.get('message')
             else:
                 return form, None
 
         else:
             try:
-                return func(), message
+                return func(), metadata.get('message')
             except ValidationError as e:
                 raise InputValidationError([{'message': e.message, 'field': None}], {}, {})
