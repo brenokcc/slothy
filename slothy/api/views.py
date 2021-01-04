@@ -120,6 +120,7 @@ class Api(APIView):
                     response['message'] = 'Logout realizado com sucesso'
             else:
                 if len(tokens) > 1:
+                    message = None
                     meta_func = None
                     instance = None
                     model = apps.get_model(tokens[0], tokens[1])
@@ -191,11 +192,25 @@ class Api(APIView):
                         func = model.objects.list
                         meta_func = getattr(model.objects, '_queryset_class').list
 
-                    output, message = self.apply(
-                        model, func, meta_func or func, instance, data, exclude_field
-                    )
-                    
-                    # output
+                    metadata = getattr(meta_func or func, '_metadata')
+                    form_cls = self.build_form(model, func, metadata, instance, data, exclude_field)
+                    if form_cls:
+                        form = form_cls(data=data or None, instance=instance)
+                        output = form
+                        if form.is_valid():
+                            if metadata.get('atomic'):
+                                with transaction.atomic():
+                                    form.save()
+                            else:
+                                form.save()
+                            message = metadata.get('message')
+                    else:
+                        try:
+                            output = func()
+                            message = metadata.get('message')
+                        except ValidationError as e:
+                            raise InputValidationError([{'message': e.message, 'field': None}], {}, {})
+
                     if output is not None:
                         # print(type(output))
                         if isinstance(output, dict):
@@ -214,8 +229,7 @@ class Api(APIView):
         response["Access-Control-Allow-Origin"] = "*"
         return response
 
-    def apply(self, _model, func, meta_func, instance, data, exclude_field):
-        metadata = getattr(meta_func, '_metadata')
+    def build_form(self, _model, func, metadata, instance, data, exclude_field):
         # print(metadata)
         if 'params' in metadata:
             custom_fields = metadata.get('fields', {})
@@ -239,9 +253,9 @@ class Api(APIView):
                     if custom_fields:
                         _fields = ()
                         _exclude = None
-                    else:  # lets return because no form is needed
+                    else:  # no form is needed
                         try:
-                            return func(), metadata.get('message')
+                            return None
                         except ValidationError as e:
                             raise InputValidationError([{'message': e.message, 'field': None}], {}, {})
 
@@ -384,6 +398,11 @@ class Api(APIView):
 
                     # fieldsets
                     self.fieldsets = {}
+                    if not fieldsets:
+                        fieldsets['Dados Gerais'] = []
+                        for field_name in self.fields:
+                            fieldsets['Dados Gerais'].append((field_name,))
+
                     for verbose_name, field_lists in fieldsets.items():
                         self.fieldsets[verbose_name] = {}
                         for field_list in field_lists:
@@ -443,12 +462,12 @@ class Api(APIView):
                                         )
 
                     if inner_errors:
-                        raise InputValidationError(inner_errors, self.metadata, self.initial_data)
+                        raise InputValidationError(inner_errors, self.fieldsets, self.initial_data)
 
                 def serialize(self, as_view=True):
                     serialized = dict(
                         type='form',
-                        input=dict(data=self.initial_data, metadata=self.fieldsets or self.metadata),
+                        input=dict(data=self.initial_data, metadata=self.fieldsets),
                         result=self.result
                     )
                     if as_view:
@@ -459,20 +478,5 @@ class Api(APIView):
                         )
                     else:
                         return serialized
-
-            form = Form(data=data or None, instance=instance)
-            if form.is_valid():
-                if metadata.get('atomic'):
-                    with transaction.atomic():
-                        form.save()
-                else:
-                    form.save()
-                return form, metadata.get('message')
-            else:
-                return form, None
-
-        else:
-            try:
-                return func(), metadata.get('message')
-            except ValidationError as e:
-                raise InputValidationError([{'message': e.message, 'field': None}], {}, {})
+            return Form
+        return None

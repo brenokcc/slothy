@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from slothy.api import models
-from slothy.api.models.decorators import param, attr, action, role, user, fieldset
+from slothy.api.models.decorators import user, role, attr, action, fieldset, param
 
 
 class Telefone(models.Model):
