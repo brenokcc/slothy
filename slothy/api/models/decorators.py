@@ -26,24 +26,19 @@ def fieldset(dictionary):
     def decorate(func):
         metadata = getattr(func, '_metadata', {})
         fieldsets = {}
-        field_width = {}
         for verbose_name, str_or_tuples in dictionary.items():
             fieldsets[verbose_name] = []
             if isinstance(str_or_tuples, str):  # sigle field
                 fieldsets[verbose_name].append((str_or_tuples,))
-                field_width[str_or_tuples] = 100
             else:  # multiple fields
                 for str_or_tuple in str_or_tuples:
                     if isinstance(str_or_tuple, str):  # string
                         fieldsets[verbose_name].append((str_or_tuple,))
-                        field_width[str_or_tuple] = 100
                     else:  # tuple
                         fieldsets[verbose_name].append(str_or_tuple)
-                        for field_name in str_or_tuple:
-                            field_width[field_name] = 100//len(str_or_tuple)
+
         metadata.update(
-            fieldsets=fieldsets,
-            field_width=field_width
+            fieldsets=fieldsets
         )
         setattr(func, '_metadata', metadata)
         return func

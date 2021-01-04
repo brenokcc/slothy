@@ -267,7 +267,7 @@ class ValueSet(UserDict):
             _values.append(values)
         return _values
 
-    def serialize(self):
+    def serialize(self, as_view=False):
         return self
 
 
@@ -728,9 +728,10 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
         if current_display_name is None:
             current_display_name = default_display
 
-        for metadata in viewset_metadata:
-            if metadata.get('display') is True:
-                fieldset_names.append(metadata['name'])
+        if not lookups:
+            for metadata in viewset_metadata:
+                if metadata.get('display') is True:
+                    fieldset_names.append(metadata['name'])
 
         display = {}
         for display_name in display_names:
