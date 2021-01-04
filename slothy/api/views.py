@@ -11,7 +11,7 @@ from django.forms import ModelForm
 from django.db.models.fields.files import FieldFile
 from django.forms import modelform_factory
 from collections import OrderedDict
-from slothy.api.models import ValidationError, ManyToManyField
+from slothy.api.models import ValidationError, ManyToManyField, ForeignKey
 from slothy.api.utils import format_value, make_choices
 
 
@@ -87,8 +87,7 @@ class Api(APIView):
     def do(self, request, path, data):
         print('# {}'.format(path))
         data = request.POST or request.GET or data
-        input_dict = dict(data={}, metadata={})
-        response = dict(path='/{}'.format(path), message=None, exception=None, errors=[], input=input_dict, output=None)
+        response = dict(type='http_response', path='/{}'.format(path), message=None, exception=None, errors=[], input=dict(data={}, metadata={}), output=None)
         try:
             if path.endswith('/'):
                 path = path[0:-1]
@@ -157,15 +156,19 @@ class Api(APIView):
                                                 exclude_field = field.name
                                             else:  # remove
 
-                                                def func():  # add or remove
-                                                    pk = qs.get(pk=data['id'])
-                                                    qs.remove(pk)
+                                                def func(id):  # add or remove
+                                                    qs.remove(id)
                                                 metadata = dict(
                                                     name='_',
-                                                    message='Ação realizada com sucesso'
+                                                    params=('id',),
+                                                    verbose_name='Remover',
+                                                    message='Ação realizada com sucesso',
+                                                    fields={'id': ForeignKey(
+                                                        qs.model, verbose_name=qs.model.get_metadata('verbose_name')
+                                                    )}
                                                 )
                                                 setattr(func, '_metadata', metadata)
-                                                response['input']['data'] = {'id': None}
+                                                # response['input']['data'] = {'id': None}
                                         else:  # many-to-many
 
                                             def func(ids):  # add or remove
@@ -174,18 +177,21 @@ class Api(APIView):
                                             metadata = dict(
                                                 name='_',
                                                 params=('ids',),
+                                                verbose_name=tokens[4] == 'add' and 'Adicionar' or 'Remover',
                                                 message='Ação realizada com sucesso',
-                                                fields={'ids': ManyToManyField(qs.model, 'Pontos Turísticos')}
+                                                fields={'ids': ManyToManyField(
+                                                    qs.model, verbose_name=qs.model.get_metadata('verbose_name_plural')
+                                                )}
                                             )
                                             setattr(func, '_metadata', metadata)
-                                            response['input']['data'] = {'ids': None}
+                                            # response['input']['data'] = {'ids': None}
                                     else:
                                         func = None
                     else:
                         func = model.objects.list
                         meta_func = getattr(model.objects, '_queryset_class').list
 
-                    output, metadata, initial_data, message = self.apply(
+                    output, message = self.apply(
                         model, func, meta_func or func, instance, data, exclude_field
                     )
                     # output
@@ -195,15 +201,10 @@ class Api(APIView):
                             response['output'] = output
                         else:
                             response['output'] = output.serialize(as_view=True)
-                    # metadata
-                    response['input']['metadata'] = metadata
-                    # data
-                    response['input']['data'] = initial_data
                     response['message'] = message
 
         except InputValidationError as e:
             response['errors'] = e.errors
-            response['input']['metadata'] = e.metadata
         except BaseException as e:
             traceback.print_exc(file=sys.stdout)
             response.update(exception=str(e))
@@ -240,7 +241,7 @@ class Api(APIView):
                         _exclude = None
                     else:  # lets return because no form is needed
                         try:
-                            return func(), {}, {}, message
+                            return func(), message
                         except ValidationError as e:
                             raise InputValidationError([{'message': e.message, 'field': None}], {}, {})
 
@@ -395,8 +396,10 @@ class Api(APIView):
                                 elif field_name in self.metadata:
                                     self.fieldsets[verbose_name][field_name] = self.metadata[field_name]
 
+                    # result
+                    self.result = None
+
                 def save(self, *args, **kwargs):
-                    result = None
                     inner_errors = []
                     # print(data, form.cleaned_data)
                     # print(form.fields.keys(), custom_fields.keys(), metadata['params'])
@@ -421,7 +424,7 @@ class Api(APIView):
                         for param in metadata['params']:
                             params[param] = self.cleaned_data.get(param)
                         try:
-                            result = func(**params)
+                            self.result = func(**params)
                         except ValidationError as ve:
                             inner_errors.append({'message': ve.message, 'field': None})
 
@@ -441,21 +444,35 @@ class Api(APIView):
 
                     if inner_errors:
                         raise InputValidationError(inner_errors, self.metadata, self.initial_data)
+
+                def serialize(self, as_view=True):
+                    serialized = dict(
+                        type='form',
+                        input=dict(data=self.initial_data, metadata=self.fieldsets or self.metadata),
+                        result=self.result
+                    )
+                    if as_view:
+                        return dict(
+                            type='form_view',
+                            title=metadata['verbose_name'],
+                            data=serialized
+                        )
                     else:
-                        return result, self.metadata, self.initial_data, message
+                        return serialized
 
             form = Form(data=data or None, instance=instance)
             if form.is_valid():
                 if metadata.get('atomic'):
                     with transaction.atomic():
-                        return form.save()
+                        form.save()
                 else:
-                    return form.save()
+                    form.save()
+                return form, message
             else:
-                return None, form.fieldsets, form.initial_data, None
+                return form, None
 
         else:
             try:
-                return func(), {}, {}, message
+                return func(), message
             except ValidationError as e:
                 raise InputValidationError([{'message': e.message, 'field': None}], {}, {})

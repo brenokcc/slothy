@@ -583,7 +583,7 @@ class QuerySet(query.QuerySet):
         }
 
         if as_view:
-            return {'type': 'listview', 'title': self.model.get_metadata('verbose_name_plural'), 'data': payload}
+            return {'type': 'list_view', 'title': self.model.get_metadata('verbose_name_plural'), 'data': payload}
         else:
             return payload
 
@@ -747,7 +747,7 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             display=display
         )
         if as_view:
-            return {'type': 'objectview', 'title': str(self), 'data': data}
+            return {'type': 'object_view', 'title': str(self), 'data': data}
         else:
             return data
 
