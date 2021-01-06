@@ -504,7 +504,7 @@ class QuerySet(query.QuerySet):
         qs._deserialized = True
         return qs
 
-    def serialize(self):
+    def serialize(self, name=None):
         data = []
         serialized_str = base64.b64encode(zlib.compress(cpickle.dumps(self.query))).decode()
 
@@ -558,29 +558,30 @@ class QuerySet(query.QuerySet):
                 item.append(value)
             data.append(item)
 
-        serialized = {
-            'type': 'queryset',
-            'path': '/util/queryset/{}/{}/'.format(
-                getattr(self.model, '_meta').app_label.lower(),
-                self.model.__name__.lower()
-            ),
-            'metadata': not self._deserialized and {
-                'query': signing.dumps(serialized_str),
-                'search': self._search,
-                'filters': self._filters,
-                'actions': self._actions,
-                'subsets': self._subsets,
-                'display': self._display,
-                'subset': self._subset,
-                'q': None,
-                'page': {
-                    'number': self._page + 1,
-                    'size': self._page_size
-                }
-            } or {},
-            'data': data,
-            'total': self.count()
-        }
+        serialized = dict()
+        serialized['type'] = 'queryset'
+        if name:
+            serialized['name'] = name
+        serialized['path'] = '/util/queryset/{}/{}/'.format(
+            getattr(self.model, '_meta').app_label.lower(),
+            self.model.__name__.lower()
+        )
+        serialized['metadata'] = not self._deserialized and {
+            'query': signing.dumps(serialized_str),
+            'search': self._search,
+            'filters': self._filters,
+            'actions': self._actions,
+            'subsets': self._subsets,
+            'display': self._display,
+            'subset': self._subset,
+            'q': None,
+            'page': {
+                'number': self._page + 1,
+                'size': self._page_size
+            }
+        } or {}
+        serialized['data'] = data
+        serialized['total'] = self.count()
 
         return serialized
 

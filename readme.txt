@@ -1,8 +1,6 @@
-token
-    value
-
 message
     text
+    data
 
 error
     text
@@ -14,7 +12,7 @@ object
 	name
 	input
 		dimension
-	fieldsets
+	data
 	    actions
 		fields
 		data

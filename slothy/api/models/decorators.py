@@ -83,7 +83,7 @@ def action(verbose_name, condition=None, formatter=None, lookups=(), category=No
         elif name == 'delete':
             default_message = 'Exclusão realizada com sucesso'
         else:
-            default_message = None
+            default_message = 'Ação realizada com sucesso'
         metadata.update(
             name=name,
             params=params,
