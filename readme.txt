@@ -15,8 +15,9 @@ object
 	input
 		dimension
 	fieldsets
+	    actions
 		fields
-		actions
+		data
 	dimensions
 		name
 		fieldsets

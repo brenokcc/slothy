@@ -227,6 +227,7 @@ class ValueSet(UserDict):
         self.thumbnail = None
         self.actions = []
         self.nested_keys = []
+        self.nested = False
         super().__init__()
         _values = []
         for lookup in lookups:
@@ -242,6 +243,8 @@ class ValueSet(UserDict):
                 value = getattrr(obj, attr)
                 if callable(value):
                     value = value()
+                if isinstance(value, ValueSet):
+                    self.nested = True
                 value = utils.custom_serialize(value, detail)
                 self[verbose_name] = value
                 keys.append(verbose_name)
@@ -266,9 +269,6 @@ class ValueSet(UserDict):
                 values.append({key: self[key]})
             _values.append(values)
         return _values
-
-    def serialize(self, as_view=False):
-        return self
 
 
 class QuerySet(query.QuerySet):
@@ -504,7 +504,7 @@ class QuerySet(query.QuerySet):
         qs._deserialized = True
         return qs
 
-    def serialize(self, as_view=False):
+    def serialize(self):
         data = []
         serialized_str = base64.b64encode(zlib.compress(cpickle.dumps(self.query))).decode()
 
@@ -582,14 +582,7 @@ class QuerySet(query.QuerySet):
             'total': self.count()
         }
 
-        if as_view:
-            return {
-                'type': 'list_view',
-                'title': self.model.get_metadata('verbose_name_plural'),
-                'queryset': serialized
-            }
-        else:
-            return serialized
+        return serialized
 
     def dumps(self):
         return json.dumps(self.serialize())
@@ -720,7 +713,7 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             setattr(cls, '_display_names', display_names)
         return getattr(cls, '_default_display'), getattr(cls, '_display_names'), getattr(cls, '_viewset_metadata')
 
-    def serialize(self, *lookups, as_view=False):
+    def serialize(self, *lookups):
         fieldset_names = [lookup for lookup in lookups]
         default_display, display_names, viewset_metadata = self.get_viewset_metadata()
 
@@ -746,22 +739,19 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
 
         if not fieldset_names:
             fieldset_names.append('default_viewset')
-        data = dict(
+        serialized = dict(
             type='object',
             input=dict(dimension=None),
-            fieldsets=self.values(*fieldset_names, verbose=True, detail=True),
+            data=self.values(*fieldset_names, verbose=True, detail=True),
             dimensions=display
         )
-        if as_view:
-            return {'type': 'object_view', 'title': str(self), 'object': data}
-        else:
-            return data
+        return serialized
 
     def values(self, *lookups, verbose=True, detail=False):
         return ValueSet(self, *lookups, verbose=verbose, detail=detail)
 
     def view(self, *lookups):
-        return self.serialize(*lookups, as_view=False)
+        return self.serialize(*lookups)
 
     def add(self):
         self.save()

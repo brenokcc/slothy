@@ -222,18 +222,10 @@ class ApiModelForm(ModelForm):
         if error or errors:
             raise InputValidationError(error, errors)
 
-    def serialize(self, as_view=True):
-        serialized = dict(
+    def serialize(self):
+        return dict(
             type='form',
             input=self.initial_data,
             fildsets=self.fieldsets,
             result=self.result.serialize() if self.result is not None else None
         )
-        if as_view:
-            return dict(
-                type='form_view',
-                title=self.title,
-                form=serialized
-            )
-        else:
-            return serialized

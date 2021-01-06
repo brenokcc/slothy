@@ -7,7 +7,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from slothy.api.models import ValidationError, ManyToManyField, ForeignKey
+from slothy.api.models import ValidationError, ManyToManyField, ForeignKey, ValueSet
 from slothy.forms import ApiModelForm, InputValidationError
 
 
@@ -114,9 +114,9 @@ class Api(APIView):
                     response = dict(type='exception', text='Recurso inexistente')
             else:
                 if len(tokens) > 1:
-                    message = None
                     meta_func = None
                     instance = None
+                    is_model_attr = False
                     model = apps.get_model(tokens[0], tokens[1])
                     exclude_field = None
                     if len(tokens) > 2:
@@ -137,6 +137,7 @@ class Api(APIView):
                             else:
                                 if len(tokens) == 4:  # object subset, meta or action
                                     func = getattr(instance, tokens[3])  # object meta or action
+                                    is_model_attr = True
                                 else:  # object relation (add or remove)
                                     qs = getattr(instance, tokens[3])()
                                     if tokens[4] in ('add', 'remove'):
@@ -187,7 +188,7 @@ class Api(APIView):
                         meta_func = getattr(model.objects, '_queryset_class').list
 
                     metadata = getattr(meta_func or func, '_metadata')
-                    form_cls = self.build_form(model, func, metadata, instance, exclude_field)
+                    form_cls = self.build_form(model, func, metadata, exclude_field)
                     if form_cls:
                         form = form_cls(data=data or None, instance=instance)
                         if form.is_valid():
@@ -201,17 +202,23 @@ class Api(APIView):
                             else:
                                 response = form.result.serialize()
                         else:
-                            response = form.serialize(as_view=False)
+                            response = form.serialize()
                     else:
                         try:
                             output = func()
+                            print(type(output), metadata['verbose_name'])
                             if output is None:
                                 response = dict(type="message", text=metadata.get('message'))
                             else:
-                                if isinstance(output, dict):
-                                    response = output
+                                if is_model_attr and metadata['type'] == 'attr':
+                                    if isinstance(output, ValueSet) and output.nested:
+                                        response = dict(type='object', name=str(instance), data=output)
+                                    else:
+                                        fieldset = {metadata['verbose_name']: output.serialize() if hasattr(
+                                            output, 'serialize') else output}
+                                        response = dict(type='object', name=str(instance), data=fieldset)
                                 else:
-                                    response = output.serialize(as_view=False)
+                                    response = output.serialize() if hasattr(output, 'serialize') else output
                         except ValidationError as e:
                             response = dict(type='error', text=e.message)
                 else:
@@ -227,7 +234,7 @@ class Api(APIView):
         output["Access-Control-Allow-Origin"] = "*"
         return output
 
-    def build_form(self, _model, func, metadata, instance, exclude_field):
+    def build_form(self, _model, func, metadata, exclude_field):
         # print(metadata)
         if 'params' in metadata:
             custom_fields = metadata.get('fields', {})

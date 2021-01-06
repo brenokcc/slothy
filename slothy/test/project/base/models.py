@@ -205,6 +205,10 @@ class Cidade(models.Model):
     def get_vereadores(self):
         return self.vereadores
 
+    @attr('Teste')
+    def teste(self):
+        return self.values('get_dados_gerais', 'get_qtd_pontos_turisticos')
+
     @attr('Quantidade de Pontos Turísticos', display='Turismo')
     def get_qtd_pontos_turisticos(self):
         return self.pontos_turisticos.count()

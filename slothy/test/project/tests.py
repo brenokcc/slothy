@@ -156,7 +156,7 @@ class MainTestCase(TestCase):
         self.assertIsNotNone(r['data']['token'])
         # getting authenticated user
         r = self.get('/api/user')
-        self.assertIsNotNone(r['fieldsets'])
+        self.assertIsNotNone(r['data'])
         # logging out
         r = self.get('/api/logout')
         self.assertEqual(r['text'], 'Logout realizado com sucesso')
@@ -178,13 +178,13 @@ class MainTestCase(TestCase):
         self.assertEqual(len(r['data']), 1)
         # view
         r = self.get('/api/base/pontoturistico/1/')
-        self.assertIn([{'Nome': 'Parque do Povo'}], r['fieldsets']['Dados Gerais']['fields'])
+        self.assertIn([{'Nome': 'Parque do Povo'}], r['data']['Dados Gerais']['fields'])
         # edit
         data = dict(nome='Parque da Cidade')
         r = self.post('/api/base/pontoturistico/1/edit/', data=data)
         self.assertEqual(r, dict(type='message', text='Edição realizada com sucesso'))
         r = self.get('/api/base/pontoturistico/1/')
-        self.assertIn([{'Nome': 'Parque da Cidade'}], r['fieldsets']['Dados Gerais']['fields'])
+        self.assertIn([{'Nome': 'Parque da Cidade'}], r['data']['Dados Gerais']['fields'])
         self.assertEqual(PontoTuristico.objects.count(), 1)
         # validation error
         data = dict(nome='Parque da Cidade')
@@ -200,12 +200,12 @@ class MainTestCase(TestCase):
         r = self.post('/api/base/estado/add/', data=data)
         self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
         r = self.get('/api/base/estado/1/get_cidades/')
-        self.assertEqual(r['total'], 0)
+        self.assertEqual(r['data']['Cidades']['total'], 0)
         data = dict(nome='Natal')
         r = self.post('/api/base/estado/1/get_cidades/add/', data=data)
         self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
         r = self.get('/api/base/estado/1/get_cidades/')
-        self.assertEqual(r['total'], 1)
+        self.assertEqual(r['data']['Cidades']['total'], 1)
 
         # many-to-many (add)
         data = dict(nome='Morro do Careca')
@@ -214,28 +214,28 @@ class MainTestCase(TestCase):
         r = self.get('/api/base/pontoturistico/')
         pk = r['data'][0][0]
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
-        self.assertEqual(r['total'], 0)
+        self.assertEqual(r['data']['Pontos Turísticos']['total'], 0)
         data = dict(ids=[pk])
         r = self.post('/api/base/cidade/1/get_pontos_turisticos/add/', data=data)
         self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
-        self.assertEqual(r['total'], 1)
+        self.assertEqual(r['data']['Pontos Turísticos']['total'], 1)
 
         # many-to-many (remove)
         data = dict(ids=[pk])
         r = self.post('/api/base/cidade/1/get_pontos_turisticos/remove/', data=data)
         self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
-        self.assertEqual(r['total'], 0)
+        self.assertEqual(r['data']['Pontos Turísticos']['total'], 0)
 
         # one-to-many (remove)
         r = self.get('/api/base/estado/1/get_cidades/')
-        pk = r['data'][0][0]
+        pk = r['data']['Cidades']['data'][0][0]
         data = dict(id=pk)
         r = self.post('/api/base/estado/1/get_cidades/remove/', data=data)
         self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
         r = self.get('/api/base/estado/1/get_cidades/')
-        self.assertEqual(r['total'], 0)
+        self.assertEqual(r['data']['Cidades']['total'], 0)
 
         # many-to-many (reverse)
         sp = Estado.objects.create(nome='São Paulo', sigla='SP')
@@ -244,7 +244,7 @@ class MainTestCase(TestCase):
         r = self.post('/api/base/pontoturistico/2/get_cidades/add/', data=data)
         self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
         r = self.get('/api/base/pontoturistico/2/get_cidades/')
-        self.assertEqual(r['total'], 1)
+        self.assertEqual(r['data']['Cidades']['total'], 1)
 
     def test_queryset(self):
         estado = Estado(nome='Rio Grande do Norte', sigla='RN')

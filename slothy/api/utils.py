@@ -142,7 +142,7 @@ def custom_serialize(obj, detail=False):
         else:
             return ', '.join((str(instance) for instance in obj)) or None
     elif isinstance(obj, ValueSet):
-        return dict(fields=obj.get_nested_values(), actions=obj.actions)
+        return dict(type='fieldset', fields=obj.get_nested_values(), actions=obj.actions)
     elif isinstance(obj, Model):
         return str(obj)
     elif isinstance(obj, FieldFile):
