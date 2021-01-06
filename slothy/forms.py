@@ -7,10 +7,9 @@ from slothy.api.utils import format_value, make_choices
 
 
 class InputValidationError(BaseException):
-    def __init__(self, errors, metadata, initial_data):
+    def __init__(self, error, errors):
+        self.error = error or 'Por favor, corriga os erros abaixo'
         self.errors = errors
-        self.metadata = metadata
-        self.initial_data = initial_data
 
 
 class ApiModelForm(ModelForm):
@@ -180,13 +179,14 @@ class ApiModelForm(ModelForm):
         self.result = None
 
     def save(self, *args, **kwargs):
-        inner_errors = []
+        error = None
+        errors = {}
         # print(data, form.cleaned_data)
         # print(form.fields.keys(), custom_fields.keys(), metadata['params'])
 
         if self.errors:
             for inner_field_name, inner_messages in self.errors.items():
-                inner_errors.append({'message': ','.join(inner_messages), 'field': inner_field_name})
+                errors[inner_field_name] = dict(message=','.join(inner_messages))
         else:
             # one-to-one
             for one_to_one_field_name, one_to_one_form in self.one_to_one_forms.items():
@@ -194,10 +194,9 @@ class ApiModelForm(ModelForm):
                     one_to_one_form.save()
                     setattr(self.instance, one_to_one_field_name, one_to_one_form.instance)
                 elif one_to_one_form.errors:
-                    for i, (inner_field_name, inner_messages) in enumerate(one_to_one_form.errors.items()):
-                        inner_errors.append(
-                            {'message': ','.join(inner_messages), 'field': one_to_one_field_name,
-                             'index': i, 'inner': inner_field_name}
+                    for inner_field_name, inner_messages in one_to_one_form.errors.items():
+                        errors[inner_field_name] = dict(
+                            message=','.join(inner_messages), field=one_to_one_field_name
                         )
             # func
             params = {}
@@ -206,7 +205,7 @@ class ApiModelForm(ModelForm):
             try:
                 self.result = self.func(**params)
             except ValidationError as ve:
-                inner_errors.append({'message': ve.message, 'field': None})
+                error = ''.join(ve.message)
 
             # one-to-many
             for one_to_many_field_name, one_to_many_forms in self.one_to_many_forms.items():
@@ -215,20 +214,19 @@ class ApiModelForm(ModelForm):
                         one_to_many_form.save()
                         getattr(self.instance, one_to_many_field_name).add(one_to_many_form.instance)
                     elif one_to_many_form.errors:
-                        inner_errors = []
                         for i, (inner_field_name, inner_messages) in enumerate(one_to_many_form.errors.items()):
-                            inner_errors.append(
-                                {'message': ','.join(inner_messages), 'field': one_to_many_field_name,
-                                 'index': i, 'inner': inner_field_name}
+                            errors[inner_field_name] = dict(
+                                message=','.join(inner_messages), field=one_to_many_field_name, index=i
                             )
 
-        if inner_errors:
-            raise InputValidationError(inner_errors, self.fieldsets, self.initial_data)
+        if error or errors:
+            raise InputValidationError(error, errors)
 
     def serialize(self, as_view=True):
         serialized = dict(
             type='form',
-            input=dict(data=self.initial_data, metadata=self.fieldsets),
+            input=self.initial_data,
+            fildsets=self.fieldsets,
             result=self.result.serialize() if self.result is not None else None
         )
         if as_view:

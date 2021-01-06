@@ -748,8 +748,9 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             fieldset_names.append('default_viewset')
         data = dict(
             type='object',
+            input=dict(dimension=None),
             fieldsets=self.values(*fieldset_names, verbose=True, detail=True),
-            display=display
+            dimensions=display
         )
         if as_view:
             return {'type': 'object_view', 'title': str(self), 'object': data}
@@ -760,7 +761,7 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
         return ValueSet(self, *lookups, verbose=verbose, detail=detail)
 
     def view(self, *lookups):
-        return self.serialize(*lookups, as_view=True)
+        return self.serialize(*lookups, as_view=False)
 
     def add(self):
         self.save()

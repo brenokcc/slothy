@@ -75,8 +75,8 @@ class Api(APIView):
 
     def do(self, request, path, data):
         print('# {}'.format(path))
+        response = {}
         data = request.POST or request.GET or data
-        response = dict(type='http_response', path='/{}'.format(path), message=None, exception=None, errors=[], input=dict(data={}, metadata={}), output=None)
         try:
             if path.endswith('/'):
                 path = path[0:-1]
@@ -84,29 +84,34 @@ class Api(APIView):
             if len(tokens) == 1:
                 if path == 'user':  # authenticated user
                     if request.user.is_authenticated:
-                        response['output'] = request.user.view()
+                        response = request.user.view()
+                    else:
+                        response = dict(type='error', text='Usuário não autenticado')
                 elif path == 'login':  # user login
                     if data:
                         user = authenticate(request, username=data['username'], password=data['password'])
                         if user:
                             login(request, user)
-                            response['output'] = dict(token=request.user.auth_token.key)
-                            response['message'] = 'Login realizado com sucesso'
+                            token = dict(token=request.user.auth_token.key)
+                            response = dict(type='message', text='Login realizado com sucesso', data=token)
                         else:
-                            response['output'] = dict(token=None)
-                            response['errors'].append({'message': 'Usuário não autenticado', 'field': None})
-                    response['input']['data'] = dict(username=None, password=None)
-                    response['input']['metadata']['username'] = dict(
-                        name='username', label='Login', required=True,
-                        mask=None, value=None, choices=None, help_text=None
-                    )
-                    response['input']['metadata']['password'] = dict(
-                        name='password', label='Senha', required=True,
-                        mask='*****', value=None, choices=None, help_text=None
-                    )
+                            response = dict(type='error', text='Usuário e senha não conferem')
+                    else:
+                        response = dict(
+                            type='form',
+                            input=dict(username=None, password=None),
+                            fieldsets={
+                                'Acesso ao Sistema': {
+                                    'username': dict(label='Login', type='char', required=True, mask=None, value=None, choices=None, help_text=None),
+                                    'password': dict(label='Senha', type='password', required=True, mask='', value=None, choices=None, help_text=None)
+                                }
+                            }
+                        )
                 elif path == 'logout':  # user logout
                     logout(request)
-                    response['message'] = 'Logout realizado com sucesso'
+                    response = dict(type='message', text='Logout realizado com sucesso')
+                else:
+                    response = dict(type='exception', text='Recurso inexistente')
             else:
                 if len(tokens) > 1:
                     message = None
@@ -127,7 +132,7 @@ class Api(APIView):
                         else:
                             instance = model.objects.get(pk=tokens[2])
                             if len(tokens) == 3:  # view object
-                                setattr(instance, '_current_display_name', request.GET.get('display'))
+                                setattr(instance, '_current_display_name', data.get('dimension'))
                                 func = instance.view
                             else:
                                 if len(tokens) == 4:  # object subset, meta or action
@@ -185,38 +190,42 @@ class Api(APIView):
                     form_cls = self.build_form(model, func, metadata, instance, exclude_field)
                     if form_cls:
                         form = form_cls(data=data or None, instance=instance)
-                        output = form
                         if form.is_valid():
                             if metadata.get('atomic'):
                                 with transaction.atomic():
                                     form.save()
                             else:
                                 form.save()
-                            message = metadata.get('message')
+                            if form.result is None:
+                                response = dict(type="message", text=metadata.get('message'))
+                            else:
+                                response = form.result.serialize()
+                        else:
+                            response = form.serialize(as_view=False)
                     else:
                         try:
                             output = func()
-                            message = metadata.get('message')
+                            if output is None:
+                                response = dict(type="message", text=metadata.get('message'))
+                            else:
+                                if isinstance(output, dict):
+                                    response = output
+                                else:
+                                    response = output.serialize(as_view=False)
                         except ValidationError as e:
-                            raise InputValidationError([{'message': e.message, 'field': None}], {}, {})
-
-                    if output is not None:
-                        # print(type(output))
-                        if isinstance(output, dict):
-                            response['output'] = output
-                        else:
-                            response['output'] = output.serialize(as_view=True)
-                    response['message'] = message
+                            response = dict(type='error', text=e.message)
+                else:
+                    response = dict(type='exception', text='Recurso inexistente')
 
         except InputValidationError as e:
-            response['errors'] = e.errors
+            response = dict(type='error', text=e.error, detail=e.errors)
         except BaseException as e:
             traceback.print_exc(file=sys.stdout)
-            response.update(exception=str(e))
+            response = dict(type='exception', text=str(e))
 
-        response = Response(response)
-        response["Access-Control-Allow-Origin"] = "*"
-        return response
+        output = Response(response)
+        output["Access-Control-Allow-Origin"] = "*"
+        return output
 
     def build_form(self, _model, func, metadata, instance, exclude_field):
         # print(metadata)

@@ -147,123 +147,104 @@ class MainTestCase(TestCase):
         pessoa.alterar_senha('senha')
         # getting the metadata
         r = self.get('/api/login')
-        self.assertIsNone(r['exception'])
-        data = r['input']['data']
+        data = r['input']
         # setting the data
         data['username'] = 'brenokcc@yahoo.com.br'
         data['password'] = 'senha'
         r = self.post('/api/login', data=data)
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['message'], 'Login realizado com sucesso')
-        self.assertIsNotNone(r['output']['token'])
+        self.assertEqual(r['text'], 'Login realizado com sucesso')
+        self.assertIsNotNone(r['data']['token'])
         # getting authenticated user
         r = self.get('/api/user')
-        self.assertIsNone(r['exception'])
-        self.assertIsNotNone(r['output'])
+        self.assertIsNotNone(r['fieldsets'])
         # logging out
         r = self.get('/api/logout')
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['message'], 'Logout realizado com sucesso')
+        self.assertEqual(r['text'], 'Logout realizado com sucesso')
         r = self.get('/api/user')
-        self.assertIsNone(r['exception'])
-        self.assertIsNone(r['output'])
+        self.assertEqual(r['text'], 'Usuário não autenticado')
         # wrong password
         data['password'] = '123'
         r = self.post('/api/login', data=data)
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['errors'][0]['message'], 'Usuário não autenticado')
+        self.assertEqual(r['text'], 'Usuário e senha não conferem')
 
     def test_api(self):
         data = dict(nome='Parque do Povo')
         # add
         r = self.post('/api/base/pontoturistico/add/', data=data)
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['message'], 'Cadastro realizado com sucesso')
+        self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
         self.assertEqual(PontoTuristico.objects.count(), 1)
         # list
         r = self.get('/api/base/pontoturistico/')
-        self.assertIsNone(r['exception'])
-        self.assertEqual(len(r['output']['queryset']['data']), 1)
+        self.assertEqual(len(r['data']), 1)
         # view
         r = self.get('/api/base/pontoturistico/1/')
-        self.assertIsNone(r['exception'])
-        self.assertIn([{'Nome': 'Parque do Povo'}], r['output']['object']['fieldsets']['Dados Gerais']['fields'])
+        self.assertIn([{'Nome': 'Parque do Povo'}], r['fieldsets']['Dados Gerais']['fields'])
         # edit
         data = dict(nome='Parque da Cidade')
         r = self.post('/api/base/pontoturistico/1/edit/', data=data)
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['message'], 'Edição realizada com sucesso')
+        self.assertEqual(r, dict(type='message', text='Edição realizada com sucesso'))
         r = self.get('/api/base/pontoturistico/1/')
-        self.assertIsNone(r['exception'])
-        self.assertIn([{'Nome': 'Parque da Cidade'}], r['output']['object']['fieldsets']['Dados Gerais']['fields'])
+        self.assertIn([{'Nome': 'Parque da Cidade'}], r['fieldsets']['Dados Gerais']['fields'])
         self.assertEqual(PontoTuristico.objects.count(), 1)
         # validation error
         data = dict(nome='Parque da Cidade')
         r = self.post('/api/base/pontoturistico/1/atualizar_nome/', data=data)
-        self.assertIsNone(r['exception'])
-        self.assertIn({'message': 'Período de edição ainda não está aberto', 'field': None}, r['errors'])
+        self.assertEqual(r, dict(type='error', text='Período de edição ainda não está aberto', detail={}))
         # delete
         r = self.post('/api/base/pontoturistico/1/delete/')
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['message'], 'Exclusão realizada com sucesso')
+        self.assertEqual(r, dict(type='message', text='Exclusão realizada com sucesso'))
         self.assertEqual(PontoTuristico.objects.count(), 0)
 
         # one-to-many (add)
         data = dict(nome='Rio Grande do Norte', sigla='RN')
-        self.post('/api/base/estado/add/', data=data)
+        r = self.post('/api/base/estado/add/', data=data)
+        self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
         r = self.get('/api/base/estado/1/get_cidades/')
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['output']['queryset']['total'], 0)
+        self.assertEqual(r['total'], 0)
         data = dict(nome='Natal')
         r = self.post('/api/base/estado/1/get_cidades/add/', data=data)
-        self.assertIsNone(r['exception'])
+        self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
         r = self.get('/api/base/estado/1/get_cidades/')
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['output']['queryset']['total'], 1)
+        self.assertEqual(r['total'], 1)
 
         # many-to-many (add)
         data = dict(nome='Morro do Careca')
         r = self.post('/api/base/pontoturistico/add/', data=data)
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['message'], 'Cadastro realizado com sucesso')
+        self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
         r = self.get('/api/base/pontoturistico/')
-        self.assertIsNone(r['exception'])
-        pk = r['output']['queryset']['data'][0][0]
+        pk = r['data'][0][0]
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['output']['queryset']['total'], 0)
+        self.assertEqual(r['total'], 0)
         data = dict(ids=[pk])
         r = self.post('/api/base/cidade/1/get_pontos_turisticos/add/', data=data)
-        self.assertIsNone(r['exception'])
+        self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['output']['queryset']['total'], 1)
+        self.assertEqual(r['total'], 1)
 
         # many-to-many (remove)
         data = dict(ids=[pk])
         r = self.post('/api/base/cidade/1/get_pontos_turisticos/remove/', data=data)
-        self.assertIsNone(r['exception'])
+        self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['output']['queryset']['total'], 0)
+        self.assertEqual(r['total'], 0)
 
         # one-to-many (remove)
         r = self.get('/api/base/estado/1/get_cidades/')
-        pk = r['output']['queryset']['data'][0][0]
+        pk = r['data'][0][0]
         data = dict(id=pk)
         r = self.post('/api/base/estado/1/get_cidades/remove/', data=data)
-        self.assertIsNone(r['exception'])
+        self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
         r = self.get('/api/base/estado/1/get_cidades/')
-        self.assertIsNone(r['exception'])
-        self.assertEqual(r['output']['queryset']['total'], 0)
+        self.assertEqual(r['total'], 0)
 
         # many-to-many (reverse)
         sp = Estado.objects.create(nome='São Paulo', sigla='SP')
         guarulhos = Cidade.objects.create(nome='Guarulhos', estado=sp)
         data = dict(ids=[guarulhos.pk])
         r = self.post('/api/base/pontoturistico/2/get_cidades/add/', data=data)
+        self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
         r = self.get('/api/base/pontoturistico/2/get_cidades/')
-        self.assertEqual(r['output']['queryset']['total'], 1)
+        self.assertEqual(r['total'], 1)
 
     def test_queryset(self):
         estado = Estado(nome='Rio Grande do Norte', sigla='RN')
@@ -271,10 +252,10 @@ class MainTestCase(TestCase):
         estado.get_cidades().add(Cidade(nome='Macaíba'))
         estado.get_cidades().add(Cidade(nome='Natal'))
         response = self.client.get('/api/base/cidade/')
-        metadata = response.data['output']['queryset']['metadata']
+        metadata = response.data['metadata']
         metadata['q'] = 'Maca'
         response = self.client.post(
-            response.data['output']['queryset']['path'],
+            response.data['path'],
             data=dict(metadata=json.dumps(metadata))
         )
         print(json.loads(response.content))
@@ -318,10 +299,11 @@ class MainTestCase(TestCase):
         data = dict(nome='Carlos Breno', email='brenokcc@yahoo.com.br', telefones=telefones)
         r = self.post('/api/base/pessoa/add/', data=data)
         self.assertIsNone(Pessoa.objects.first())
-        error = dict(message='Este campo é obrigatório.', field='telefones', index=0, inner='numero')
-        self.assertEqual(r['errors'], [error])
+        error = dict(numero=dict(message='Este campo é obrigatório.', field='telefones', index=0))
+        self.assertEqual(r['text'], 'Por favor, corriga os erros abaixo')
+        self.assertEqual(r['detail'], error)
         telefones[1]['numero'] = '3272-3898'
         r = self.post('/api/base/pessoa/add/', data=data)
         self.assertIsNotNone(Pessoa.objects.first())
         self.assertEqual(Telefone.objects.count(), 2)
-        self.assertEqual(r['message'], 'Cadastro realizado com sucesso')
+        self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))

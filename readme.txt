@@ -1,5 +1,14 @@
+token
+    value
+
+message
+    text
+
+error
+    text
+
 exception
-    message
+    text
 
 object
 	name
