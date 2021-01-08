@@ -608,6 +608,9 @@ class Manager(manager.BaseManager.from_queryset(QuerySet)):
         self.queryset_class = kwargs.pop('queryset_class', QuerySet)
         super().__init__(*args, **kwargs)
 
+    def all(self):
+        return self.get_queryset().all()
+
     def get_queryset(self):
         return self.queryset_class(self.model, using=self._db)
 
@@ -623,8 +626,21 @@ class ModelBase(base.ModelBase):
         if hasattr(module, '{}Manager'.format(name)):
             queryset_class = getattr(module, '{}Manager'.format(name))
             if issubclass(queryset_class, DefaultManager):
+                class LocalManager(manager.BaseManager.from_queryset(queryset_class)):
+                    def __init__(self, *args, **kwargs):
+                        self.queryset_class = queryset_class
+                        super().__init__(*args, **kwargs)
+
+                    def all(self):
+                        return self.get_queryset().all()
+
+                    def get_queryset(self):
+                        return self.queryset_class(self.model, using=self._db)
+
+                    def get_by_natural_key(self, username):
+                        return self.get(**{self.model.USERNAME_FIELD: username})
                 attrs.update(
-                    objects=manager.BaseManager.from_queryset(queryset_class)()
+                    objects=LocalManager()
                 )
 
         if 'AbstractUser' in (cls.__name__ for cls in bases):

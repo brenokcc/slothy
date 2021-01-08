@@ -104,7 +104,7 @@ class MainTestCase(TestCase):
         estado.add()
         estado = Estado(nome='Rio Grande do Norte', sigla='RN')
         estado.add()
-        print(Estado.objects.list())
+        print(Estado.objects.all())
 
         # one-to-many
         print(estado.get_cidades())
@@ -267,13 +267,13 @@ class MainTestCase(TestCase):
         Cidade.objects.create(nome='Guarulhos', estado=sp)
 
         # states
-        self.assertEqual(Estado.objects.list().apply_lookups(bolsonaro).count(), 2)
-        self.assertEqual(Estado.objects.list().apply_lookups(fatima).count(), 1)
+        self.assertEqual(Estado.objects.all().apply_lookups(bolsonaro).count(), 2)
+        self.assertEqual(Estado.objects.all().apply_lookups(fatima).count(), 1)
 
         # cities
-        self.assertEqual(Cidade.objects.list().apply_lookups(bolsonaro).count(), 4)
-        self.assertEqual(Cidade.objects.list().apply_lookups(fatima).count(), 2)
-        self.assertEqual(Cidade.objects.list().apply_lookups(kelps).count(), 0)
+        self.assertEqual(Cidade.objects.all().apply_lookups(bolsonaro).count(), 4)
+        self.assertEqual(Cidade.objects.all().apply_lookups(fatima).count(), 2)
+        self.assertEqual(Cidade.objects.all().apply_lookups(kelps).count(), 0)
 
         # action lookups
         self.assertTrue(natal.check_lookups('edit', bolsonaro))

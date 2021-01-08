@@ -190,8 +190,8 @@ class Api(APIView):
                                     else:
                                         func = None
                     else:
-                        func = model.objects.list
-                        meta_func = getattr(model.objects, '_queryset_class').list
+                        func = model.objects.all
+                        meta_func = getattr(model.objects, '_queryset_class').all
 
                     metadata = getattr(meta_func or func, '_metadata')
                     form_cls = self.build_form(model, func, metadata, exclude_field)
@@ -222,7 +222,14 @@ class Api(APIView):
                                             output, 'serialize') else output}
                                         response = dict(type='object', name=str(instance), data=fieldset)
                             elif isinstance(output, QuerySet):
-                                response = output.serialize(metadata['verbose_name'])
+                                if metadata['name'] == 'all':
+                                    name = metadata['verbose_name']
+                                else:
+                                    name = '{} {}'.format(
+                                        model.get_metadata('verbose_name_plural'),
+                                        metadata['verbose_name']
+                                    )
+                                response = output.serialize(name)
                             elif isinstance(output, Model):
                                 response = output.serialize()
                             else:

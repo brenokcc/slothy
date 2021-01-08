@@ -17,9 +17,9 @@ class Telefone(models.Model):
 
 class EstadoManager(models.DefaultManager):
 
-    @action('Todos')
-    def list(self):
-        return self.all(
+    @attr('Estados')
+    def all(self):
+        return super().all(
         ).list_display(
             'nome', 'ativo'
         ).list_filter(
@@ -39,7 +39,10 @@ class EstadoManager(models.DefaultManager):
 
     @attr('Ativos')
     def ativos(self):
-        return self.filter(ativo=True)
+        return self.filter(ativo=True).lookups(
+            'presidente',
+            'self__governador__pessoa'
+        )
 
     @attr('Inativos')
     def inativos(self):
@@ -142,9 +145,9 @@ class Estado(models.Model):
 
 class CidadeManager(models.DefaultManager):
 
-    @action('Listar', lookups=('governador', 'prefeito', 'presidente'))
-    def list(self):
-        return self.all().list_filter(
+    @attr('Cidades', lookups=('governador', 'prefeito', 'presidente'))
+    def all(self):
+        return super().all().list_filter(
             'estado'
         ).list_display(
             'id', 'get_dados_gerais'
@@ -253,9 +256,9 @@ class Endereco(models.Model):
 
 class PessoaManager(models.DefaultManager):
 
-    @action('Todas')
-    def list(self):
-        return self.list_display('id', 'nome')
+    @attr('Pessoas')
+    def all(self):
+        return super().all().list_display('id', 'nome')
 
 
 @user('email')
@@ -323,9 +326,9 @@ class Pessoa(models.AbstractUser):
 
 class PontoTuristicoManager(models.DefaultManager):
 
-    @action('Todos')
-    def list(self):
-        return self.all()
+    @attr('Pontos Turísticos')
+    def all(self):
+        return super().all()
 
     @attr('Referenciados')
     def referenciados(self):
@@ -378,9 +381,9 @@ class PontoTuristico(models.Model):
 
 
 class PresidenteManager(models.DefaultManager):
-    @action('Presidentes')
-    def list(self):
-        return self.all()
+    @attr('Presidentes')
+    def all(self):
+        return super().all()
 
 
 @role()
@@ -395,9 +398,9 @@ class Presidente(Pessoa):
 
 
 class GovernadorManager(models.DefaultManager):
-    @action('Listar')
-    def list(self):
-        return self.all()
+    @attr('Governadores')
+    def all(self):
+        return super().all()
 
 
 @role('pessoa')
