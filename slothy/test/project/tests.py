@@ -244,11 +244,17 @@ class MainTestCase(TestCase):
         estado.get_cidades().add(Cidade(nome='Natal'))
         response = self.get('/api/base/cidade/')
         response['input']['q'] = 'Maca'
-        response = self.post(
+        search_response = self.post(
             response['path'],
             data=response['input']
         )
-        print(response)
+        self.assertEqual(type(search_response), list)
+        filter_response = self.post(
+            '{}{}/'.format(response['path'], 'estado'),
+            data=response['input']
+        )
+        self.assertEqual(type(filter_response), dict)
+        self.assertEqual(filter_response['type'], 'queryset')
 
     def test_lookups(self):
         bolsonaro = Presidente.objects.create(nome='Jair Bolsonaro')

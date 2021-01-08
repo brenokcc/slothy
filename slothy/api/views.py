@@ -37,7 +37,7 @@ class QuerysetView(APIView):
                 list_display.append(filter_display)
             qs = field.related_model.objects.filter(
                 pk__in=qs.values_list(filter_name).distinct()
-            ).list_display(*list_display)
+            ).display(*list_display)
             return Response(qs.serialize())
         return Response(qs.serialize())
 

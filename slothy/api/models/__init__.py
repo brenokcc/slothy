@@ -312,7 +312,7 @@ class QuerySet(query.QuerySet):
             field_names = self._list_display
         return super().values_list(*field_names, flat=flat, named=named)
 
-    def list_display(self, *list_display):
+    def display(self, *list_display):
         self._list_display = list_display
         return self
 
@@ -327,7 +327,7 @@ class QuerySet(query.QuerySet):
             self._list_display = list_display
         return self._list_display
 
-    def list_filter(self, *list_filter):
+    def filter_by(self, *list_filter):
         self._list_filter = list_filter
         return self
 
@@ -336,7 +336,7 @@ class QuerySet(query.QuerySet):
             self._list_filter = self.model.get_metadata('list_filter')
         return self._list_filter
 
-    def list_subsets(self, *list_subsets):
+    def subsets(self, *list_subsets):
         self._list_subsets = list_subsets
         return self
 
@@ -345,7 +345,7 @@ class QuerySet(query.QuerySet):
             self._list_subsets = self.model.get_metadata('list_subsets')
         return self._list_subsets
 
-    def list_actions(self, *list_actions):
+    def actions(self, *list_actions):
         self._list_actions = list_actions
         return self
 
@@ -357,14 +357,14 @@ class QuerySet(query.QuerySet):
             list_actions.extend(self.model.get_metadata('list_actions', ()))
         return list_actions
 
-    def list_per_page(self, page_size):
+    def paginate(self, page_size):
         self._page_size = page_size
         return self
 
     def get_page_size(self):
         return self._page_size
 
-    def list_search(self, *search_fields):
+    def search_by(self, *search_fields):
         self._list_search = search_fields
         return self
 

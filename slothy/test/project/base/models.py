@@ -20,17 +20,17 @@ class EstadoManager(models.DefaultManager):
     @attr('Estados')
     def all(self):
         return super().all(
-        ).list_display(
+        ).display(
             'nome', 'ativo'
-        ).list_filter(
+        ).filter_by(
             'ativo'
-        ).list_actions(
+        ).actions(
             'inativar'
-        ).list_search(
+        ).search_by(
             'nome', 'sigla'
-        ).list_subsets(
+        ).subsets(
             'ativos', 'inativos'
-        ).list_per_page(
+        ).paginate(
             10
         ).lookups(
             'presidente',
@@ -116,7 +116,7 @@ class Estado(models.Model):
 
     @attr('Cidades', display=True)
     def get_cidades(self):
-        return self.cidade_set.all().list_filter('estado')
+        return self.cidade_set.all().filter_by('estado')
 
     @action('Ativar')
     def ativar(self):
@@ -147,9 +147,9 @@ class CidadeManager(models.DefaultManager):
 
     @attr('Cidades', lookups=('governador', 'prefeito', 'presidente'))
     def all(self):
-        return super().all().list_filter(
+        return super().all().filter_by(
             'estado'
-        ).list_display(
+        ).display(
             'id', 'get_dados_gerais'
         ).lookups(
             'self__estado__governador__pessoa', 'self__prefeito', 'presidente'
@@ -258,7 +258,7 @@ class PessoaManager(models.DefaultManager):
 
     @attr('Pessoas')
     def all(self):
-        return super().all().list_display('id', 'nome')
+        return super().all().display('id', 'nome')
 
 
 @user('email')
