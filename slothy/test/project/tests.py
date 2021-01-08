@@ -131,15 +131,6 @@ class MainTestCase(TestCase):
         estado.get_cidades().remove(parnamirim)
         print(estado.get_cidades())
 
-        payload = json.loads(Estado.objects.list().dumps())
-        payload['metadata']['q'] = 'SP'
-        payload['metadata']['filters'][0]['value'] = False
-        payload['metadata']['page']['number'] = 1
-        payload['metadata']['subset'] = 'inativos'
-        # print(json.dumps(payload))
-        qs = Estado.objects.loads(json.dumps(payload['metadata']))
-        # print(qs.dumps())
-
         self.assertTrue(1)
 
     def test_login(self):
@@ -251,14 +242,13 @@ class MainTestCase(TestCase):
         estado.add()
         estado.get_cidades().add(Cidade(nome='Macaíba'))
         estado.get_cidades().add(Cidade(nome='Natal'))
-        response = self.client.get('/api/base/cidade/')
-        metadata = response.data['metadata']
-        metadata['q'] = 'Maca'
-        response = self.client.post(
-            response.data['path'],
-            data=dict(metadata=json.dumps(metadata))
+        response = self.get('/api/base/cidade/')
+        response['input']['q'] = 'Maca'
+        response = self.post(
+            response['path'],
+            data=response['input']
         )
-        print(json.loads(response.content))
+        print(response)
 
     def test_lookups(self):
         bolsonaro = Presidente.objects.create(nome='Jair Bolsonaro')

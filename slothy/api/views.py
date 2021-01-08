@@ -3,6 +3,7 @@ import json
 import traceback
 from django.apps import apps
 from django.db import transaction
+from django.http import HttpResponse
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
@@ -17,11 +18,17 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
         return
 
 
+class UploadView(APIView):
+    def post(self, request):
+        print(request.FILES.keys())
+        return HttpResponse('OK')
+
+
 class QuerysetView(APIView):
     def post(self, request, app_label, model_name, filter_name=None):
         model = apps.get_model(app_label, model_name)
         body = request.body
-        s = request.POST and request.POST['metadata'] or body
+        s = request.POST or body
         qs = model.objects.loads(s)
         if filter_name:
             field = qs.model.get_field(filter_name)
@@ -31,9 +38,8 @@ class QuerysetView(APIView):
             qs = field.related_model.objects.filter(
                 pk__in=qs.values_list(filter_name).distinct()
             ).list_display(*list_display)
-
             return Response(qs.serialize())
-        return Response(qs.serialize()['data'])
+        return Response(qs.serialize())
 
     def get(self, *args, **kwargs):
         return Response({})

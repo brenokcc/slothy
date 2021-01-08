@@ -494,13 +494,13 @@ class QuerySet(query.QuerySet):
         qs = self.all()
         qs.query = cpickle.loads(zlib.decompress(base64.b64decode(signing.loads(payload['query']))))
         qs._q = payload['q']
-        qs._filters = payload['filters']
-        qs._actions = payload['actions']
-        qs._subsets = payload['subsets']
         qs._subset = payload['subset']
-        qs._display = payload['display']
         qs._page = payload['page']['number'] - 1
         qs._page_size = payload['page']['size']
+        for name, value in payload['filters'].items():
+            self._filters.append(dict(name=name, value=value))
+        for name in payload['display']:
+            self._display.append(dict(name=name))
         qs._deserialized = True
         return qs
 
@@ -558,30 +558,39 @@ class QuerySet(query.QuerySet):
                 item.append(value)
             data.append(item)
 
-        serialized = dict()
-        serialized['type'] = 'queryset'
-        if name:
-            serialized['name'] = name
-        serialized['path'] = '/util/queryset/{}/{}/'.format(
-            getattr(self.model, '_meta').app_label.lower(),
-            self.model.__name__.lower()
-        )
-        serialized['metadata'] = not self._deserialized and {
-            'query': signing.dumps(serialized_str),
-            'search': self._search,
-            'filters': self._filters,
-            'actions': self._actions,
-            'subsets': self._subsets,
-            'display': self._display,
-            'subset': self._subset,
-            'q': None,
-            'page': {
+        if self._deserialized:
+            serialized = data
+        else:
+            serialized = dict()
+            serialized['type'] = 'queryset'
+            if name:
+                serialized['name'] = name
+            serialized['path'] = '/util/queryset/{}/{}/'.format(
+                getattr(self.model, '_meta').app_label.lower(),
+                self.model.__name__.lower()
+            )
+            serialized['input'] = dict()
+            serialized['input']['query'] = signing.dumps(serialized_str)
+            serialized['input']['q'] = ''
+            serialized['input']['subset'] = self._subset
+            serialized['input']['page'] = {
                 'number': self._page + 1,
                 'size': self._page_size
             }
-        } or {}
-        serialized['data'] = data
-        serialized['total'] = self.count()
+            serialized['input']['display'] = [display['name'] for display in self._display]
+            serialized['input']['filters'] = dict()
+            for _filter in self._filters:
+                serialized['input']['filters'][_filter['name']] = _filter['value']
+
+            serialized['metadata'] = {
+                'search': self._search,
+                'filters': self._filters,
+                'actions': self._actions,
+                'subsets': self._subsets,
+                'display': self._display,
+            }
+            serialized['data'] = data
+            serialized['total'] = self.count()
 
         return serialized
 
