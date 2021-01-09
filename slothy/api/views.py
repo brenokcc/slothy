@@ -1,6 +1,10 @@
+import os
 import sys
 import json
 import traceback
+import uuid
+import base64
+from django.conf import settings
 from django.apps import apps
 from django.db import transaction
 from django.http import HttpResponse
@@ -20,8 +24,11 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
 
 class UploadView(APIView):
     def post(self, request):
-        print(request.FILES.keys())
-        return HttpResponse('OK')
+        uploaded_file = request.FILES['file']
+        file_name = '{}.{}'.format(uuid.uuid1().hex, uploaded_file.name.split('.')[-1])
+        file_path = os.path.join(settings.MEDIA_ROOT, file_name)
+        open(file_path, 'wb').write(uploaded_file.read())
+        return HttpResponse('/media/{}'.format(file_name))
 
 
 class QuerysetView(APIView):
