@@ -62,8 +62,8 @@ class ApiModelForm(ModelForm):
             field_type = type(field).__name__.replace('Field', '').lower()
             item = OrderedDict(
                 label=field.label, type=field_type, required=field.required,
-                mask=None, value=None, choices=choices, help_text=field.help_text,
-                width=field_width.get(name, 100)
+                mask=None, value=None, display=None, choices=choices, help_text=field.help_text,
+                error=None, width=field_width.get(name, 100)
             )
             self.metadata[name] = item
 
@@ -88,8 +88,8 @@ class ApiModelForm(ModelForm):
                 field_type = type(field).__name__.replace('Field', '').lower()
                 item = OrderedDict(
                     label=field.label, type=field_type, required=field.required,
-                    mask=None, value=None, choices=choices, help_text=field.help_text,
-                    width=one_to_one_field_width.get(name, 100)
+                    mask=None, value=None, display=None, choices=choices, help_text=field.help_text,
+                    error=None, width=one_to_one_field_width.get(name, 100)
                 )
                 one_to_one_items[name] = item
             self.metadata[one_to_one_field_name] = one_to_one_items
@@ -116,8 +116,8 @@ class ApiModelForm(ModelForm):
                 field_type = type(field).__name__.replace('Field', '').lower()
                 item = OrderedDict(
                     label=field.label, type=field_type, required=field.required,
-                    mask=None, value=None, choices=choices, help_text=field.help_text,
-                    width=100 // len(one_to_many_form_cls.base_fields)
+                    mask=None, value=None, display=None, choices=choices, help_text=field.help_text,
+                    error=None, width=100 // len(one_to_many_form_cls.base_fields)
                 )
                 one_to_many_items[name] = item
             self.metadata[one_to_many_field_name] = [one_to_many_items]
@@ -226,6 +226,6 @@ class ApiModelForm(ModelForm):
         return dict(
             type='form',
             input=self.initial_data,
-            fildsets=self.fieldsets,
+            fieldsets=self.fieldsets,
             result=self.result.serialize() if self.result is not None else None
         )

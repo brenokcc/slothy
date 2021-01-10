@@ -132,7 +132,9 @@ def format_value(value):
 def custom_serialize(obj, detail=False):
     from django.db.models.fields.files import FieldFile
     from slothy.api.models import QuerySet, ValueSet, Model
-    if isinstance(obj, datetime.datetime):
+    if isinstance(obj, bool):
+        return obj and 'Sim' or 'Não'
+    elif isinstance(obj, datetime.datetime):
         return obj.strftime('%d/%m/%Y %H:%M')
     elif isinstance(obj, datetime.date):
         return obj.strftime('%d/%m/%Y')

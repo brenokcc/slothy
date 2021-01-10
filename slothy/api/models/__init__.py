@@ -549,6 +549,8 @@ class QuerySet(query.QuerySet):
                 value = getattrr(obj, display['name'])
                 if callable(value):
                     value = value()
+                elif isinstance(value, bool):
+                    value = value and 'Sim' or 'Não'
                 elif isinstance(value, Model):
                     value = str(value)
                 elif isinstance(value, datetime.date):
