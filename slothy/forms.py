@@ -225,6 +225,7 @@ class ApiModelForm(ModelForm):
     def serialize(self):
         return dict(
             type='form',
+            name=self.title,
             input=self.initial_data,
             fieldsets=self.fieldsets,
             result=self.result.serialize() if self.result is not None else None

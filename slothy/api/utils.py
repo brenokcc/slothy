@@ -161,11 +161,13 @@ def make_choices(name, field, custom_choices):
         return choices
     elif hasattr(field, 'choices'):
         if hasattr(field.choices, 'queryset'):
-            if field.choices.queryset.count() < 25:
+            if field.choices.queryset.count() < 1:
                 choices = []
                 for obj in field.choices.queryset:
                     choices.append([obj.id, str(obj)])
                 return choices
+            else:
+                return field.choices.queryset.display('id', '__str__').serialize(field.label)
         else:
             return field.choices
     else:

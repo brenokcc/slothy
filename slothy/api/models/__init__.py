@@ -31,7 +31,7 @@ ValidationError = exceptions.ValidationError
 class ForeignKey(models.ForeignKey):
     def __init__(self, to, **kwargs):
         on_delete = kwargs.pop('on_delete', models.CASCADE)
-        self.filter_display = kwargs.pop('filter_display', ('__str__',))
+        self.filter_display = kwargs.pop('filter_display', ('id', '__str__',))
         super().__init__(to, on_delete, **kwargs)
 
 
