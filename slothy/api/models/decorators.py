@@ -115,3 +115,13 @@ def param(**kwargs):
     return decorate
 
 
+def ui(shortcut):
+    def decorate(func):
+        metadata = getattr(func, '_metadata', {})
+        metadata.update(shortcut=shortcut)
+        setattr(func, '_metadata', metadata)
+        return func
+
+    return decorate
+
+

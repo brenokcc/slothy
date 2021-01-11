@@ -3,7 +3,7 @@ import sys
 import json
 import traceback
 import uuid
-import base64
+from slothy.api.ui import App
 from django.conf import settings
 from django.apps import apps
 from django.db import transaction
@@ -95,7 +95,10 @@ class Api(APIView):
                 path = path[0:-1]
             tokens = path.split('/')
             if len(tokens) == 1:
-                if path == 'user':  # authenticated user
+                if path == 'app':  # authenticated user
+                    app = App()
+                    response = app.serialize(request.user)
+                elif path == 'user':  # authenticated user
                     if request.user.is_authenticated:
                         response = request.user.view()
                     else:

@@ -515,8 +515,17 @@ class QuerySet(query.QuerySet):
                     {'name': lookup, 'label': metadata.get('verbose_name'), 'active': False}
                 )
             for lookup in self._list_filter:
+                choices = []
+                field = self.model.get_field(lookup)
+                if hasattr(field, 'related_model'):
+                    qs = field.related_model.objects.filter(
+                        pk__in=self.values_list(lookup).distinct()
+                    ).display(*('id', '__str__'))
+                    choices = qs.serialize(self.model.get_verbose_name(lookup))
+                elif hasattr(field, 'choices'):
+                    choices = field.choices
                 self._filters.append(
-                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None}
+                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None, 'choices': choices}
                 )
             for lookup in self._list_actions:
                 self._actions.append(

@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 from slothy.api import models
-from slothy.api.models.decorators import user, role, attr, action, fieldset, param
+from slothy.api.models.decorators import user, role, attr, action, fieldset, param, ui
 
 
 class Telefone(models.Model):
@@ -17,7 +17,8 @@ class Telefone(models.Model):
 
 class EstadoManager(models.DefaultManager):
 
-    @attr('Estados')
+    @ui(shortcut=True)
+    @attr('Estados', icon=62187)
     def all(self):
         return super().all(
         ).display(
@@ -145,10 +146,11 @@ class Estado(models.Model):
 
 class CidadeManager(models.DefaultManager):
 
-    @attr('Cidades', lookups=('governador', 'prefeito', 'presidente'))
+    @ui(shortcut=True)
+    @attr('Cidades', lookups=('governador', 'prefeito', 'presidente'), icon=57910)
     def all(self):
         return super().all().filter_by(
-            'estado'
+            'estado', 'prefeito'
         ).display(
             'id', 'get_dados_gerais'
         ).lookups(
@@ -256,7 +258,8 @@ class Endereco(models.Model):
 
 class PessoaManager(models.DefaultManager):
 
-    @attr('Pessoas')
+    @ui(shortcut=True)
+    @attr('Pessoas', icon=59638)
     def all(self):
         return super().all().display('id', 'nome')
 
