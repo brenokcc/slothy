@@ -32,20 +32,11 @@ class UploadView(APIView):
 
 
 class QuerysetView(APIView):
-    def post(self, request, app_label, model_name, filter_name=None):
+    def post(self, request, app_label, model_name):
         model = apps.get_model(app_label, model_name)
         body = request.body
         s = request.POST or body
         qs = model.objects.loads(s)
-        if filter_name:
-            field = qs.model.get_field(filter_name)
-            list_display = ['id']
-            for filter_display in field.filter_display:
-                list_display.append(filter_display)
-            qs = field.related_model.objects.filter(
-                pk__in=qs.values_list(filter_name).distinct()
-            ).display(*list_display)
-            return Response(qs.serialize())
         return Response(qs.serialize())
 
     def get(self, *args, **kwargs):

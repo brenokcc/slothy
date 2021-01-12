@@ -282,15 +282,18 @@ class QuerySet(query.QuerySet):
         self._list_subsets = ()
         self._list_actions = ()
         self._list_search = ()
+        self._list_sort = ()
         self._page = 0
         self._page_size = 10
         self._subset = None
         self._q = None
+        self._sorter = None
         self._filters = []
         self._actions = []
         self._subsets = []
         self._display = []
         self._search = []
+        self._sort = []
         self._deserialized = False
         self._related_manager = None
         self._related_attribute = None
@@ -373,6 +376,13 @@ class QuerySet(query.QuerySet):
             self._list_search = self.model.get_metadata('search_fields')
         return self._list_search
 
+    def sort_by(self, *sort_fields):
+        self._list_sort = sort_fields
+        return self
+
+    def get_sort_by(self):
+        return self._list_sort
+
     def __str__(self):
         output = list()
         for obj in self[0:self._page_size]:
@@ -392,13 +402,16 @@ class QuerySet(query.QuerySet):
         clone._lookups = self._lookups
         clone._page_size = self._page_size
         clone._list_search = self._list_search
+        clone._list_sort = self._list_sort
         clone._page = self._page
         clone._subset = self._subset
         clone._q = self._q
+        clone._sorter = self._sorter
         clone._filters = self._filters
         clone._actions = self._actions
         clone._subsets = self._subsets
         clone._display = self._display
+        clone._sort = self._sort
         clone._search = self._search
         clone._related_manager = self._related_manager
         clone._related_attribute = self._related_attribute
@@ -491,9 +504,11 @@ class QuerySet(query.QuerySet):
 
     def loads(self, payload):
         payload = json.loads(payload)
+        print(payload)
         qs = self.all()
         qs.query = cpickle.loads(zlib.decompress(base64.b64decode(signing.loads(payload['query']))))
         qs._q = payload['q']
+        qs._sorter = payload['sorter']
         qs._subset = payload['subset']
         qs._page = payload['page']['number'] - 1
         qs._page_size = payload['page']['size']
@@ -517,15 +532,21 @@ class QuerySet(query.QuerySet):
             for lookup in self._list_filter:
                 choices = []
                 field = self.model.get_field(lookup)
-                if hasattr(field, 'related_model'):
+                if hasattr(field, 'related_model') and field.related_model:
                     qs = field.related_model.objects.filter(
                         pk__in=self.values_list(lookup).distinct()
                     ).display(*('id', '__str__'))
                     choices = qs.serialize(self.model.get_verbose_name(lookup))
-                elif hasattr(field, 'choices'):
+                elif hasattr(field, 'choices') and field.choices:
                     choices = field.choices
+                elif isinstance(field, BooleanField):
+                    choices = [[True, 'Sim'], [False, 'Não']]
                 self._filters.append(
-                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None, 'choices': choices}
+                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None, 'display': None, 'choices': choices}
+                )
+            for lookup in self._list_sort:
+                self._sort.append(
+                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None, 'display': None}
                 )
             for lookup in self._list_actions:
                 self._actions.append(
@@ -548,8 +569,11 @@ class QuerySet(query.QuerySet):
         if self._q:
             qs = qs.search(self._q)
 
+        if self._sorter:
+            qs = qs.order_by(self._sorter)
+
         for _filter in self._filters:
-            if _filter['value']:
+            if _filter['value'] is not None:
                 qs = qs.filter(**{_filter['name']: _filter['value']})
 
         for obj in qs[self._page * self._page_size:self._page * self._page_size + self._page_size]:
@@ -583,6 +607,7 @@ class QuerySet(query.QuerySet):
             serialized['input'] = dict()
             serialized['input']['query'] = signing.dumps(serialized_str)
             serialized['input']['q'] = ''
+            serialized['input']['sorter'] = None
             serialized['input']['subset'] = self._subset
             serialized['input']['page'] = {
                 'number': self._page + 1,
@@ -599,6 +624,7 @@ class QuerySet(query.QuerySet):
                 'actions': self._actions,
                 'subsets': self._subsets,
                 'display': self._display,
+                'sort': self._sort,
             }
             serialized['data'] = data
             serialized['total'] = self.count()

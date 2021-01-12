@@ -249,12 +249,6 @@ class MainTestCase(TestCase):
             data=response['input']
         )
         self.assertEqual(type(search_response), list)
-        filter_response = self.post(
-            '{}{}/'.format(response['path'], 'estado'),
-            data=response['input']
-        )
-        self.assertEqual(type(filter_response), dict)
-        self.assertEqual(filter_response['type'], 'queryset')
 
     def test_lookups(self):
         bolsonaro = Presidente.objects.create(nome='Jair Bolsonaro')
