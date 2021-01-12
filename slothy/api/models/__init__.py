@@ -270,6 +270,12 @@ class ValueSet(UserDict):
             _values.append(values)
         return _values
 
+    def serialize(self):
+        serialized = []
+        for name, data in self.items():
+            serialized.append(dict(type='fieldset', name=name, data=data))
+        return serialized
+
 
 class QuerySet(query.QuerySet):
 
@@ -519,7 +525,7 @@ class QuerySet(query.QuerySet):
         qs._deserialized = True
         return qs
 
-    def serialize(self, name=None):
+    def serialize(self, name=''):
         data = []
         serialized_str = base64.b64encode(zlib.compress(cpickle.dumps(self.query))).decode()
 
@@ -598,8 +604,7 @@ class QuerySet(query.QuerySet):
         else:
             serialized = dict()
             serialized['type'] = 'queryset'
-            if name:
-                serialized['name'] = name
+            serialized['name'] = name
             serialized['path'] = '/util/queryset/{}/{}/'.format(
                 getattr(self.model, '_meta').app_label.lower(),
                 self.model.__name__.lower()
@@ -796,7 +801,7 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
                 if metadata['display'] == display_name and display_name == current_display_name:
                     display_fieldset_names.append(metadata['name'])
             if display_fieldset_names:
-                display[display_name] = self.values(*display_fieldset_names, verbose=True)
+                display[display_name] = self.values(*display_fieldset_names, verbose=True).serialize()
             else:
                 display[display_name] = []
 
@@ -804,8 +809,9 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             fieldset_names.append('default_viewset')
         serialized = dict(
             type='object',
-            input=dict(dimension=None),
-            data=self.values(*fieldset_names, verbose=True, detail=True),
+            name=str(self),
+            input=dict(dimension=current_display_name),
+            data=self.values(*fieldset_names, verbose=True, detail=True).serialize(),
             dimensions=display
         )
         return serialized

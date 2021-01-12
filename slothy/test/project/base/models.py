@@ -22,7 +22,7 @@ class EstadoManager(models.DefaultManager):
     def all(self):
         return super().all(
         ).display(
-            'nome', 'ativo'
+            'id', 'nome', 'ativo'
         ).filter_by(
             'ativo'
         ).actions(
@@ -329,7 +329,8 @@ class Pessoa(models.AbstractUser):
 
 class PontoTuristicoManager(models.DefaultManager):
 
-    @attr('Pontos Turísticos')
+    @ui(shortcut=True)
+    @attr('Pontos Turísticos', icon=58639)
     def all(self):
         return super().all()
 

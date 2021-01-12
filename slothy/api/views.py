@@ -235,6 +235,10 @@ class Api(APIView):
                                 response = output.serialize()
                             else:
                                 response = output
+
+                            if response.get('type') == 'object':
+                                response['path'] = request.path
+
                         except ValidationError as e:
                             response = dict(type='error', text=e.message)
                 else:

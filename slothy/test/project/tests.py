@@ -169,13 +169,14 @@ class MainTestCase(TestCase):
         self.assertEqual(len(r['data']), 1)
         # view
         r = self.get('/api/base/pontoturistico/1/')
-        self.assertIn([{'Nome': 'Parque do Povo'}], r['data']['Dados Gerais']['fields'])
+        print(r['data'][0])
+        self.assertIn([{'Nome': 'Parque do Povo'}], r['data'][0]['data']['fields'])
         # edit
         data = dict(nome='Parque da Cidade')
         r = self.post('/api/base/pontoturistico/1/edit/', data=data)
         self.assertEqual(r, dict(type='message', text='Edição realizada com sucesso'))
         r = self.get('/api/base/pontoturistico/1/')
-        self.assertIn([{'Nome': 'Parque da Cidade'}], r['data']['Dados Gerais']['fields'])
+        self.assertIn([{'Nome': 'Parque da Cidade'}], r['data'][0]['data']['fields'])
         self.assertEqual(PontoTuristico.objects.count(), 1)
         # validation error
         data = dict(nome='Parque da Cidade')
