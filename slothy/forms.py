@@ -89,7 +89,7 @@ class ApiModelForm(ModelForm):
                 item = OrderedDict(
                     label=field.label, type=field_type, required=field.required,
                     mask=None, value=None, display=None, choices=choices, help_text=field.help_text,
-                    error=None, width=one_to_one_field_width.get(name, 100)
+                    error=None, one_to_one=one_to_one_field_name, width=one_to_one_field_width.get(name, 100)
                 )
                 one_to_one_items[name] = item
             self.metadata[one_to_one_field_name] = one_to_one_items
@@ -117,7 +117,7 @@ class ApiModelForm(ModelForm):
                 item = OrderedDict(
                     label=field.label, type=field_type, required=field.required,
                     mask=None, value=None, display=None, choices=choices, help_text=field.help_text,
-                    error=None, width=100 // len(one_to_many_form_cls.base_fields)
+                    error=None, one_to_many=one_to_many_field_name, width=100 // len(one_to_many_form_cls.base_fields)
                 )
                 one_to_many_items[name] = item
             self.metadata[one_to_many_field_name] = [one_to_many_items]
@@ -146,7 +146,8 @@ class ApiModelForm(ModelForm):
             if isinstance(value, FieldFile):
                 value = value.name or None
             self.initial_data[name] = value
-            self.metadata[name]['value'] = format_value(field.to_python(value))
+            self.metadata[name]['value'] = value
+            self.metadata[name]['display'] = format_value(field.to_python(value))
         for one_to_one_field_name, one_to_one_form in self.one_to_one_forms.items():
             self.initial_data[one_to_one_field_name] = {}
             for name, field in one_to_one_form.fields.items():
@@ -222,9 +223,10 @@ class ApiModelForm(ModelForm):
         if error or errors:
             raise InputValidationError(error, errors)
 
-    def serialize(self):
+    def serialize(self, path):
         return dict(
             type='form',
+            path=path,
             name=self.title,
             input=self.initial_data,
             fieldsets=self.fieldsets,

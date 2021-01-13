@@ -3,6 +3,8 @@ import sys
 import json
 import traceback
 import uuid
+import tempfile
+import pdfkit
 from slothy.api.ui import App
 from django.conf import settings
 from django.apps import apps
@@ -14,6 +16,18 @@ from django.contrib.auth import login, logout, authenticate
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from slothy.api.models import ValidationError, ManyToManyField, ForeignKey, ValueSet, QuerySet, Model
 from slothy.forms import ApiModelForm, InputValidationError
+
+
+class PdfResponse(HttpResponse):
+
+    def __init__(self, html=''):
+        file_name = tempfile.mktemp('.pdf')
+        html = html.replace('/media', settings.MEDIA_ROOT)
+        html = html.replace('/static', '{}/{}/static'.format(settings.BASE_DIR, settings.PROJECT_NAME))
+        pdfkit.from_string(html, file_name)
+        content = open(file_name, "rb").read()
+        os.unlink(file_name)
+        super().__init__(content=content, content_type='application/pdf')
 
 
 class CsrfExemptSessionAuthentication(SessionAuthentication):
@@ -46,10 +60,10 @@ class QuerysetView(APIView):
 class Api(APIView):
     authentication_classes = CsrfExemptSessionAuthentication, TokenAuthentication
 
-    def options(self, request, path):
-        return self.do(request, path, {}, {})
+    def options(self, request, service, path):
+        return self.do(request, service, path, {}, {})
 
-    def get(self, request, path):
+    def get(self, request, service, path):
         body = request.body
         if body and body[0] == 123:
             data = json.loads(body)
@@ -58,9 +72,9 @@ class Api(APIView):
         # data = {}
         # for key in request.GET:
         #     data[key] = request.GET[key]
-        return self.do(request, path, data)
+        return self.do(request, service, path, data)
 
-    def post(self, request, path):
+    def post(self, request, service, path):
         body = request.body
         if body and body[0] == 123:
             data = json.loads(body)
@@ -75,16 +89,16 @@ class Api(APIView):
         #             data[key] = request.FILES[key]
         # else:  # nodejs
         #     data = json.loads(body or '{}')
-        return self.do(request, path, data)
+        return self.do(request, service, path, data)
 
-    def do(self, request, path, data):
+    def do(self, request, service, path, data):
         print('# {}'.format(path))
         response = {}
+        if path.endswith('/'):
+            path = path[0:-1]
+        tokens = path.split('/')
         data = request.POST or request.GET or data
         try:
-            if path.endswith('/'):
-                path = path[0:-1]
-            tokens = path.split('/')
             if len(tokens) == 1:
                 if path == 'app':  # authenticated user
                     app = App()
@@ -198,7 +212,7 @@ class Api(APIView):
                     form_cls = self.build_form(model, func, metadata, exclude_field)
                     if form_cls:
                         form = form_cls(data=data or None, instance=instance)
-                        if form.is_valid():
+                        if data:
                             if metadata.get('atomic'):
                                 with transaction.atomic():
                                     form.save()
@@ -209,7 +223,7 @@ class Api(APIView):
                             else:
                                 response = form.result.serialize()
                         else:
-                            response = form.serialize()
+                            response = form.serialize(request.path)
                     else:
                         try:
                             output = func()
@@ -250,9 +264,12 @@ class Api(APIView):
             traceback.print_exc(file=sys.stdout)
             response = dict(type='exception', text=str(e))
 
-        output = Response(response)
-        output["Access-Control-Allow-Origin"] = "*"
-        return output
+        if service == 'pdf':
+            return PdfResponse()
+        else:
+            output = Response(response)
+            output["Access-Control-Allow-Origin"] = "*"
+            return output
 
     def build_form(self, _model, func, metadata, exclude_field):
         # print(metadata)
