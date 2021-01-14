@@ -92,7 +92,7 @@ class Api(APIView):
         return self.do(request, service, path, data)
 
     def do(self, request, service, path, data):
-        print('# {}'.format(path))
+        # print('# {}'.format(path))
         response = {}
         if path.endswith('/'):
             path = path[0:-1]
@@ -259,7 +259,7 @@ class Api(APIView):
                     response = dict(type='exception', text='Recurso inexistente')
 
         except InputValidationError as e:
-            response = dict(type='error', text=e.error, detail=e.errors)
+            response = dict(type='error', text=e.error, errors=e.errors)
         except BaseException as e:
             traceback.print_exc(file=sys.stdout)
             response = dict(type='exception', text=str(e))

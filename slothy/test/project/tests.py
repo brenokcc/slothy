@@ -181,7 +181,7 @@ class MainTestCase(TestCase):
         # validation error
         data = dict(nome='Parque da Cidade')
         r = self.post('/api/base/pontoturistico/1/atualizar_nome/', data=data)
-        self.assertEqual(r, dict(type='error', text='Período de edição ainda não está aberto', detail={}))
+        self.assertEqual(r, dict(type='error', text='Período de edição ainda não está aberto', errors=[]))
         # delete
         r = self.post('/api/base/pontoturistico/1/delete/')
         self.assertEqual(r, dict(type='message', text='Exclusão realizada com sucesso'))
@@ -290,9 +290,9 @@ class MainTestCase(TestCase):
         data = dict(nome='Carlos Breno', email='brenokcc@yahoo.com.br', telefones=telefones)
         r = self.post('/api/base/pessoa/add/', data=data)
         self.assertIsNone(Pessoa.objects.first())
-        error = dict(numero=dict(message='Este campo é obrigatório.', field='telefones', index=0))
+        error = dict(field='numero', message='Este campo é obrigatório.', one_to_many='telefones', index=1)
         self.assertEqual(r['text'], 'Por favor, corriga os erros abaixo')
-        self.assertEqual(r['detail'], error)
+        self.assertIn(error, r['errors'])
         telefones[1]['numero'] = '3272-3898'
         r = self.post('/api/base/pessoa/add/', data=data)
         self.assertIsNotNone(Pessoa.objects.first())

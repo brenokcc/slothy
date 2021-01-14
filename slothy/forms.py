@@ -94,7 +94,11 @@ class ApiModelForm(ModelForm):
                 one_to_one_items[name] = item
             self.metadata[one_to_one_field_name] = one_to_one_items
             one_to_one_form_instance = getattr(self.instance, one_to_one_field_name)
-            one_to_one_form_data = self.data.get(one_to_one_field_name)
+            if one_to_one_field.required:
+                one_to_one_form_data = self.data.get(one_to_one_field_name) or {}
+            else:
+                one_to_one_form_data = self.data.get(one_to_one_field_name)
+
             one_to_one_form = one_to_one_form_cls(
                 data=one_to_one_form_data,
                 instance=one_to_one_form_instance
@@ -130,9 +134,10 @@ class ApiModelForm(ModelForm):
                 one_to_many_form_data = None
                 one_to_many_form_instance = None
                 if len(one_to_many_data) > i:
-                    one_to_many_form_data = one_to_many_data[i]
+                    one_to_many_form_data = one_to_many_data[i] or None
                 if len(one_to_many_instances) > i:
                     one_to_many_form_instance = one_to_many_instances[i]
+
                 one_to_many_form = one_to_many_form_cls(
                     instance=one_to_many_form_instance,
                     data=one_to_many_form_data
@@ -181,13 +186,13 @@ class ApiModelForm(ModelForm):
 
     def save(self, *args, **kwargs):
         error = None
-        errors = {}
+        errors = []
         # print(data, form.cleaned_data)
         # print(form.fields.keys(), custom_fields.keys(), metadata['params'])
 
         if self.errors:
             for inner_field_name, inner_messages in self.errors.items():
-                errors[inner_field_name] = dict(message=','.join(inner_messages))
+                errors.append(dict(field=inner_field_name, message=','.join(inner_messages)))
         else:
             # one-to-one
             for one_to_one_field_name, one_to_one_form in self.one_to_one_forms.items():
@@ -196,9 +201,11 @@ class ApiModelForm(ModelForm):
                     setattr(self.instance, one_to_one_field_name, one_to_one_form.instance)
                 elif one_to_one_form.errors:
                     for inner_field_name, inner_messages in one_to_one_form.errors.items():
-                        errors[inner_field_name] = dict(
-                            message=','.join(inner_messages), field=one_to_one_field_name
-                        )
+                        errors.append(dict(
+                            field=inner_field_name,
+                            message=','.join(inner_messages),
+                            one_to_one=one_to_one_field_name
+                        ))
             # func
             params = {}
             for param in self.params:
@@ -210,15 +217,19 @@ class ApiModelForm(ModelForm):
 
             # one-to-many
             for one_to_many_field_name, one_to_many_forms in self.one_to_many_forms.items():
-                for one_to_many_form in one_to_many_forms:
-                    if one_to_many_form.is_valid():
-                        one_to_many_form.save()
-                        getattr(self.instance, one_to_many_field_name).add(one_to_many_form.instance)
-                    elif one_to_many_form.errors:
-                        for i, (inner_field_name, inner_messages) in enumerate(one_to_many_form.errors.items()):
-                            errors[inner_field_name] = dict(
-                                message=','.join(inner_messages), field=one_to_many_field_name, index=i
-                            )
+                for i, one_to_many_form in enumerate(one_to_many_forms):
+                    if one_to_many_form.data:
+                        if one_to_many_form.is_valid():
+                            one_to_many_form.save()
+                            getattr(self.instance, one_to_many_field_name).add(one_to_many_form.instance)
+                        else:
+                            for inner_field_name, inner_messages in one_to_many_form.errors.items():
+                                errors.append(dict(
+                                    field=inner_field_name,
+                                    message=','.join(inner_messages),
+                                    one_to_many=one_to_many_field_name,
+                                    index=i
+                                ))
 
         if error or errors:
             raise InputValidationError(error, errors)

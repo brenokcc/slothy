@@ -326,6 +326,10 @@ class Pessoa(models.AbstractUser):
     def alterar_senha(self, senha):
         super().change_password(senha)
 
+    @attr('Telefones', display=True)
+    def get_telefones(self):
+        return self.telefones.all()
+
 
 class PontoTuristicoManager(models.DefaultManager):
 
