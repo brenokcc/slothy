@@ -354,7 +354,7 @@ class QuerySet(query.QuerySet):
             self._list_subsets = self.model.get_metadata('list_subsets')
         return self._list_subsets
 
-    def actions(self, *list_actions):
+    def allow(self, *list_actions):
         self._list_actions = list_actions
         return self
 
@@ -461,6 +461,12 @@ class QuerySet(query.QuerySet):
         else:  # many-to-many
             related_manager.remove(instance)
 
+    def set(self, instances):
+        related_manager = getattr(self, '_related_manager', None)
+        if related_manager:
+            for instance in instances:
+                related_manager.add(instance)
+
     def count(self, x=None, y=None):
         return QuerySetStatistic(self, x, y=y) if x else super().count()
 
@@ -555,8 +561,28 @@ class QuerySet(query.QuerySet):
                     {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None, 'display': None}
                 )
             for lookup in self._list_actions:
+                action_params = True
+                action_url = '/api/{}/{}'.format(
+                    self.model.get_metadata('app_label'), self.model.get_metadata('model_name')
+                )
+                if hasattr(self.model.objects, 'lookup'):
+                    action_type = 'subset'
+                    action_func = getattr(getattr(self.model.objects, '_queryset_class'), 'lookup')
+                else:
+                    action_type = 'instance'
+                    action_func = getattr(self.model, lookup)
+                action_metadata = getattr(action_func, '_metadata')
+                action_icon = action_metadata['icon']
+                if action_metadata['name'] == 'add':
+                    action_type = 'subset'
+                if action_type == 'instance':
+                    action_url = '{}/{{id}}'.format(action_url)
+                action_url = '{}/{}'.format(action_url, action_metadata['name'])
+
+                if action_metadata['name'] not in ('add', 'edit') and not action_metadata['params']:
+                    action_params = False
                 self._actions.append(
-                    {'name': lookup, 'label': self.model.get_verbose_name(lookup)}
+                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'type': action_type, 'icon': action_icon, 'url': action_url, 'params': action_params}
                 )
             for lookup in self.get_list_display():
                 self._display.append(
@@ -573,6 +599,7 @@ class QuerySet(query.QuerySet):
             qs = self
 
         if self._q:
+            print(111, self._q)
             qs = qs.search(self._q)
 
         if self._sorter:
@@ -598,6 +625,7 @@ class QuerySet(query.QuerySet):
                     value = value.strftime('%d/%m/%Y %H:%M')
                 item.append(value)
             data.append(item)
+        print(data)
 
         if self._deserialized:
             serialized = data

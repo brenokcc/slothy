@@ -298,3 +298,12 @@ class MainTestCase(TestCase):
         self.assertIsNotNone(Pessoa.objects.first())
         self.assertEqual(Telefone.objects.count(), 2)
         self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
+
+    def test_many_to_many(self):
+        rn = Estado.objects.create(nome='Rio Grande do Norte', sigla='RN')
+        va = Pessoa.objects.create(nome='Vereador A', email='va@mail.com')
+        vb = Pessoa.objects.create(nome='Vereador B', email='vb@mail.com')
+        data = dict(nome='Natal', estado=rn.pk, prefeito=None, vereadores=[va.pk, vb.pk])
+        r = self.post('/api/base/cidade/add/', data=data)
+        self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
+        self.assertEqual(Cidade.objects.first().vereadores.count(), 2)

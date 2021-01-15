@@ -78,9 +78,14 @@ class ApiModelForm(ModelForm):
             del (self.fields[one_to_one_field_name])
             one_to_one_form_cls = modelform_factory(one_to_one_field.queryset.model, exclude=())
             if hasattr(one_to_one_field.queryset.model, 'add'):
-                one_to_one_field_width = getattr(
+                one_to_one_fieldsets = getattr(
                     one_to_one_field.queryset.model.add, '_metadata', {}
-                ).get('field_width', {})
+                ).get('fieldsets', {})
+                one_to_one_field_width = dict()
+                for verbose_name, field_lists in one_to_one_fieldsets.items():
+                    for field_list in field_lists:
+                        for field_name in field_list:
+                            one_to_one_field_width[field_name] = 100 // len(field_list)
             else:
                 one_to_one_field_width = {}
             for name, field in one_to_one_form_cls.base_fields.items():
@@ -115,13 +120,24 @@ class ApiModelForm(ModelForm):
             one_to_many_field = self.fields[one_to_many_field_name]
             del (self.fields[one_to_many_field_name])
             one_to_many_form_cls = modelform_factory(one_to_many_field.queryset.model, exclude=())
+            if hasattr(one_to_many_field.queryset.model, 'add'):
+                one_to_many_fieldsets = getattr(
+                    one_to_many_field.queryset.model.add, '_metadata', {}
+                ).get('fieldsets', {})
+                one_to_many_field_width = dict()
+                for verbose_name, field_lists in one_to_many_fieldsets.items():
+                    for field_list in field_lists:
+                        for field_name in field_list:
+                            one_to_many_field_width[field_name] = 100 // len(field_list)
+            else:
+                one_to_many_field_width = {}
             for name, field in one_to_many_form_cls.base_fields.items():
                 choices = make_choices(name, field, custom_choices)
                 field_type = type(field).__name__.replace('Field', '').lower()
                 item = OrderedDict(
                     label=field.label, type=field_type, required=field.required,
                     mask=None, value=None, display=None, choices=choices, help_text=field.help_text,
-                    error=None, one_to_many=one_to_many_field_name, width=100 // len(one_to_many_form_cls.base_fields)
+                    error=None, one_to_many=one_to_many_field_name, width=one_to_many_field_width.get(name, 100)
                 )
                 one_to_many_items[name] = item
             self.metadata[one_to_many_field_name] = [one_to_many_items]
@@ -212,6 +228,7 @@ class ApiModelForm(ModelForm):
                 params[param] = self.cleaned_data.get(param)
             try:
                 self.result = self.func(**params)
+                self._save_m2m()
             except ValidationError as ve:
                 error = ''.join(ve.message)
 

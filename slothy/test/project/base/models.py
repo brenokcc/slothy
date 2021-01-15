@@ -14,6 +14,10 @@ class Telefone(models.Model):
     def __str__(self):
         return '({}) {}'.format(self.ddd, self.numero)
 
+    @fieldset({'Dados Gerais': (('ddd', 'numero'),)})
+    def add(self):
+        super().add()
+
 
 class EstadoManager(models.DefaultManager):
 
@@ -25,7 +29,7 @@ class EstadoManager(models.DefaultManager):
             'id', 'nome', 'ativo'
         ).filter_by(
             'ativo'
-        ).actions(
+        ).allow(
             'inativar'
         ).search_by(
             'nome', 'sigla'
@@ -150,7 +154,7 @@ class CidadeManager(models.DefaultManager):
     @attr('Cidades', lookups=('governador', 'prefeito', 'presidente'), icon=57910)
     def all(self):
         return super().all().filter_by(
-            'estado', 'prefeito'
+            'estado', 'prefeito', 'estado__ativo', 'vereadores'
         ).display(
             'id', 'get_dados_gerais'
         ).lookups(
@@ -261,7 +265,7 @@ class PessoaManager(models.DefaultManager):
     @ui(shortcut=True)
     @attr('Pessoas', icon=59638)
     def all(self):
-        return super().all().display('id', 'nome')
+        return super().all().display('id', 'nome').allow('add')
 
 
 @user('email')
@@ -336,7 +340,7 @@ class PontoTuristicoManager(models.DefaultManager):
     @ui(shortcut=True)
     @attr('Pontos Turísticos', icon=58639)
     def all(self):
-        return super().all()
+        return super().all().allow('add', 'edit', 'delete')
 
     @attr('Referenciados')
     def referenciados(self):
