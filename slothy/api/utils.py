@@ -167,7 +167,7 @@ def make_choices(name, field, custom_choices):
                     choices.append([obj.id, str(obj)])
                 return choices
             else:
-                return field.choices.queryset.display('id', '__str__').serialize(field.label)
+                return field.choices.queryset.display('__str__').serialize(field.label)
         else:
             return field.choices
     else:

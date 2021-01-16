@@ -31,7 +31,7 @@ ValidationError = exceptions.ValidationError
 class ForeignKey(models.ForeignKey):
     def __init__(self, to, **kwargs):
         on_delete = kwargs.pop('on_delete', models.CASCADE)
-        self.filter_display = kwargs.pop('filter_display', ('id', '__str__',))
+        self.filter_display = kwargs.pop('filter_display', ('__str__',))
         super().__init__(to, on_delete, **kwargs)
 
 
@@ -326,15 +326,14 @@ class QuerySet(query.QuerySet):
         return self
 
     def get_list_display(self, exclude=()):
-        list_display = self._list_display
-        if not list_display:
-            list_display = self.model.get_metadata('list_display')
-            if not list_display:
-                local_fields = self.model.get_metadata('local_fields')
-                list_display = [field.name for field in local_fields
-                                if field.name not in exclude or field.name == 'id']
-            self._list_display = list_display
-        return self._list_display
+        list_display = ['id']
+        if self._list_display:
+            for lookup in self._list_display:
+                if lookup not in exclude:
+                    list_display.append(lookup)
+        else:
+            list_display.append('__str__')
+        return list_display
 
     def filter_by(self, *list_filter):
         self._list_filter = list_filter
@@ -516,7 +515,6 @@ class QuerySet(query.QuerySet):
 
     def loads(self, payload):
         payload = json.loads(payload)
-        print(payload)
         qs = self.all()
         qs.query = cpickle.loads(zlib.decompress(base64.b64decode(signing.loads(payload['query']))))
         qs._q = payload['q']
@@ -547,7 +545,7 @@ class QuerySet(query.QuerySet):
                 if hasattr(field, 'related_model') and field.related_model:
                     qs = field.related_model.objects.filter(
                         pk__in=self.values_list(lookup).distinct()
-                    ).display(*('id', '__str__'))
+                    ).display(*('__str__',))
                     choices = qs.serialize(self.model.get_verbose_name(lookup))
                 elif hasattr(field, 'choices') and field.choices:
                     choices = field.choices
@@ -600,7 +598,6 @@ class QuerySet(query.QuerySet):
             qs = self
 
         if self._q:
-            print(111, self._q)
             qs = qs.search(self._q)
 
         if self._sorter:
@@ -624,9 +621,10 @@ class QuerySet(query.QuerySet):
                     value = value.strftime('%d/%d/%Y')
                 elif isinstance(value, datetime.datetime):
                     value = value.strftime('%d/%m/%Y %H:%M')
+                elif isinstance(value, FieldFile):
+                    value = value.name or None
                 item.append(value)
             data.append(item)
-        print(data)
 
         if self._deserialized:
             serialized = data

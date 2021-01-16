@@ -1,9 +1,12 @@
+import os
+import json
 from collections import OrderedDict
-
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db.models.fields.files import FieldFile
-from django.forms import ModelForm, modelform_factory
+from django.forms import ModelForm, modelform_factory, FileField
 from slothy.api.utils import format_value, make_choices
+from django.core.files.uploadedfile import InMemoryUploadedFile
 
 
 class InputValidationError(BaseException):
@@ -199,6 +202,23 @@ class ApiModelForm(ModelForm):
 
         # result
         self.result = None
+
+    def _clean_fields(self):
+        for name, field in self.fields.items():
+            if isinstance(field, FileField):
+                if name in self.data:
+                    data = json.loads(self.data[name])
+                    file_path = '{}{}'.format(settings.BASE_DIR, data['path'])
+                    self.files[name] = InMemoryUploadedFile(
+                        open(file_path, 'rb'),
+                        field_name=name,
+                        name=data['name'],
+                        content_type=data['content_type'],
+                        size=data['size'],
+                        charset=data['charset']
+                    )
+
+        return super()._clean_fields()
 
     def save(self, *args, **kwargs):
         error = None

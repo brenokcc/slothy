@@ -104,7 +104,7 @@ class MainTestCase(TestCase):
         estado.add()
         estado = Estado(nome='Rio Grande do Norte', sigla='RN')
         estado.add()
-        print(Estado.objects.all())
+        self.assertEqual(Estado.objects.all().count(), 2)
 
         # one-to-many
         print(estado.get_cidades())

@@ -24,7 +24,6 @@ class App:
                             if hasattr(attr, '_metadata'):
                                 metadata = getattr(attr, '_metadata')
                                 if metadata.get('shortcut'):
-                                    print(cls.__name__, attr_name)
                                     shortcuts.append(
                                         dict(
                                             icon=metadata.get('icon') or 58788,

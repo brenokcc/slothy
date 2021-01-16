@@ -38,11 +38,21 @@ class CsrfExemptSessionAuthentication(SessionAuthentication):
 
 class UploadView(APIView):
     def post(self, request):
-        uploaded_file = request.FILES['file']
-        file_name = '{}.{}'.format(uuid.uuid1().hex, uploaded_file.name.split('.')[-1])
-        file_path = os.path.join(settings.MEDIA_ROOT, file_name)
-        open(file_path, 'wb').write(uploaded_file.read())
-        return HttpResponse('/media/{}'.format(file_name))
+        ouput = dict()
+        for name in request.FILES:
+            uploaded_file = request.FILES[name]
+            file_name = '{}.{}'.format(uuid.uuid1().hex, uploaded_file.name.split('.')[-1])
+            file_path = os.path.join(settings.MEDIA_ROOT, file_name)
+            open(file_path, 'wb').write(uploaded_file.read())
+            ouput.update(
+                name=file_name,
+                field_name=name,
+                path='/media/{}'.format(file_name),
+                content_type=uploaded_file.content_type,
+                size=uploaded_file.size,
+                charset=uploaded_file.charset
+            )
+        return HttpResponse(json.dumps(ouput))
 
 
 class QuerysetView(APIView):

@@ -27,7 +27,7 @@ class EstadoManager(models.DefaultManager):
     def all(self):
         return super().all(
         ).display(
-            'id', 'nome', 'ativo'
+            'nome', 'ativo'
         ).filter_by(
             'ativo'
         ).allow(
@@ -157,10 +157,10 @@ class CidadeManager(models.DefaultManager):
         return super().all().filter_by(
             'estado', 'prefeito', 'estado__ativo', 'vereadores'
         ).display(
-            'id', 'get_dados_gerais'
+            'get_dados_gerais'
         ).lookups(
             'self__estado__governador__pessoa', 'self__prefeito', 'presidente'
-        ).sort_by('nome', 'estado')
+        ).sort_by('nome', 'estado').allow('add')
 
 
 class Cidade(models.Model):
@@ -266,7 +266,7 @@ class PessoaManager(models.DefaultManager):
     @ui(shortcut=True)
     @attr('Pessoas', icon=59638)
     def all(self):
-        return super().all().display('id', 'nome').allow('add')
+        return super().all().display('nome').allow('add')
 
 
 @user('email')
@@ -341,7 +341,7 @@ class PontoTuristicoManager(models.DefaultManager):
     @ui(shortcut=True)
     @attr('Pontos Turísticos', icon=58639)
     def all(self):
-        return super().all().allow('add', 'edit', 'delete', 'teste2')
+        return super().all().display('nome', 'foto').allow('add', 'edit', 'delete', 'teste2')
 
     @attr('Referenciados')
     def referenciados(self):
@@ -369,6 +369,7 @@ class PontoTuristicoManager(models.DefaultManager):
 
 class PontoTuristico(models.Model):
     nome = models.CharField(verbose_name='Nome', max_length=255)
+    foto = models.ImageField(verbose_name='Foto', upload_to='fotos', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Ponto Turístico'
