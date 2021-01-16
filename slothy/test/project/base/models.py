@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import datetime
 from slothy.api import models
 from slothy.api.models.decorators import user, role, attr, action, fieldset, param, ui
 
@@ -251,7 +252,7 @@ class Endereco(models.Model):
     def __str__(self):
         return '{}, {}, {}'.format(self.logradouro, self.numero, self.cidade)
 
-    @fieldset({'Dados Gerais': ('logradouro', ('numero', 'cidade'))})
+    @fieldset({'Dados Gerais': (('logradouro', 'numero', 'cidade'),)})
     def add(self):
         super().add()
 
@@ -288,7 +289,7 @@ class Pessoa(models.AbstractUser):
 
     @action('Cadastrar', atomic=True)
     @fieldset({
-        'Dados Gerais': ('nome', ('email', 'foto')),
+        'Dados Gerais': ('nome', ('email', 'foto', 'password', 'last_login'),),
         'Endereço': 'endereco',
         'Telefones': 'telefones'
     })
@@ -340,7 +341,7 @@ class PontoTuristicoManager(models.DefaultManager):
     @ui(shortcut=True)
     @attr('Pontos Turísticos', icon=58639)
     def all(self):
-        return super().all().allow('add', 'edit', 'delete')
+        return super().all().allow('add', 'edit', 'delete', 'teste2')
 
     @attr('Referenciados')
     def referenciados(self):
@@ -355,6 +356,15 @@ class PontoTuristicoManager(models.DefaultManager):
     @action('Remover Tudo')
     def remover_tudo(cls):
         PontoTuristico.objects.all().delete()
+
+    @staticmethod
+    def teste_initial():
+        return dict(data=datetime.date.today())
+
+    @action('Teste')
+    @param(data=models.DateField('Data'))
+    def teste(self, data):
+        print(self.count(), data)
 
 
 class PontoTuristico(models.Model):
@@ -390,6 +400,15 @@ class PontoTuristico(models.Model):
     @attr('Cidades')
     def get_cidades(self):
         return self.cidade_set.all()
+
+    @staticmethod
+    def teste2_initial():
+        return dict(data=datetime.date.today())
+
+    @action('Teste')
+    @param(data=models.DateField('Data'))
+    def teste2(self, data):
+        print(self.id, data)
 
 
 class PresidenteManager(models.DefaultManager):

@@ -565,12 +565,13 @@ class QuerySet(query.QuerySet):
                 action_url = '/api/{}/{}'.format(
                     self.model.get_metadata('app_label'), self.model.get_metadata('model_name')
                 )
-                if hasattr(self.model.objects, 'lookup'):
-                    action_type = 'subset'
-                    action_func = getattr(getattr(self.model.objects, '_queryset_class'), 'lookup')
-                else:
+                if hasattr(self.model, lookup):
                     action_type = 'instance'
                     action_func = getattr(self.model, lookup)
+                else:
+                    action_type = 'subset'
+                    action_func = getattr(getattr(self.model.objects, '_queryset_class'), lookup)
+
                 action_metadata = getattr(action_func, '_metadata')
                 action_icon = action_metadata['icon']
                 if action_metadata['name'] == 'add':
@@ -894,19 +895,23 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
                 field = getattr(model, '_meta').get_field(attr_name)
                 model = field.related_model
             else:  # last
-                attr = getattr(model, attr_name)
-                if hasattr(attr, '_meta'):  # method
-                    return getattr(attr, '_meta').verbose_name
+                if hasattr(model, attr_name):
+                    attr = getattr(model, attr_name)
+                    if hasattr(attr, '_meta'):  # method
+                        return getattr(attr, '_meta').verbose_name
+                    else:
+                        try:
+                            field = getattr(model, '_meta').get_field(attr_name)
+                            if hasattr(field, 'verbose_name'):
+                                return field.verbose_name
+                            else:
+                                return getattr(field.related_model, '_meta').verbose_name
+                        except FieldDoesNotExist:  # mehod
+                            attr = getattr(model, attr_name)
+                            return getattr(attr, '_metadata', {}).get('verbose_name')
                 else:
-                    try:
-                        field = getattr(model, '_meta').get_field(attr_name)
-                        if hasattr(field, 'verbose_name'):
-                            return field.verbose_name
-                        else:
-                            return getattr(field.related_model, '_meta').verbose_name
-                    except FieldDoesNotExist:  # mehod
-                        attr = getattr(model, attr_name)
-                        return getattr(attr, '_metadata', {}).get('verbose_name')
+                    attr = getattr(getattr(model.objects, '_queryset_class'), attr_name)
+                    return getattr(attr, '_metadata', {}).get('verbose_name')
 
     def check_lookups(self, attr_name, user):
         self._user = user
