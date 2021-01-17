@@ -168,10 +168,13 @@ class ApiModelForm(ModelForm):
         for name, field in self.fields.items():
             value = self.initial.get(name)
             if isinstance(value, FieldFile):
-                value = value.name or None
+                display = value.name
+                value = None
+            else:
+                display = format_value(field.to_python(value))
             self.initial_data[name] = value
             self.metadata[name]['value'] = value
-            self.metadata[name]['display'] = format_value(field.to_python(value))
+            self.metadata[name]['display'] = display
         for one_to_one_field_name, one_to_one_form in self.one_to_one_forms.items():
             self.initial_data[one_to_one_field_name] = {}
             for name, field in one_to_one_form.fields.items():
@@ -207,16 +210,17 @@ class ApiModelForm(ModelForm):
         for name, field in self.fields.items():
             if isinstance(field, FileField):
                 if name in self.data:
-                    data = json.loads(self.data[name])
-                    file_path = '{}{}'.format(settings.BASE_DIR, data['path'])
-                    self.files[name] = InMemoryUploadedFile(
-                        open(file_path, 'rb'),
-                        field_name=name,
-                        name=data['name'],
-                        content_type=data['content_type'],
-                        size=data['size'],
-                        charset=data['charset']
-                    )
+                    if self.data[name]:
+                        data = json.loads(self.data[name])
+                        file_path = '{}{}'.format(settings.BASE_DIR, data['path'])
+                        self.files[name] = InMemoryUploadedFile(
+                            open(file_path, 'rb'),
+                            field_name=name,
+                            name=data['name'],
+                            content_type=data['content_type'],
+                            size=data['size'],
+                            charset=data['charset']
+                        )
 
         return super()._clean_fields()
 

@@ -249,7 +249,9 @@ class MainTestCase(TestCase):
             response['path'],
             data=response['input']
         )
-        self.assertEqual(type(search_response), list)
+        self.assertEqual(type(search_response), dict)
+        self.assertEqual(type(search_response['data']), list)
+        self.assertEqual(type(search_response['total']), int)
 
     def test_lookups(self):
         bolsonaro = Presidente.objects.create(nome='Jair Bolsonaro')

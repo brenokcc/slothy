@@ -524,8 +524,8 @@ class QuerySet(query.QuerySet):
         qs._page_size = payload['page']['size']
         for name, value in payload['filters'].items():
             self._filters.append(dict(name=name, value=value))
-        for name in payload['display']:
-            self._display.append(dict(name=name))
+        self._list_display = payload['display']
+        self._list_actions = payload['actions']
         qs._deserialized = True
         return qs
 
@@ -558,39 +558,39 @@ class QuerySet(query.QuerySet):
                 self._sort.append(
                     {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None, 'display': None}
                 )
-            for lookup in self._list_actions:
-                action_params = True
-                action_url = '/api/{}/{}'.format(
-                    self.model.get_metadata('app_label'), self.model.get_metadata('model_name')
-                )
-                if hasattr(self.model, lookup):
-                    action_type = 'instance'
-                    action_func = getattr(self.model, lookup)
-                else:
-                    action_type = 'subset'
-                    action_func = getattr(getattr(self.model.objects, '_queryset_class'), lookup)
-
-                action_metadata = getattr(action_func, '_metadata')
-                action_icon = action_metadata['icon']
-                if action_metadata['name'] == 'add':
-                    action_type = 'subset'
-                if action_type == 'instance':
-                    action_url = '{}/{{id}}'.format(action_url)
-                action_url = '{}/{}'.format(action_url, action_metadata['name'])
-
-                if action_metadata['name'] not in ('add', 'edit') and not action_metadata['params']:
-                    action_params = False
-                self._actions.append(
-                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'type': action_type, 'icon': action_icon, 'url': action_url, 'params': action_params}
-                )
-            for lookup in self.get_list_display():
-                self._display.append(
-                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'sorted': False, 'formatter': None},
-                )
             for lookup in self._list_search:
                 self._search.append(
                     {'name': lookup, 'label': self.model.get_verbose_name(lookup)}
                 )
+        for lookup in self._list_actions:
+            action_params = True
+            action_url = '/api/{}/{}'.format(
+                self.model.get_metadata('app_label'), self.model.get_metadata('model_name')
+            )
+            if hasattr(self.model, lookup):
+                action_type = 'instance'
+                action_func = getattr(self.model, lookup)
+            else:
+                action_type = 'subset'
+                action_func = getattr(getattr(self.model.objects, '_queryset_class'), lookup)
+
+            action_metadata = getattr(action_func, '_metadata')
+            action_icon = action_metadata['icon']
+            if action_metadata['name'] == 'add':
+                action_type = 'subset'
+            if action_type == 'instance':
+                action_url = '{}/{{id}}'.format(action_url)
+            action_url = '{}/{}'.format(action_url, action_metadata['name'])
+
+            if action_metadata['name'] not in ('add', 'edit') and not action_metadata['params']:
+                action_params = False
+            self._actions.append(
+                {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'type': action_type, 'icon': action_icon, 'url': action_url, 'params': action_params}
+            )
+        for lookup in self.get_list_display():
+            self._display.append(
+                {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'sorted': False, 'formatter': None},
+            )
 
         if self._subset:
             qs = getattr(self, self._subset)()
@@ -624,10 +624,15 @@ class QuerySet(query.QuerySet):
                 elif isinstance(value, FieldFile):
                     value = value.name or None
                 item.append(value)
+            actions = []
+            for action in self._actions:
+                if action['type'] == 'instance':
+                    actions.append(action['name'])
+            item.append(actions)
             data.append(item)
 
         if self._deserialized:
-            serialized = data
+            serialized = dict(data=data, total=self.count())
         else:
             serialized = dict()
             serialized['type'] = 'queryset'
@@ -646,6 +651,7 @@ class QuerySet(query.QuerySet):
                 'size': self._page_size
             }
             serialized['input']['display'] = [display['name'] for display in self._display]
+            serialized['input']['actions'] = [action['name'] for action in self._actions]
             serialized['input']['filters'] = dict()
             for _filter in self._filters:
                 serialized['input']['filters'][_filter['name']] = _filter['value']

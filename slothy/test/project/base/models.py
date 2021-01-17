@@ -30,17 +30,17 @@ class EstadoManager(models.DefaultManager):
             'nome', 'ativo'
         ).filter_by(
             'ativo'
-        ).allow(
-            'inativar'
         ).search_by(
             'nome', 'sigla'
         ).subsets(
             'ativos', 'inativos'
         ).paginate(
-            10
+            5
         ).lookups(
             'presidente',
             'self__governador__pessoa'
+        ).allow(
+            'add', 'edit', 'delete', 'inativar', 'view'
         )
 
     @attr('Ativos')
@@ -100,7 +100,7 @@ class Estado(models.Model):
     def add(self):
         super().add()
 
-    @action('Editar')
+    @action('Editar', icon=57705)
     def edit(self):
         super().edit()
 
