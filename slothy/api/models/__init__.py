@@ -376,9 +376,7 @@ class QuerySet(query.QuerySet):
         self._list_search = search_fields
         return self
 
-    def get_list_search(self, add_default=False):
-        if self._list_search is None and add_default:
-            self._list_search = self.model.get_metadata('search_fields')
+    def get_list_search(self):
         return self._list_search
 
     def sort_by(self, *sort_fields):
@@ -535,10 +533,13 @@ class QuerySet(query.QuerySet):
 
         if not self._deserialized:
             for lookup in self._list_subsets:
-                metadata = getattr(getattr(self, lookup), '_metadata', {})
+                attr = getattr(self, lookup)
+                metadata = getattr(attr, '_metadata', {})
                 self._subsets.append(
-                    {'name': lookup, 'label': metadata.get('verbose_name'), 'active': False}
+                    {'name': lookup, 'label': metadata.get('verbose_name'), 'count': attr().count(), 'active': self._subset == lookup}
                 )
+            if self._subsets:
+                self._subsets.insert(0, {'name': None, 'label': 'Geral', 'count': self.count(), 'active': self._subset is None})
             for lookup in self._list_filter:
                 choices = []
                 field = self.model.get_field(lookup)

@@ -35,7 +35,7 @@ class EstadoManager(models.DefaultManager):
         ).subsets(
             'ativos', 'inativos'
         ).paginate(
-            5
+            10
         ).lookups(
             'presidente',
             'self__governador__pessoa'
@@ -129,7 +129,7 @@ class Estado(models.Model):
         self.ativo = True
         self.save()
 
-    @action('Ativar')
+    @action('Inativar')
     def inativar(self):
         self.ativo = False
         self.save()

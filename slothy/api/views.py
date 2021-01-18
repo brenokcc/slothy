@@ -56,12 +56,14 @@ class UploadView(APIView):
 
 
 class QuerysetView(APIView):
-    def post(self, request, app_label, model_name):
+    def post(self, request, app_label, model_name, subset=None):
         model = apps.get_model(app_label, model_name)
         body = request.body
         s = request.POST or body
         qs = model.objects.loads(s)
-        return Response(qs.serialize())
+        r = qs.serialize()
+        print(r)
+        return Response(r)
 
     def get(self, *args, **kwargs):
         return Response({})
