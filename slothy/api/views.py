@@ -5,7 +5,7 @@ import traceback
 import uuid
 import tempfile
 import pdfkit
-from slothy.api.ui import App
+from slothy.ui import App
 from django.conf import settings
 from django.apps import apps
 from django.db import transaction
@@ -115,8 +115,7 @@ class Api(APIView):
         try:
             if len(tokens) == 1:
                 if path == 'app':  # authenticated user
-                    app = App()
-                    response = app.serialize(request.user)
+                    response = App(request.user)
                 elif path == 'user':  # authenticated user
                     if request.user.is_authenticated:
                         response = request.user.view()
@@ -259,6 +258,9 @@ class Api(APIView):
                                         metadata['verbose_name']
                                     )
                                 response = output.serialize(name)
+                                formatter = metadata.get('formatter')
+                                if formatter:
+                                    response['formatter'] = formatter
                             elif isinstance(output, Model):
                                 response = output.serialize()
                             else:

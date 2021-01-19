@@ -1,3 +1,4 @@
+import inspect
 import datetime
 import collections
 from django.conf import settings
@@ -145,6 +146,12 @@ def format_ouput(output, metadata):
     else:
         response = output
     return response
+
+
+def get_model(func):
+    app_label = inspect.getmodule(func).__name__.split('.')[0]
+    model_name = func.__qualname__.split('.')[0].replace('Manager', '')
+    return apps.get_model(app_label, model_name)
 
 
 def custom_serialize(obj, detail=False):

@@ -303,7 +303,6 @@ class QuerySet(query.QuerySet):
         self._count_subsets = False
         self._related_manager = None
         self._related_attribute = None
-        self._formatter = None
         self._iterable_class = ModelIterable
         self._lookups = ()
 
@@ -379,10 +378,6 @@ class QuerySet(query.QuerySet):
     def get_sort_by(self):
         return self._list_sort
 
-    def format(self, formatter):
-        self._formatter = formatter
-        return self
-
     def __str__(self):
         output = list()
         for obj in self[0:self._page_size]:
@@ -415,7 +410,6 @@ class QuerySet(query.QuerySet):
         clone._search = self._search
         clone._related_manager = self._related_manager
         clone._related_attribute = self._related_attribute
-        clone._formatter = self._formatter
         return clone
 
     def add(self, instance):
@@ -671,7 +665,6 @@ class QuerySet(query.QuerySet):
                 'subsets': self._subsets,
                 'display': self._display,
                 'sort': self._sort,
-                'formatter': self._formatter
             }
             serialized['data'] = data
             serialized['total'] = self.count()

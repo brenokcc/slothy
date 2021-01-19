@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
 import datetime
 from slothy.api import models
-from slothy.api.models.decorators import user, role, attr, action, fieldset, param, ui
+from slothy.api.models.decorators import user, role, attr, action, fieldset, param
+from slothy.ui import dashboard
 
 
 class Telefone(models.Model):
@@ -22,7 +23,8 @@ class Telefone(models.Model):
 
 class EstadoManager(models.DefaultManager):
 
-    @ui(shortcut=True, top=True)
+    @dashboard.shortcut()
+    @dashboard.card()
     @attr('Estados', icon=62187)
     def all(self):
         return super().all(
@@ -43,6 +45,7 @@ class EstadoManager(models.DefaultManager):
             'add', 'edit', 'delete', 'view', 'ativar', 'inativar'
         )
 
+    @dashboard.center()
     @attr('Ativos')
     def ativos(self):
         return self.filter(ativo=True).display('nome', 'sigla').lookups(
@@ -149,7 +152,7 @@ class Estado(models.Model):
 
 class CidadeManager(models.DefaultManager):
 
-    @ui(shortcut=True)
+    @dashboard.shortcut()
     @attr('Cidades', lookups=('governador', 'prefeito', 'presidente'), icon=57910)
     def all(self):
         return super().all().filter_by(
@@ -261,7 +264,7 @@ class Endereco(models.Model):
 
 class PessoaManager(models.DefaultManager):
 
-    @ui(shortcut=True)
+    @dashboard.shortcut()
     @attr('Pessoas', icon=59638)
     def all(self):
         return super().all().display('nome').allow('add')
@@ -336,12 +339,13 @@ class Pessoa(models.AbstractUser):
 
 class PontoTuristicoManager(models.DefaultManager):
 
-    @ui(shortcut=True)
-    @attr('Pontos Turísticos', icon=58639)
+    @dashboard.top(formatter='round_image')
+    @dashboard.shortcut()
+    @attr('Pontos Turísticos', icon=58639, formatter='round_image')
     def all(self):
         return super().display('foto', 'nome').allow(
             'add', 'edit', 'delete', 'teste2'
-        ).format('round_image')
+        )
 
     @attr('Referenciados')
     def referenciados(self):
