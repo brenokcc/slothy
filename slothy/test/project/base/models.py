@@ -40,22 +40,20 @@ class EstadoManager(models.DefaultManager):
             'presidente',
             'self__governador__pessoa'
         ).allow(
-            'add', 'edit', 'delete', 'inativar', 'view'
+            'add', 'edit', 'delete', 'view', 'ativar', 'inativar'
         )
 
     @attr('Ativos')
     def ativos(self):
-        return self.filter(ativo=True).lookups(
-            'presidente',
-            'self__governador__pessoa'
-        )
+        return self.filter(ativo=True).display('nome', 'sigla').lookups(
+            'presidente', 'self__governador__pessoa').allow('inativar').search_by('sigla')
 
     @attr('Inativos')
     def inativos(self):
-        return self.filter(ativo=False)
+        return self.filter(ativo=False).allow('ativar').search_by('sigla')
 
     @action('Ativar')
-    def ativar(self):
+    def ativar_todos(self):
         self.update(ativo=True)
 
     @action('Agendar Inativacao')
@@ -341,7 +339,7 @@ class PontoTuristicoManager(models.DefaultManager):
     @ui(shortcut=True)
     @attr('Pontos Turísticos', icon=58639)
     def all(self):
-        return super().all().display('nome', 'foto').allow('add', 'edit', 'delete', 'teste2')
+        return super().display('foto', 'nome').allow('add', 'edit', 'delete', 'teste2')
 
     @attr('Referenciados')
     def referenciados(self):
@@ -368,8 +366,8 @@ class PontoTuristicoManager(models.DefaultManager):
 
 
 class PontoTuristico(models.Model):
-    nome = models.CharField(verbose_name='Nome', max_length=255)
     foto = models.ImageField(verbose_name='Foto', upload_to='fotos', null=True, blank=True)
+    nome = models.CharField(verbose_name='Nome', max_length=255)
 
     class Meta:
         verbose_name = 'Ponto Turístico'

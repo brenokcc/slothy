@@ -60,10 +60,12 @@ class QuerysetView(APIView):
         model = apps.get_model(app_label, model_name)
         body = request.body
         s = request.POST or body
-        qs = model.objects.loads(s)
-        r = qs.serialize()
-        print(r)
-        return Response(r)
+        metadata = json.loads(s)
+        qs = model.objects.load_query(metadata['query'])
+        qs.load(metadata)
+        if subset:
+            qs = qs if subset == 'all' else getattr(qs, subset)()
+        return Response(qs.serialize())
 
     def get(self, *args, **kwargs):
         return Response({})

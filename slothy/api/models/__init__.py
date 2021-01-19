@@ -300,7 +300,7 @@ class QuerySet(query.QuerySet):
         self._display = []
         self._search = []
         self._sort = []
-        self._deserialized = False
+        self._count_subsets = False
         self._related_manager = None
         self._related_attribute = None
         self._iterable_class = ModelIterable
@@ -322,18 +322,10 @@ class QuerySet(query.QuerySet):
         return super().values_list(*field_names, flat=flat, named=named)
 
     def display(self, *list_display):
-        self._list_display = list_display
+        self._list_display = ['id']
+        for lookup in list_display:
+            self._list_display.append(lookup)
         return self
-
-    def get_list_display(self, exclude=()):
-        list_display = ['id']
-        if self._list_display:
-            for lookup in self._list_display:
-                if lookup not in exclude:
-                    list_display.append(lookup)
-        else:
-            list_display.append('__str__')
-        return list_display
 
     def filter_by(self, *list_filter):
         self._list_filter = list_filter
@@ -511,58 +503,61 @@ class QuerySet(query.QuerySet):
             queryset = queryset | self.filter(**{'{}__icontains'.format(search_field): q})
         return queryset
 
-    def loads(self, payload):
-        payload = json.loads(payload)
-        qs = self.all()
-        qs.query = cpickle.loads(zlib.decompress(base64.b64decode(signing.loads(payload['query']))))
-        qs._q = payload['q']
-        qs._sorter = payload['sorter']
-        qs._subset = payload['subset']
-        qs._page = payload['page']['number'] - 1
-        qs._page_size = payload['page']['size']
-        for name, value in payload['filters'].items():
+    def dump_query(self):
+        return signing.dumps(base64.b64encode(zlib.compress(cpickle.dumps(self.query))).decode())
+
+    def load_query(self, s):
+        self.query = cpickle.loads(zlib.decompress(base64.b64decode(signing.loads(s))))
+        return self
+
+    def load(self, metadata):
+        self._q = metadata['q']
+        self._sorter = metadata['sorter']
+        self._subset = metadata['subset']
+        self._page = metadata['page']['number'] - 1
+        self._page_size = metadata['page']['size']
+        for name, value in metadata['filters'].items():
             self._filters.append(dict(name=name, value=value))
-        self._list_display = payload['display']
-        self._list_actions = payload['actions']
-        qs._deserialized = True
-        return qs
+        self._list_display = metadata['display']
+        self._list_actions = metadata['actions']
+        if 'subsets' in metadata:
+            self._count_subsets = metadata['subsets']
+        return self
 
     def serialize(self, name=''):
         data = []
-        serialized_str = base64.b64encode(zlib.compress(cpickle.dumps(self.query))).decode()
+        s = self.dump_query()
 
-        if not self._deserialized:
-            for lookup in self._list_subsets:
-                attr = getattr(self, lookup)
-                metadata = getattr(attr, '_metadata', {})
-                self._subsets.append(
-                    {'name': lookup, 'label': metadata.get('verbose_name'), 'count': attr().count(), 'active': self._subset == lookup}
-                )
-            if self._subsets:
-                self._subsets.insert(0, {'name': None, 'label': 'Geral', 'count': self.count(), 'active': self._subset is None})
-            for lookup in self._list_filter:
-                choices = []
-                field = self.model.get_field(lookup)
-                if hasattr(field, 'related_model') and field.related_model:
-                    qs = field.related_model.objects.filter(
-                        pk__in=self.values_list(lookup).distinct()
-                    ).display(*('__str__',))
-                    choices = qs.serialize(self.model.get_verbose_name(lookup))
-                elif hasattr(field, 'choices') and field.choices:
-                    choices = field.choices
-                elif isinstance(field, BooleanField):
-                    choices = [[True, 'Sim'], [False, 'Não']]
-                self._filters.append(
-                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None, 'display': None, 'choices': choices}
-                )
-            for lookup in self._list_sort:
-                self._sort.append(
-                    {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None, 'display': None}
-                )
-            for lookup in self._list_search:
-                self._search.append(
-                    {'name': lookup, 'label': self.model.get_verbose_name(lookup)}
-                )
+        for lookup in self._list_subsets:
+            attr = getattr(self, lookup)
+            metadata = getattr(attr, '_metadata', {})
+            qss = attr()
+            self._subsets.append(
+                {'name': lookup, 'label': metadata.get('verbose_name'), 'count': qss.count(), 'query': qss.dump_query(), 'active': False}
+            )
+        for lookup in self._list_filter:
+            choices = []
+            field = self.model.get_field(lookup)
+            if hasattr(field, 'related_model') and field.related_model:
+                qs = field.related_model.objects.filter(
+                    pk__in=self.values_list(lookup).distinct()
+                ).display(*('__str__',))
+                choices = qs.serialize(self.model.get_verbose_name(lookup))
+            elif hasattr(field, 'choices') and field.choices:
+                choices = field.choices
+            elif isinstance(field, BooleanField):
+                choices = [[True, 'Sim'], [False, 'Não']]
+            self._filters.append(
+                {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None, 'display': None, 'choices': choices}
+            )
+        for lookup in self._list_sort:
+            self._sort.append(
+                {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None, 'display': None}
+            )
+        for lookup in self._list_search:
+            self._search.append(
+                {'name': lookup, 'label': self.model.get_verbose_name(lookup)}
+            )
         for lookup in self._list_actions:
             action_params = True
             action_url = '/api/{}/{}'.format(
@@ -588,7 +583,7 @@ class QuerySet(query.QuerySet):
             self._actions.append(
                 {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'type': action_type, 'icon': action_icon, 'url': action_url, 'params': action_params}
             )
-        for lookup in self.get_list_display():
+        for lookup in self._list_display or ('id', '__str__'):
             self._display.append(
                 {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'sorted': False, 'formatter': None},
             )
@@ -632,18 +627,24 @@ class QuerySet(query.QuerySet):
             item.append(actions)
             data.append(item)
 
-        if self._deserialized:
+        if self._count_subsets:
             serialized = dict(data=data, total=self.count())
+            totals = dict()
+            clone = self._clone()
+            for subset_name, subset_query in self._count_subsets.items():
+                clone.load_query(subset_query)
+                totals[subset_name] = clone.count()
+            serialized.update(totals=totals)
         else:
             serialized = dict()
             serialized['type'] = 'queryset'
             serialized['name'] = name
-            serialized['path'] = '/util/queryset/{}/{}/'.format(
+            serialized['path'] = '/queryset/{}/{}/'.format(
                 getattr(self.model, '_meta').app_label.lower(),
                 self.model.__name__.lower()
             )
             serialized['input'] = dict()
-            serialized['input']['query'] = signing.dumps(serialized_str)
+            serialized['input']['query'] = s
             serialized['input']['q'] = ''
             serialized['input']['sorter'] = None
             serialized['input']['subset'] = self._subset
@@ -667,7 +668,6 @@ class QuerySet(query.QuerySet):
             }
             serialized['data'] = data
             serialized['total'] = self.count()
-
         return serialized
 
     def dumps(self):
