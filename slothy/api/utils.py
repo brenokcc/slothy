@@ -129,6 +129,24 @@ def format_value(value):
     return None
 
 
+def format_ouput(output, metadata):
+    from slothy.api import models
+    if isinstance(output, models.QuerySet):
+        if metadata['name'] == 'all':
+            name = metadata['verbose_name']
+        else:
+            name = '{} {}'.format(
+                output.model.get_metadata('verbose_name_plural'),
+                metadata['verbose_name']
+            )
+        response = output.serialize(name)
+    elif isinstance(output, models.Model):
+        response = output.serialize()
+    else:
+        response = output
+    return response
+
+
 def custom_serialize(obj, detail=False):
     from django.db.models.fields.files import FieldFile
     from slothy.api.models import QuerySet, ValueSet, Model

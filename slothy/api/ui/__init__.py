@@ -1,7 +1,10 @@
 from django.apps import apps
+from slothy.api.utils import format_ouput
 
 initialize = True
-shortcuts = []
+data = dict(
+    type='app',
+)
 
 
 class App:
@@ -23,22 +26,27 @@ class App:
                             attr = getattr(cls, attr_name)
                             if hasattr(attr, '_metadata'):
                                 metadata = getattr(attr, '_metadata')
-                                if metadata.get('shortcut'):
-                                    shortcuts.append(
-                                        dict(
-                                            icon=metadata.get('icon') or 58788,
-                                            url='/api/{}/{}{}'.format(
-                                                model.get_metadata('app_label'),
-                                                model.get_metadata('model_name'),
-                                                '/{}'.format(attr_name) if attr_name != 'all' else ''
-                                            ),
-                                            label=metadata.get('verbose_name')
-                                        )
-                                    )
+                                if 'ui' in metadata:
+                                    for element in ('shortcut', 'card'):
+                                        for lookups in metadata['ui'].get(element, []):
+                                            if element not in data:
+                                                data[element] = list()
+                                            data[element].append(
+                                                dict(
+                                                    icon=metadata.get('icon') or 58788,
+                                                    url='/api/{}/{}{}'.format(
+                                                        model.get_metadata('app_label'),
+                                                        model.get_metadata('model_name'),
+                                                        '/{}'.format(attr_name) if attr_name != 'all' else ''
+                                                    ),
+                                                    label=metadata.get('verbose_name'),
+                                                    lookups=lookups
+                                                )
+                                            )
+                                    for element in ('top', 'bottom'):
+                                        if element not in data:
+                                            data[element] = list()
+
 
     def serialize(self, user):
-        self.shortcuts = shortcuts
-        return dict(
-            type='app',
-            shortcuts=shortcuts
-        )
+        return data

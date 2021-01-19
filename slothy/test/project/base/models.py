@@ -22,7 +22,7 @@ class Telefone(models.Model):
 
 class EstadoManager(models.DefaultManager):
 
-    @ui(shortcut=True)
+    @ui(shortcut=True, top=True)
     @attr('Estados', icon=62187)
     def all(self):
         return super().all(
@@ -339,7 +339,9 @@ class PontoTuristicoManager(models.DefaultManager):
     @ui(shortcut=True)
     @attr('Pontos Turísticos', icon=58639)
     def all(self):
-        return super().display('foto', 'nome').allow('add', 'edit', 'delete', 'teste2')
+        return super().display('foto', 'nome').allow(
+            'add', 'edit', 'delete', 'teste2'
+        ).format('round_image')
 
     @attr('Referenciados')
     def referenciados(self):
