@@ -5,6 +5,7 @@ import traceback
 import uuid
 import tempfile
 import pdfkit
+import slothy
 from slothy.ui import App
 from django.conf import settings
 from django.apps import apps
@@ -15,7 +16,10 @@ from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from slothy.api.models import ValidationError, ManyToManyField, ForeignKey, ValueSet, QuerySet, Model
-from slothy.forms import ApiModelForm, InputValidationError
+from slothy.forms import ModelForm, InputValidationError
+
+
+slothy.initialize()
 
 
 class PdfResponse(HttpResponse):
@@ -75,7 +79,7 @@ class Api(APIView):
     authentication_classes = CsrfExemptSessionAuthentication, TokenAuthentication
 
     def options(self, request, service, path):
-        return self.do(request, service, path, {}, {})
+        return self.do(request, service, path, {})
 
     def get(self, request, service, path):
         body = request.body
@@ -83,9 +87,6 @@ class Api(APIView):
             data = json.loads(body)
         else:
             data = {}
-        # data = {}
-        # for key in request.GET:
-        #     data[key] = request.GET[key]
         return self.do(request, service, path, data)
 
     def post(self, request, service, path):
@@ -94,15 +95,6 @@ class Api(APIView):
             data = json.loads(body)
         else:
             data = {}
-        # data = {}
-        # if request.POST:  # browser
-        #     for key in request.POST:
-        #         data[key] = request.POST[key]
-        #     if request.FILES:
-        #         for key in request.FILES:
-        #             data[key] = request.FILES[key]
-        # else:  # nodejs
-        #     data = json.loads(body or '{}')
         return self.do(request, service, path, data)
 
     def do(self, request, service, path, data):
@@ -115,7 +107,7 @@ class Api(APIView):
         try:
             if len(tokens) == 1:
                 if path == 'app':  # authenticated user
-                    response = App(request.user)
+                    response = App(request)
                 elif path == 'user':  # authenticated user
                     if request.user.is_authenticated:
                         response = request.user.view()
@@ -147,7 +139,15 @@ class Api(APIView):
                 else:
                     response = dict(type='exception', text='Recurso inexistente')
             else:
-                if len(tokens) > 1:
+                if tokens[0] == 'forms':
+                    form = slothy.FORMS[tokens[1]](request, data=data)
+                    if data:
+                        form.submit()
+                    response = form.serialize()
+                elif tokens[0] == 'views':
+                    view = slothy.VIEWS[tokens[1]](request)
+                    response = view.serialize()
+                elif len(tokens) > 1:
                     meta_func = None
                     instance = None
                     is_model_attr = False
@@ -319,7 +319,7 @@ class Api(APIView):
                     else:  # no form is needed
                         return None
 
-            class Form(ApiModelForm):
+            class Form(ModelForm):
 
                 class Meta:
                     model = _model

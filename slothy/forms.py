@@ -1,10 +1,12 @@
-import os
 import json
 from collections import OrderedDict
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db.models.fields.files import FieldFile
-from django.forms import ModelForm, modelform_factory, FileField
+from django import forms
+from django.forms.forms import DeclarativeFieldsMetaclass
+
+from slothy import api
 from slothy.api.utils import format_value, make_choices
 from django.core.files.uploadedfile import InMemoryUploadedFile
 
@@ -15,7 +17,98 @@ class InputValidationError(BaseException):
         self.errors = errors
 
 
-class ApiModelForm(ModelForm):
+class Form(forms.Form):
+
+    def __init__(self, request, *args, **kwargs):
+        self.request = request
+        self.title = 'Form'
+        super().__init__(*args, **kwargs)
+
+        # fieldsets
+        if hasattr(self.Meta, 'fieldsets'):
+            fieldsets = self.Meta.fieldsets
+        else:
+            fieldsets = dict()
+            fieldsets['Dados Gerais'] = []
+            for field_name in self.fields:
+                fieldsets['Dados Gerais'].append((field_name,))
+
+        # metadata
+        self.metadata = {}
+        for name, field in self.fields.items():
+            choices = make_choices(name, field, {})
+            field_type = type(field).__name__.replace('Field', '').lower()
+            item = OrderedDict(
+                label=field.label, type=field_type, required=field.required,
+                mask=None, value=None, display=None, choices=choices, help_text=field.help_text,
+                error=None, width=100
+            )
+            self.metadata[name] = item
+
+        # initial data
+        self.initial_data = {}
+        for name, field in self.fields.items():
+            value = self.initial.get(name)
+            if isinstance(value, FieldFile):
+                display = value.name
+                value = None
+            else:
+                display = format_value(field.to_python(value))
+            self.initial_data[name] = value
+            self.metadata[name]['value'] = value
+            self.metadata[name]['display'] = display
+
+        # fieldsets
+        self.fieldsets = {}
+        for verbose_name, field_lists in fieldsets.items():
+            self.fieldsets[verbose_name] = {}
+            for field_list in field_lists:
+                if isinstance(field_list, str):
+                    field_list = field_list,
+                for field_name in field_list:
+                    if field_name in self.metadata:
+                        self.fieldsets[verbose_name][field_name] = self.metadata[field_name]
+
+        # result
+        self.result = None
+
+    def show(self):
+        return True
+
+    def submit(self):
+        pass
+
+    def save(self, *args, **kwargs):
+        error = None
+        errors = []
+
+        if self.errors:
+            for inner_field_name, inner_messages in self.errors.items():
+                errors.append(dict(field=inner_field_name, message=','.join(inner_messages)))
+
+        try:
+            self.submit()
+        except ValidationError as ve:
+            error = ''.join(ve.message)
+
+        if error or errors:
+            raise InputValidationError(error, errors)
+
+    def serialize(self):
+        return dict(
+            type='form',
+            path='/api/forms/{}'.format(self.__class__.__name__.lower()),
+            name=self.title,
+            input=self.initial_data,
+            fieldsets=self.fieldsets,
+            result=self.result.serialize() if self.result is not None else None
+        )
+
+    def log(self):
+        print(json.dumps(self.serialize(), indent=2, sort_keys=False, ensure_ascii=False))
+
+
+class ModelForm(forms.ModelForm):
 
     def __init__(self, title, func, params, exclude=None, fields=None, fieldsets=None, **kwargs):
         self.title = title
@@ -79,7 +172,7 @@ class ApiModelForm(ModelForm):
             one_to_one_items = {}
             one_to_one_field = self.fields[one_to_one_field_name]
             del (self.fields[one_to_one_field_name])
-            one_to_one_form_cls = modelform_factory(one_to_one_field.queryset.model, exclude=())
+            one_to_one_form_cls = forms.modelform_factory(one_to_one_field.queryset.model, exclude=())
             if hasattr(one_to_one_field.queryset.model, 'add'):
                 one_to_one_fieldsets = getattr(
                     one_to_one_field.queryset.model.add, '_metadata', {}
@@ -122,7 +215,7 @@ class ApiModelForm(ModelForm):
             one_to_many_items = {}
             one_to_many_field = self.fields[one_to_many_field_name]
             del (self.fields[one_to_many_field_name])
-            one_to_many_form_cls = modelform_factory(one_to_many_field.queryset.model, exclude=())
+            one_to_many_form_cls = forms.modelform_factory(one_to_many_field.queryset.model, exclude=())
             if hasattr(one_to_many_field.queryset.model, 'add'):
                 one_to_many_fieldsets = getattr(
                     one_to_many_field.queryset.model.add, '_metadata', {}
@@ -208,7 +301,7 @@ class ApiModelForm(ModelForm):
 
     def _clean_fields(self):
         for name, field in self.fields.items():
-            if isinstance(field, FileField):
+            if isinstance(field, forms.FileField):
                 if name in self.data:
                     if self.data[name]:
                         data = json.loads(self.data[name])

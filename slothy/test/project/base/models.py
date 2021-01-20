@@ -161,7 +161,7 @@ class CidadeManager(models.DefaultManager):
             'get_dados_gerais'
         ).lookups(
             'self__estado__governador__pessoa', 'self__prefeito', 'presidente'
-        ).sort_by('nome', 'estado').allow('add')
+        ).sort_by('nome', 'estado').allow('add', 'view')
 
 
 class Cidade(models.Model):
