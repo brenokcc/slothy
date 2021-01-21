@@ -1,6 +1,6 @@
 from slothy.api import utils
 from collections import UserDict
-from slothy.ui import dashboard
+from slothy.ui import dashboard, form, view
 
 
 class App(UserDict):

@@ -790,63 +790,48 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
                 satisfied = not satisfied
         return satisfied
 
-    def get_viewset_metadata(self):
-        cls = type(self)
-        if not hasattr(cls, '_viewset_metadata'):
-            default_display = None
-            viewset_metadata = []
-            display_names = []
-            for attr_name in dir(cls):
-                if attr_name[0] != '_':
-                    attr = getattr(cls, attr_name)
-                    if hasattr(attr, '_metadata'):
-                        metadata = getattr(attr, '_metadata')
-                        if metadata.get('type') == 'attr' and metadata.get('display'):
-                            viewset_metadata.append(metadata)
-            viewset_metadata = sorted(viewset_metadata, key=lambda k: k['order'])
-            for metadata in viewset_metadata:
-                if metadata.get('display') is not True:
-                    if metadata.get('display') not in display_names:
-                        display_names.append(metadata.get('display'))
-                        if default_display is None:
-                            default_display = metadata.get('display')
-            setattr(cls, '_viewset_metadata', viewset_metadata)
-            setattr(cls, '_default_display', default_display)
-            setattr(cls, '_display_names', display_names)
-        return getattr(cls, '_default_display'), getattr(cls, '_display_names'), getattr(cls, '_viewset_metadata')
-
     def serialize(self, *lookups):
-        fieldset_names = [lookup for lookup in lookups]
-        default_display, display_names, viewset_metadata = self.get_viewset_metadata()
+        fieldsets = []
+        displays = []
+        default_display = None
+        data = dict(fieldset=[], tab=[], shortcut=[], card=[], top=[], left=[], center=[], right=[], bottom=[])
+        for attr_name in dir(self):
+            if attr_name.startswith('get'):
+                attr = getattr(self, attr_name)
+                if hasattr(attr, '__page'):
+                    item = getattr(attr, '__page')
+                    if item['key'] == 'tab':
+                        if not displays:
+                            default_display = item['verbose_name']
+                        displays.append(item)
+                    else:
+                        fieldsets.append(item)
+                    data[item['key']].append(item)
+
+        fieldsets = sorted(fieldsets, key=lambda item: item['order'])
 
         current_display_name = getattr(self, '_current_display_name', None)
         if current_display_name is None:
             current_display_name = default_display
 
-        if not lookups:
-            for metadata in viewset_metadata:
-                if metadata.get('display') is True:
-                    fieldset_names.append(metadata['name'])
-
-        display = {}
-        for display_name in display_names:
-            display_fieldset_names = []
-            for metadata in viewset_metadata:
-                if metadata['display'] == display_name and display_name == current_display_name:
-                    display_fieldset_names.append(metadata['name'])
-            if display_fieldset_names:
-                display[display_name] = self.values(*display_fieldset_names, verbose=True).serialize()
+        dimensions = {}
+        for item in displays:
+            if item['verbose_name'] == current_display_name:
+                dimensions[item['verbose_name']] = getattr(self, item['name'])().serialize()
             else:
-                display[display_name] = []
+                dimensions[item['verbose_name']] = []
 
-        if not fieldset_names:
-            fieldset_names.append('default_viewset')
+        if not fieldsets:
+            fieldsets.append(dict(name='default_viewset'))
+        fieldset_names = []
+        for item in fieldsets:
+            fieldset_names.append(item['name'])
         serialized = dict(
             type='object',
             name=str(self),
             input=dict(dimension=current_display_name),
             data=self.values(*fieldset_names, verbose=True, detail=True).serialize(),
-            dimensions=display
+            dimensions=dimensions
         )
         return serialized
 

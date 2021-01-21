@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import datetime
 from slothy.api import models
-from slothy.api.models.decorators import user, role, attr, action, fieldset, param
-from slothy.ui import dashboard
+from slothy.api.models.decorators import user, role, attr, action, param
+from slothy import ui
 
 
 class Telefone(models.Model):
@@ -16,15 +16,15 @@ class Telefone(models.Model):
     def __str__(self):
         return '({}) {}'.format(self.ddd, self.numero)
 
-    @fieldset({'Dados Gerais': (('ddd', 'numero'),)})
+    @ui.form.fieldset({'Dados Gerais': (('ddd', 'numero'),)})
     def add(self):
         super().add()
 
 
 class EstadoManager(models.DefaultManager):
 
-    @dashboard.shortcut()
-    @dashboard.card()
+    @ui.dashboard.shortcut()
+    @ui.dashboard.card()
     @attr('Estados', icon=62187)
     def all(self):
         return super().all(
@@ -45,7 +45,7 @@ class EstadoManager(models.DefaultManager):
             'add', 'edit', 'delete', 'view', 'ativar', 'inativar'
         )
 
-    @dashboard.center()
+    @ui.dashboard.center()
     @attr('Ativos')
     def ativos(self):
         return self.filter(ativo=True).display('nome', 'sigla').lookups(
@@ -113,15 +113,15 @@ class Estado(models.Model):
     def view(self):
         return super().view()
 
-    @attr('Dados Gerais', display=True)
+    @attr('Dados Gerais')
     def dados_gerais(self):
         return self.values('nome', ('sigla', 'ativo'))
 
-    @attr('Dados Populacionais', display=True)
+    @attr('Dados Populacionais')
     def dados_populacionais(self):
         return self.values('get_populacao')
 
-    @attr('Cidades', display=True)
+    @attr('Cidades')
     def get_cidades(self):
         return self.cidade_set.all().filter_by('estado')
 
@@ -152,7 +152,7 @@ class Estado(models.Model):
 
 class CidadeManager(models.DefaultManager):
 
-    @dashboard.shortcut()
+    @ui.dashboard.shortcut()
     @attr('Cidades', lookups=('governador', 'prefeito', 'presidente'), icon=57910)
     def all(self):
         return super().all().filter_by(
@@ -161,7 +161,7 @@ class CidadeManager(models.DefaultManager):
             'get_dados_gerais'
         ).lookups(
             'self__estado__governador__pessoa', 'self__prefeito', 'presidente'
-        ).sort_by('nome', 'estado').allow('add', 'view')
+        ).sort_by('nome', 'estado').allow('add', 'view', 'edit')
 
 
 class Cidade(models.Model):
@@ -179,7 +179,7 @@ class Cidade(models.Model):
         return '{}/{}'.format(self.nome, self.estado)
 
     @action('Adicionar')
-    @fieldset({
+    @ui.form.fieldset({
         'Dados Gerais': ('nome', 'estado'),
         'Administração': ('prefeito', 'vereadores')
     })
@@ -204,15 +204,22 @@ class Cidade(models.Model):
     def view(self):
         return super().view()
 
-    @attr('Dados Gerais', display=True)
+    @ui.view.fieldset()
+    @attr('Dados Gerais')
     def get_dados_gerais(self):
         return self.values('nome', ('estado', 'get_qtd_pontos_turisticos')).allow('edit')
 
-    @attr('Prefeito', display='Administração')
+    # Dados Administrativos
+    @ui.view.tab()
+    @attr('Dados Administrativos')
+    def get_dados_administrativos(self):
+        return self.values('get_prefeito', 'get_vereadores')
+
+    @attr('Prefeito')
     def get_prefeito(self):
         return self.values('prefeito__nome', 'prefeito__email').allow('set_prefeito')
 
-    @attr('Vereadores', display='Administração')
+    @attr('Vereadores')
     def get_vereadores(self):
         return self.vereadores
 
@@ -220,15 +227,27 @@ class Cidade(models.Model):
     def teste(self):
         return self.values('get_dados_gerais', 'get_qtd_pontos_turisticos')
 
-    @attr('Quantidade de Pontos Turísticos', display='Turismo')
+    # Dados Turísticos
+    @ui.view.tab()
+    @attr('Dados Turísticos')
+    def get_dados_turisticos(self):
+        return self.values('get_qtd_pontos_turisticos', 'get_pontos_turisticos')
+
+    @attr('Quantidade de Pontos Turísticos')
     def get_qtd_pontos_turisticos(self):
         return self.pontos_turisticos.count()
 
-    @attr('Pontos Turísticos', display='Turismo')
+    @attr('Pontos Turísticos')
     def get_pontos_turisticos(self):
         return self.pontos_turisticos
 
-    @attr('Estatística Populacional', display='Estatística')
+    # Dados Estatísticos
+    @ui.view.tab()
+    @attr('Dados Estatísticos')
+    def get_dados_estatisticos(self):
+        return self.values('get_estatisticas')
+
+    @attr('Estatística Populacional')
     def get_estatisticas(self):
         return {
             'Polulação Infantil': 288989,
@@ -253,7 +272,7 @@ class Endereco(models.Model):
     def __str__(self):
         return '{}, {}, {}'.format(self.logradouro, self.numero, self.cidade)
 
-    @fieldset({'Dados Gerais': (('logradouro', 'numero', 'cidade'),)})
+    @ui.form.fieldset({'Dados Gerais': (('logradouro', 'numero', 'cidade'),)})
     def add(self):
         super().add()
 
@@ -264,10 +283,10 @@ class Endereco(models.Model):
 
 class PessoaManager(models.DefaultManager):
 
-    @dashboard.shortcut()
+    @ui.dashboard.shortcut()
     @attr('Pessoas', icon=59638)
     def all(self):
-        return super().all().display('nome').allow('add')
+        return super().all().display('nome').allow('add', 'view')
 
 
 @user('email')
@@ -289,7 +308,7 @@ class Pessoa(models.AbstractUser):
         return self.nome
 
     @action('Cadastrar', atomic=True)
-    @fieldset({
+    @ui.form.fieldset({
         'Dados Gerais': ('nome', ('email', 'foto', 'password', 'last_login'),),
         'Endereço': 'endereco',
         'Telefones': 'telefones'
@@ -309,17 +328,23 @@ class Pessoa(models.AbstractUser):
     def view(self):
         return super().view()
 
-    @attr('Dados Gerais', display=True)
-    def dados_gerais(self):
+    @ui.view.fieldset()
+    @attr('Dados Gerais')
+    def get_dados_gerais(self):
         return self.values('nome', ('email', 'foto'))
 
-    @attr('Dados de Acesso', display=True)
-    def dados_acesso(self):
-        return self.values(('last_login', 'password'), 'groups')
+    @ui.view.fieldset()
+    @attr('Dados de Acesso')
+    def get_dados_acesso(self):
+        return self.values(('last_login', 'get_senha'), 'groups')
 
-    @attr('Grupos', display=True)
+    @attr('Grupos')
     def get_grupos(self):
         return self.groups
+
+    @attr('Senha')
+    def get_senha(self):
+        return '*****'
 
     @action('Atualizar Nome')
     @param(data_atualizacao=models.DateField())
@@ -332,15 +357,15 @@ class Pessoa(models.AbstractUser):
     def alterar_senha(self, senha):
         super().change_password(senha)
 
-    @attr('Telefones', display=True)
+    @attr('Telefones')
     def get_telefones(self):
         return self.telefones.all()
 
 
 class PontoTuristicoManager(models.DefaultManager):
 
-    @dashboard.top(formatter='round_image')
-    @dashboard.shortcut()
+    @ui.dashboard.top(formatter='round_image')
+    @ui.dashboard.shortcut()
     @attr('Pontos Turísticos', icon=58639, formatter='round_image')
     def all(self):
         return super().display('foto', 'nome').allow(
