@@ -1,6 +1,101 @@
 from slothy.api import utils
 from collections import UserDict
-from slothy.ui import dashboard, form, view
+from slothy.ui import dashboard
+
+order = 0
+
+
+def setdata(key, func, lookups, priority, formatter=None):
+    global order
+    order += 1
+    verbose_name = getattr(func, '_metadata', {}).get('verbose_name')
+    data = dict(key=key, verbose_name=verbose_name, name=func.__name__, func=func, lookups=lookups, priority=priority, formatter=formatter, order=order)
+    setattr(func, '__page', data)
+
+
+def shortcut(lookups=None, priority=0):
+    def decorate(func):
+        setdata('shortcut', func, lookups, priority)
+        return func
+    return decorate
+
+
+def card(lookups=None, priority=0):
+    def decorate(func):
+        setdata('card', func, lookups, priority)
+        return func
+    return decorate
+
+
+def top(lookups=None, priority=0, formatter=None):
+    def decorate(func):
+        setdata('top', func, lookups, priority, formatter)
+        return func
+    return decorate
+
+
+def left(lookups=None, priority=0, formatter=None):
+    def decorate(func):
+        setdata('left', func, lookups, priority, formatter)
+        return func
+    return decorate
+
+
+def center(lookups=None, priority=0, formatter=None):
+    def decorate(func):
+        setdata('center', func, lookups, priority, formatter)
+        return func
+    return decorate
+
+
+def right(lookups=None, priority=0, formatter=None):
+    def decorate(func):
+        setdata('right', func, lookups, priority, formatter)
+        return func
+    return decorate
+
+
+def bottom(lookups=None, priority=0, formatter=None):
+    def decorate(func):
+        setdata('bottom', func, lookups, priority, formatter)
+        return func
+    return decorate
+
+
+def fieldset(lookups=None, priority=0):
+    def decorate(func):
+        # form fieldset
+        if isinstance(lookups, dict):
+            metadata = getattr(func, '_metadata', {})
+            fieldsets = {}
+            for verbose_name, str_or_tuples in lookups.items():
+                fieldsets[verbose_name] = []
+                if isinstance(str_or_tuples, str):  # sigle field
+                    fieldsets[verbose_name].append((str_or_tuples,))
+                else:  # multiple fields
+                    for str_or_tuple in str_or_tuples:
+                        if isinstance(str_or_tuple, str):  # string
+                            fieldsets[verbose_name].append((str_or_tuple,))
+                        else:  # tuple
+                            fieldsets[verbose_name].append(str_or_tuple)
+
+            metadata.update(
+                fieldsets=fieldsets
+            )
+            setattr(func, '_metadata', metadata)
+        # object fieldset
+        else:
+            setdata('fieldset', func, lookups, priority)
+        return func
+
+    return decorate
+
+
+def tab(lookups=None, priority=0):
+    def decorate(func):
+        setdata('tab', func, lookups, priority)
+        return func
+    return decorate
 
 
 class App(UserDict):

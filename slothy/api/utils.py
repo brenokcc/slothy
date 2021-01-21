@@ -169,11 +169,23 @@ def custom_serialize(obj, detail=False):
         else:
             return ', '.join((str(instance) for instance in obj)) or None
     elif isinstance(obj, ValueSet):
-        return dict(type='valueset', fields=obj.get_nested_values(), actions=obj.actions)
+        if detail:
+            return dict(type='valueset', fields=obj.get_nested_values(), actions=obj.actions)
+        else:
+            for key in obj:
+                obj[key] = custom_serialize(obj[key], detail=False)
+            return obj
     elif isinstance(obj, Model):
         return str(obj)
     elif isinstance(obj, FieldFile):
         return obj.name or None
+    elif isinstance(obj, dict):
+        if detail:
+            for key in obj:
+                obj[key] = custom_serialize(obj[key], detail=False)
+            return dict(type='valueset', fields=[[{k: v}] for k, v in obj.items()], actions=[])
+        else:
+            pass
     return obj
 
 

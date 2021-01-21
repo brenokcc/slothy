@@ -16,7 +16,7 @@ class Telefone(models.Model):
     def __str__(self):
         return '({}) {}'.format(self.ddd, self.numero)
 
-    @ui.form.fieldset({'Dados Gerais': (('ddd', 'numero'),)})
+    @ui.fieldset({'Dados Gerais': (('ddd', 'numero'),)})
     def add(self):
         super().add()
 
@@ -179,7 +179,7 @@ class Cidade(models.Model):
         return '{}/{}'.format(self.nome, self.estado)
 
     @action('Adicionar')
-    @ui.form.fieldset({
+    @ui.fieldset({
         'Dados Gerais': ('nome', 'estado'),
         'Administração': ('prefeito', 'vereadores')
     })
@@ -204,16 +204,16 @@ class Cidade(models.Model):
     def view(self):
         return super().view()
 
-    @ui.view.fieldset()
+    @ui.fieldset()
     @attr('Dados Gerais')
     def get_dados_gerais(self):
-        return self.values('nome', ('estado', 'get_qtd_pontos_turisticos')).allow('edit')
+        return self.values('nome', ('estado', 'get_qtd_pontos_turisticos'), 'get_pontos_turisticos2').allow('edit')
 
     # Dados Administrativos
-    @ui.view.tab()
+    @ui.tab()
     @attr('Dados Administrativos')
     def get_dados_administrativos(self):
-        return self.values('get_prefeito', 'get_vereadores')
+        return self.values('get_prefeito', 'get_vereadores', 'get_pontos_turisticos2')
 
     @attr('Prefeito')
     def get_prefeito(self):
@@ -228,21 +228,26 @@ class Cidade(models.Model):
         return self.values('get_dados_gerais', 'get_qtd_pontos_turisticos')
 
     # Dados Turísticos
-    @ui.view.tab()
+    @ui.tab()
     @attr('Dados Turísticos')
     def get_dados_turisticos(self):
-        return self.values('get_qtd_pontos_turisticos', 'get_pontos_turisticos')
+        return self.values('get_qtd_pontos_turisticos', 'get_pontos_turisticos2')
 
     @attr('Quantidade de Pontos Turísticos')
     def get_qtd_pontos_turisticos(self):
         return self.pontos_turisticos.count()
 
+    @ui.fieldset()
     @attr('Pontos Turísticos')
     def get_pontos_turisticos(self):
-        return self.pontos_turisticos
+        return self.pontos_turisticos.display('nome')
+
+    @attr('Pontos Turísticos')
+    def get_pontos_turisticos2(self):
+        return self.pontos_turisticos.all().display('nome')
 
     # Dados Estatísticos
-    @ui.view.tab()
+    @ui.tab()
     @attr('Dados Estatísticos')
     def get_dados_estatisticos(self):
         return self.values('get_estatisticas')
@@ -272,7 +277,7 @@ class Endereco(models.Model):
     def __str__(self):
         return '{}, {}, {}'.format(self.logradouro, self.numero, self.cidade)
 
-    @ui.form.fieldset({'Dados Gerais': (('logradouro', 'numero', 'cidade'),)})
+    @ui.fieldset({'Dados Gerais': (('logradouro', 'numero', 'cidade'),)})
     def add(self):
         super().add()
 
@@ -308,7 +313,7 @@ class Pessoa(models.AbstractUser):
         return self.nome
 
     @action('Cadastrar', atomic=True)
-    @ui.form.fieldset({
+    @ui.fieldset({
         'Dados Gerais': ('nome', ('email', 'foto', 'password', 'last_login'),),
         'Endereço': 'endereco',
         'Telefones': 'telefones'
@@ -328,12 +333,12 @@ class Pessoa(models.AbstractUser):
     def view(self):
         return super().view()
 
-    @ui.view.fieldset()
+    @ui.fieldset()
     @attr('Dados Gerais')
     def get_dados_gerais(self):
         return self.values('nome', ('email', 'foto'))
 
-    @ui.view.fieldset()
+    @ui.fieldset()
     @attr('Dados de Acesso')
     def get_dados_acesso(self):
         return self.values(('last_login', 'get_senha'), 'groups')

@@ -245,7 +245,6 @@ class ValueSet(UserDict):
                     value = value()
                 if isinstance(value, ValueSet):
                     self.nested = True
-                value = utils.custom_serialize(value, detail)
                 self[verbose_name] = value
                 keys.append(verbose_name)
             self.nested_keys.append(keys)
@@ -266,14 +265,17 @@ class ValueSet(UserDict):
         for key_list in self.nested_keys:
             values = []
             for key in key_list:
-                values.append({key: self[key]})
+                value = self[key]
+                value = utils.custom_serialize(value, False)
+                values.append({key: value})
             _values.append(values)
         return _values
 
     def serialize(self):
         serialized = []
-        for name, data in self.items():
-            serialized.append(dict(type='fieldset', name=name, data=data))
+        for name, value in self.items():
+            value = utils.custom_serialize(value, True)
+            serialized.append(dict(type='fieldset', name=name, data=value))
         return serialized
 
 
@@ -609,17 +611,7 @@ class QuerySet(query.QuerySet):
                 value = getattrr(obj, display['name'])
                 if callable(value):
                     value = value()
-                elif isinstance(value, bool):
-                    value = value and 'Sim' or 'Não'
-                elif isinstance(value, Model):
-                    value = str(value)
-                elif isinstance(value, datetime.date):
-                    value = value.strftime('%d/%d/%Y')
-                elif isinstance(value, datetime.datetime):
-                    value = value.strftime('%d/%m/%Y %H:%M')
-                elif isinstance(value, FieldFile):
-                    value = value.name or None
-                item.append(value)
+                item.append(utils.custom_serialize(value, detail=False))
             actions = []
             for action in self._actions:
                 if action['type'] == 'instance':
@@ -668,6 +660,7 @@ class QuerySet(query.QuerySet):
             }
             serialized['data'] = data
             serialized['total'] = self.count()
+
         return serialized
 
     def dumps(self):
