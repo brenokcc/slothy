@@ -113,17 +113,19 @@ class Estado(models.Model):
     def view(self):
         return super().view()
 
+    @ui.fieldset()
     @attr('Dados Gerais')
-    def dados_gerais(self):
+    def get_dados_gerais(self):
         return self.values('nome', ('sigla', 'ativo'))
 
     @attr('Dados Populacionais')
-    def dados_populacionais(self):
+    def get_dados_populacionais(self):
         return self.values('get_populacao')
 
+    @ui.fieldset()
     @attr('Cidades')
     def get_cidades(self):
-        return self.cidade_set.all().filter_by('estado')
+        return self.cidade_set.allow('add', 'remove')
 
     @action('Ativar')
     def ativar(self):
@@ -180,7 +182,7 @@ class Cidade(models.Model):
 
     @action('Adicionar')
     @ui.fieldset({
-        'Dados Gerais': ('nome', 'estado'),
+        'Dados Gerais': (('nome', 'estado'),),
         'Administração': ('prefeito', 'vereadores')
     })
     def add(self):
@@ -211,7 +213,7 @@ class Cidade(models.Model):
 
     # Dados Administrativos
     @ui.tab()
-    @attr('Dados Administrativos')
+    @attr('Dados Administrativos para Exibição em Aba')
     def get_dados_administrativos(self):
         return self.values('get_prefeito', 'get_vereadores', 'get_pontos_turisticos2')
 
@@ -240,7 +242,7 @@ class Cidade(models.Model):
     @ui.fieldset()
     @attr('Pontos Turísticos')
     def get_pontos_turisticos(self):
-        return self.pontos_turisticos.display('nome')
+        return self.pontos_turisticos.display('nome').allow('add', 'remove')
 
     @attr('Pontos Turísticos')
     def get_pontos_turisticos2(self):

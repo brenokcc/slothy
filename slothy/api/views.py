@@ -69,7 +69,8 @@ class QuerysetView(APIView):
         qs.load(metadata)
         if subset:
             qs = qs if subset == 'all' else getattr(qs, subset)()
-        return Response(qs.serialize())
+        d = qs.serialize()
+        return Response(d)
 
     def get(self, *args, **kwargs):
         return Response({})
@@ -150,7 +151,7 @@ class Api(APIView):
                 elif len(tokens) > 1:
                     meta_func = None
                     instance = None
-                    is_model_attr = False
+                    caller = None
                     model = apps.get_model(tokens[0], tokens[1])
                     exclude_field = None
                     if len(tokens) > 2:
@@ -169,11 +170,18 @@ class Api(APIView):
                                 setattr(instance, '_current_display_name', data.get('dimension'))
                                 func = instance.view
                             else:
+
                                 if len(tokens) == 4:  # object subset, meta or action
                                     func = getattr(instance, tokens[3])  # object meta or action
-                                    is_model_attr = True
+                                    caller = dict(
+                                        app_label=tokens[0],
+                                        model_name=tokens[1],
+                                        id=tokens[2],
+                                        attr_name=tokens[3],
+                                    )
                                 else:  # object relation (add or remove)
                                     qs = getattr(instance, tokens[3])()
+
                                     if tokens[4] in ('add', 'remove'):
                                         field = getattr(getattr(qs, '_related_manager'), 'field', None)
                                         if field:  # one-to-many
@@ -185,36 +193,39 @@ class Api(APIView):
                                                 func = instance.add
                                                 exclude_field = field.name
                                             else:  # remove
-
-                                                def func(id):  # add or remove
-                                                    qs.remove(id)
+                                                def func():  # remove
+                                                    qs.remove(int(tokens[5]))
                                                 metadata = dict(
                                                     name='_',
-                                                    params=('id',),
                                                     verbose_name='Remover',
                                                     message='Ação realizada com sucesso',
-                                                    fields={'id': ForeignKey(
-                                                        qs.model, verbose_name=qs.model.get_metadata('verbose_name')
+                                                )
+                                                setattr(func, '_metadata', metadata)
+                                        else:  # many-to-many
+                                            if tokens[4] == 'add':
+                                                def func(ids):  # add
+                                                    for pk in ids:
+                                                        qs.add(pk)
+                                                metadata = dict(
+                                                    name='_',
+                                                    params=('ids',),
+                                                    verbose_name='Adicionar',
+                                                    message='Ação realizada com sucesso',
+                                                    fields={'ids': ManyToManyField(
+                                                        qs.model,
+                                                        verbose_name=qs.model.get_metadata('verbose_name_plural'),
                                                     )}
                                                 )
                                                 setattr(func, '_metadata', metadata)
-                                                # response['input']['data'] = {'id': None}
-                                        else:  # many-to-many
-
-                                            def func(ids):  # add or remove
-                                                for pk in ids:
-                                                    getattr(qs, tokens[4])(pk)
-                                            metadata = dict(
-                                                name='_',
-                                                params=('ids',),
-                                                verbose_name=tokens[4] == 'add' and 'Adicionar' or 'Remover',
-                                                message='Ação realizada com sucesso',
-                                                fields={'ids': ManyToManyField(
-                                                    qs.model, verbose_name=qs.model.get_metadata('verbose_name_plural')
-                                                )}
-                                            )
-                                            setattr(func, '_metadata', metadata)
-                                            # response['input']['data'] = {'ids': None}
+                                            else:  # remove
+                                                def func():
+                                                    qs.remove(int(tokens[5]))
+                                                metadata = dict(
+                                                    name='_',
+                                                    verbose_name='Remover',
+                                                    message='Ação realizada com sucesso',
+                                                )
+                                                setattr(func, '_metadata', metadata)
                                     else:
                                         func = None
                     else:
@@ -242,13 +253,15 @@ class Api(APIView):
                             output = func()
                             if output is None:
                                 response = dict(type="message", text=metadata.get('message'))
-                            elif is_model_attr and metadata['type'] == 'attr':
-                                    if isinstance(output, ValueSet) and output.nested:
-                                        response = dict(type='object', name=str(instance), data=output)
-                                    else:
-                                        fieldset = {metadata['verbose_name']: output.serialize() if hasattr(
-                                            output, 'serialize') else output}
-                                        response = dict(type='object', name=str(instance), data=fieldset)
+                            elif caller and metadata['type'] == 'attr':
+                                if isinstance(output, ValueSet) and output.nested:
+                                    response = dict(type='object', name=str(instance), data=output)
+                                else:
+                                    if isinstance(output, QuerySet):
+                                        setattr(output, '_caller', caller)
+                                    fieldset = {metadata['verbose_name']: output.serialize() if hasattr(
+                                        output, 'serialize') else output}
+                                    response = dict(type='object', name=str(instance), data=fieldset)
                             elif isinstance(output, QuerySet):
                                 if metadata['name'] == 'all':
                                     name = metadata['verbose_name']

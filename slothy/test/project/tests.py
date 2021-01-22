@@ -214,8 +214,7 @@ class MainTestCase(TestCase):
         self.assertEqual(r['data']['Pontos Turísticos']['total'], 1)
 
         # many-to-many (remove)
-        data = dict(ids=[pk])
-        r = self.post('/api/base/cidade/1/get_pontos_turisticos/remove/', data=data)
+        r = self.post('/api/base/cidade/1/get_pontos_turisticos/remove/{}'.format(pk))
         self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
         r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
         self.assertEqual(r['data']['Pontos Turísticos']['total'], 0)
@@ -223,8 +222,7 @@ class MainTestCase(TestCase):
         # one-to-many (remove)
         r = self.get('/api/base/estado/1/get_cidades/')
         pk = r['data']['Cidades']['data'][0][0]
-        data = dict(id=pk)
-        r = self.post('/api/base/estado/1/get_cidades/remove/', data=data)
+        r = self.post('/api/base/estado/1/get_cidades/remove/{}'.format(pk))
         self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
         r = self.get('/api/base/estado/1/get_cidades/')
         self.assertEqual(r['data']['Cidades']['total'], 0)

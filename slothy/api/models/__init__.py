@@ -234,17 +234,26 @@ class ValueSet(UserDict):
             keys = []
             if not isinstance(lookup, tuple):
                 lookup = lookup,
-            for attr in lookup:
+            for attr_name in lookup:
                 if verbose:
-                    verbose_name = obj.get_verbose_name(attr)
+                    verbose_name = obj.get_verbose_name(attr_name)
                 else:
-                    verbose_name = attr
+                    verbose_name = attr_name
 
-                value = getattrr(obj, attr)
+                value = getattrr(obj, attr_name)
                 if callable(value):
                     value = value()
                 if isinstance(value, ValueSet):
                     self.nested = True
+                if isinstance(value, QuerySet):
+                    if hasattr(value, '_related_manager'):
+                        caller = dict(
+                            id=obj.id,
+                            attr_name=attr_name,
+                            app_label=type(obj).get_metadata('app_label'),
+                            model_name=type(obj).get_metadata('model_name')
+                        )
+                        setattr(value, '_caller', caller)
                 self[verbose_name] = value
                 keys.append(verbose_name)
             self.nested_keys.append(keys)
@@ -307,6 +316,7 @@ class QuerySet(query.QuerySet):
         self._related_attribute = None
         self._iterable_class = ModelIterable
         self._lookups = ()
+        self._caller = None
 
     def filter(self, *args, **kwargs):
         low_mark = self.query.low_mark
@@ -412,6 +422,7 @@ class QuerySet(query.QuerySet):
         clone._search = self._search
         clone._related_manager = self._related_manager
         clone._related_attribute = self._related_attribute
+        clone._caller = self._caller
         return clone
 
     def add(self, instance):
@@ -516,6 +527,7 @@ class QuerySet(query.QuerySet):
         self._q = metadata['q']
         self._sorter = metadata['sorter']
         self._subset = metadata['subset']
+        self._caller = metadata['caller']
         self._page = metadata['page']['number'] - 1
         self._page_size = metadata['page']['size']
         for name, value in metadata['filters'].items():
@@ -562,28 +574,46 @@ class QuerySet(query.QuerySet):
             )
         for lookup in self._list_actions:
             action_params = True
-            action_url = '/api/{}/{}'.format(
-                self.model.get_metadata('app_label'), self.model.get_metadata('model_name')
-            )
-            if hasattr(self.model, lookup):
-                action_type = 'instance'
-                action_func = getattr(self.model, lookup)
+            if self._caller:
+                action_url = '/api/{}/{}/{}/{}/{}'.format(
+                    self._caller['app_label'], self._caller['model_name'],
+                    self._caller['id'], self._caller['attr_name'], lookup
+                )
+                if lookup == 'add':
+                    action_icon = None
+                    action_type = 'subset'
+                    action_params = True
+                    action_label = 'Adicionar'
+                else:
+                    action_icon = None
+                    action_type = 'instance'
+                    action_params = False
+                    action_label = 'Remover'
+                    action_url = '{}/{{id}}'.format(action_url)
             else:
-                action_type = 'subset'
-                action_func = getattr(getattr(self.model.objects, '_queryset_class'), lookup)
+                action_url = '/api/{}/{}'.format(
+                    self.model.get_metadata('app_label'),
+                    self.model.get_metadata('model_name')
+                )
+                if hasattr(self.model, lookup):
+                    action_type = 'instance'
+                    action_func = getattr(self.model, lookup)
+                else:
+                    action_type = 'subset'
+                    action_func = getattr(getattr(self.model.objects, '_queryset_class'), lookup)
 
-            action_metadata = getattr(action_func, '_metadata')
-            action_icon = action_metadata['icon']
-            if action_metadata['name'] == 'add':
-                action_type = 'subset'
-            if action_type == 'instance':
-                action_url = '{}/{{id}}'.format(action_url)
-            action_url = '{}/{}'.format(action_url, action_metadata['name'])
-
-            if action_metadata['name'] not in ('add', 'edit') and not action_metadata['params']:
-                action_params = False
+                action_metadata = getattr(action_func, '_metadata')
+                action_icon = action_metadata['icon']
+                if action_metadata['name'] == 'add':
+                    action_type = 'subset'
+                if action_type == 'instance':
+                    action_url = '{}/{{id}}'.format(action_url)
+                action_url = '{}/{}'.format(action_url, action_metadata['name'])
+                action_label = self.model.get_verbose_name(lookup)
+                if action_metadata['name'] not in ('add', 'edit') and not action_metadata['params']:
+                    action_params = False
             self._actions.append(
-                {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'type': action_type, 'icon': action_icon, 'url': action_url, 'params': action_params}
+                {'name': lookup, 'label': action_label, 'type': action_type, 'icon': action_icon, 'url': action_url, 'params': action_params}
             )
         for lookup in self._list_display or ('id', '__str__'):
             self._display.append(
@@ -640,6 +670,7 @@ class QuerySet(query.QuerySet):
             serialized['input']['q'] = ''
             serialized['input']['sorter'] = None
             serialized['input']['subset'] = self._subset
+            serialized['input']['caller'] = self._caller
             serialized['input']['page'] = {
                 'number': self._page + 1,
                 'size': self._page_size

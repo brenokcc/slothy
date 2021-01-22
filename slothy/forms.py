@@ -260,6 +260,8 @@ class ModelForm(forms.ModelForm):
         self.initial_data = {}
         for name, field in self.fields.items():
             value = self.initial.get(name)
+            if value is None and (isinstance(field, forms.MultipleChoiceField) or isinstance(field, forms.ModelMultipleChoiceField)):
+                value = []
             if isinstance(value, FieldFile):
                 display = value.name
                 value = None
