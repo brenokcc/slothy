@@ -1,6 +1,6 @@
 from slothy.forms import Form
 from django import forms
-from slothy.ui import dashboard
+from slothy.decorators import dashboard
 
 
 @dashboard.card()

@@ -1,6 +1,6 @@
 from slothy.views import View
 from .models import Cidade
-from slothy.ui import dashboard
+from slothy.decorators import dashboard
 
 
 @dashboard.shortcut()

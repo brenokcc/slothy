@@ -6,7 +6,7 @@ import uuid
 import tempfile
 import pdfkit
 import slothy
-from slothy.ui import App
+from slothy.decorators import App
 from django.conf import settings
 from django.apps import apps
 from django.db import transaction

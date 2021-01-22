@@ -8,7 +8,7 @@ from django.db.models.fields import *
 from django.db.models.fields.files import *
 from django.db.models.fields.related import *
 
-from slothy.api.models.decorators import attr
+from slothy import decorators
 from slothy.api.utils import getattrr
 from slothy.api import utils
 import zlib
@@ -871,7 +871,7 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
     def edit(self):
         self.save()
 
-    @attr('Dados Gerais')
+    @decorators.attr('Dados Gerais')
     def default_viewset(self):
         lookups = self.get_metadata('list_display')
         return self.values(*lookups)
