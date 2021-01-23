@@ -3,6 +3,7 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_NAME = __file__.split(os.sep)[-2]
 DEBUG = True
 ROOT_URLCONF = 'slothy.api.urls'
+RUNSERVERPLUS_SERVER_ADDRESS_PORT = 'localhost:8000'
 ALLOWED_HOSTS = '*'
 CORS_ORIGIN_ALLOW_ALL = True
 LANGUAGE_CODE = 'pt-br'
@@ -30,8 +31,10 @@ INSTALLED_APPS = (
     'django.contrib.auth',
     'rest_framework',
     'rest_framework.authtoken',
+    'netifaces',
     'corsheaders',
     'slothy.api',
+    'sslserver',
     'base',
 )
 TEMPLATES = [

@@ -7,7 +7,7 @@ from django.db import models
 from django.db.models.fields import *
 from django.db.models.fields.files import *
 from django.db.models.fields.related import *
-
+from django.core.exceptions import FieldDoesNotExist
 from slothy import decorators
 from slothy.api.utils import getattrr
 from slothy.api import utils
