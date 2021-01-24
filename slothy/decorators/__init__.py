@@ -166,7 +166,7 @@ class App(UserDict):
                     module_name = 'forms' if hasattr(data['func'], 'submit') else 'views'
                     self[key].append(
                         dict(
-                            icon=58788,
+                            icon='apps',
                             url='/api/{}/{}'.format(module_name, data['func'].__name__.lower()),
                             label=module_name,
                         )
@@ -177,7 +177,7 @@ class App(UserDict):
                     model = utils.get_model(data['func'])
                     self[key].append(
                         dict(
-                            icon=metadata.get('icon') or 58788,
+                            icon=metadata.get('icon') or 'apps',
                             url='/api/{}/{}{}'.format(
                                 model.get_metadata('app_label'),
                                 model.get_metadata('model_name'),

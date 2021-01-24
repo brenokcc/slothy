@@ -50,7 +50,7 @@
 		function copyToClipboard(icon) {
 		  var $temp = $("<input>");
 		  $("body").append($temp);
-		  var code = $(icon).parent().find('b').text();
+		  var code = $(icon).html();
 		  $temp.val(code).select();
 		  document.execCommand("copy");
 		  $temp.remove();

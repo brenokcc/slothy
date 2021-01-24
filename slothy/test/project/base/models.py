@@ -24,7 +24,7 @@ class EstadoManager(models.DefaultManager):
 
     @dashboard.shortcut()
     @dashboard.card()
-    @attr('Estados', icon=62187)
+    @attr('Estados', icon='map')
     def all(self):
         return self.display(
             'nome', 'ativo'
@@ -99,7 +99,7 @@ class Estado(models.Model):
     def add(self):
         super().add()
 
-    @action('Editar', icon=57705)
+    @action('Editar', icon='edit')
     def edit(self):
         super().edit()
 
@@ -151,7 +151,7 @@ class Estado(models.Model):
 class CidadeManager(models.DefaultManager):
 
     @dashboard.shortcut()
-    @attr('Cidades', lookups=('governador', 'prefeito', 'presidente'), icon=57910)
+    @attr('Cidades', lookups=('governador', 'prefeito', 'presidente'), icon='house')
     def all(self):
         return self.filter_by(
             'estado', 'prefeito', 'estado__ativo', 'vereadores'
@@ -278,7 +278,7 @@ class Endereco(models.Model):
 class PessoaManager(models.DefaultManager):
 
     @dashboard.shortcut()
-    @attr('Pessoas', icon=59638)
+    @attr('Pessoas', icon='people_alt')
     def all(self):
         return self.display('nome').allow('add', 'view')
 
@@ -358,7 +358,7 @@ class PontoTuristicoManager(models.DefaultManager):
 
     @dashboard.top(formatter='round_image')
     @dashboard.shortcut()
-    @attr('Pontos Turísticos 2', icon=58639, formatter='round_image')
+    @attr('Pontos Turísticos 2', icon='wb_sunny', formatter='round_image')
     def all(self):
         return super().display('foto', 'nome').allow(
             'add', 'edit', 'delete', 'teste2'
