@@ -68,14 +68,14 @@ def top_bar(lookups=None, priority=0):
 
 def bottom_bar(lookups=None, priority=0):
     def decorate(func):
-        setdata('top_bar', func, lookups, priority)
+        setdata('bottom_bar', func, lookups, priority)
         return func
     return decorate
 
 
 def floating(lookups=None, priority=0):
     def decorate(func):
-        setdata('top_bar', func, lookups, priority)
+        setdata('floating', func, lookups, priority)
         return func
     return decorate
 

@@ -24,7 +24,7 @@ class EstadoManager(models.DefaultManager):
 
     @dashboard.shortcut()
     @dashboard.card()
-    @attr('Estados', icon='map')
+    @attr('Estados com Descrição', icon='map')
     def all(self):
         return self.display(
             'nome', 'ativo'
@@ -278,6 +278,8 @@ class Endereco(models.Model):
 class PessoaManager(models.DefaultManager):
 
     @dashboard.shortcut()
+    @dashboard.bottom_bar()
+    @dashboard.floating()
     @attr('Pessoas', icon='people_alt')
     def all(self):
         return self.display('nome').allow('add', 'view')
@@ -358,9 +360,11 @@ class PontoTuristicoManager(models.DefaultManager):
 
     @dashboard.top(formatter='round_image')
     @dashboard.shortcut()
+    @dashboard.bottom_bar()
+    @dashboard.floating()
     @attr('Pontos Turísticos 2', icon='wb_sunny', formatter='round_image')
     def all(self):
-        return super().display('foto', 'nome').allow(
+        return super().display('foto', 'nome').search_by('nome').order_by('nome').allow(
             'add', 'edit', 'delete', 'teste2'
         )
 

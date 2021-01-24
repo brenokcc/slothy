@@ -140,15 +140,13 @@ def fieldsets(data):
                             _fieldsets[verbose_name].append((str_or_tuple,))
                         else:  # tuple
                             _fieldsets[verbose_name].append(str_or_tuple)
-
-            metadata.update(
-                fieldsets=_fieldsets
-            )
+            metadata.update(fieldsets=_fieldsets)
             setattr(func, '_metadata', metadata)
-
         else:
+            metadata = getattr(func, '_metadata', {})
+            metadata.update(verbose_name=data)
+            setattr(func, '_metadata', metadata)
             setdata('tab', func, None)
-
         return func
 
     return decorate
