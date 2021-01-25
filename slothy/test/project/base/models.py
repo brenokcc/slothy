@@ -27,7 +27,7 @@ class EstadoManager(models.DefaultManager):
     @attr('Estados com Descrição', icon='map')
     def all(self):
         return self.display(
-            'nome', 'ativo'
+            'nome', 'cor'
         ).filter_by(
             'ativo'
         ).search_by(
@@ -87,6 +87,7 @@ class Estado(models.Model):
     nome = models.CharField(verbose_name='Nome', max_length=255)
     sigla = models.CharField(verbose_name='Sigla', max_length=255)
     ativo = models.BooleanField(verbose_name='Ativo', default=True)
+    cor = models.ColorField(verbose_name='Cor', max_length=10)
 
     class Meta:
         verbose_name = 'Estado'
