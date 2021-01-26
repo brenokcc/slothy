@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import json
 from collections import OrderedDict
 from django.conf import settings
@@ -35,9 +37,10 @@ class Form(forms.Form):
         for name, field in self.fields.items():
             choices = make_choices(name, field, {})
             field_type = type(field).__name__.replace('Field', '').lower()
+            mask = field.mask if hasattr(field, 'mask') else None
             item = OrderedDict(
                 label=field.label, type=field_type, required=field.required,
-                mask=None, value=None, display=None, choices=choices, help_text=field.help_text,
+                mask=mask, value=None, display=None, choices=choices, help_text=field.help_text,
                 error=None, width=100
             )
             self.metadata[name] = item
@@ -142,7 +145,7 @@ class ModelForm(forms.ModelForm):
         for verbose_name, field_lists in fieldsets.items():
             for field_list in field_lists:
                 for field_name in field_list:
-                    field_width[field_name] = 100//len(field_list)
+                    field_width[field_name] = 100 // len(field_list)
 
         # custom choices
         method_name = '{}_choices'.format(func.__name__)
@@ -153,9 +156,10 @@ class ModelForm(forms.ModelForm):
         for name, field in self.fields.items():
             choices = make_choices(name, field, custom_choices)
             field_type = type(field).__name__.replace('Field', '').lower()
+            mask = field.mask if hasattr(field, 'mask') else None
             item = OrderedDict(
                 label=field.label, type=field_type, required=field.required,
-                mask=None, value=None, display=None, choices=choices, help_text=field.help_text,
+                mask=mask, value=None, display=None, choices=choices, help_text=field.help_text,
                 error=None, width=field_width.get(name, 100)
             )
             self.metadata[name] = item
@@ -184,9 +188,10 @@ class ModelForm(forms.ModelForm):
             for name, field in one_to_one_form_cls.base_fields.items():
                 choices = make_choices(name, field, custom_choices)
                 field_type = type(field).__name__.replace('Field', '').lower()
+                mask = field.mask if hasattr(field, 'mask') else None
                 item = OrderedDict(
                     label=field.label, type=field_type, required=field.required,
-                    mask=None, value=None, display=None, choices=choices, help_text=field.help_text,
+                    mask=mask, value=None, display=None, choices=choices, help_text=field.help_text,
                     error=None, one_to_one=one_to_one_field_name, width=one_to_one_field_width.get(name, 100)
                 )
                 one_to_one_items[name] = item
@@ -227,9 +232,10 @@ class ModelForm(forms.ModelForm):
             for name, field in one_to_many_form_cls.base_fields.items():
                 choices = make_choices(name, field, custom_choices)
                 field_type = type(field).__name__.replace('Field', '').lower()
+                mask = field.mask if hasattr(field, 'mask') else None
                 item = OrderedDict(
                     label=field.label, type=field_type, required=field.required,
-                    mask=None, value=None, display=None, choices=choices, help_text=field.help_text,
+                    mask=mask, value=None, display=None, choices=choices, help_text=field.help_text,
                     error=None, one_to_many=one_to_many_field_name, width=one_to_many_field_width.get(name, 100)
                 )
                 one_to_many_items[name] = item
@@ -257,7 +263,8 @@ class ModelForm(forms.ModelForm):
         self.initial_data = {}
         for name, field in self.fields.items():
             value = self.initial.get(name)
-            if value is None and (isinstance(field, forms.MultipleChoiceField) or isinstance(field, forms.ModelMultipleChoiceField)):
+            is_cf = isinstance(field, forms.MultipleChoiceField) or isinstance(field, forms.ModelMultipleChoiceField)
+            if value is None and is_cf:
                 value = []
             if isinstance(value, FieldFile):
                 display = value.name

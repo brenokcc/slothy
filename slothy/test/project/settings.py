@@ -37,6 +37,7 @@ INSTALLED_APPS = (
     'sslserver',
     'base',
 )
+COLORS = '#f1948a', '#af7ac5', '#f7dc6f', '#73c6b6', '#5dade2', '#82e0aa'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',

@@ -1,4 +1,4 @@
-from slothy.views import View
+from slothy.api.ui.views import View
 from .models import Cidade
 from slothy.decorators import dashboard
 

@@ -1,4 +1,6 @@
-from slothy.api import utils
+# -*- coding: utf-8 -*-
+
+from slothy.db import utils
 from collections import UserDict
 from slothy.decorators import dashboard
 
@@ -155,6 +157,7 @@ def fieldsets(data):
 class App(UserDict):
 
     def __init__(self, request):
+        from slothy.api.utils import format_ouput
         super().__init__()
         self.update(type='app')
         for key in ('shortcut', 'card', 'top_bar', 'bottom_bar', 'floating'):
@@ -194,7 +197,7 @@ class App(UserDict):
                     metadata = getattr(data['func'], '_metadata')
                     model = utils.get_model(data['func'])
                     output = getattr(model.objects, func_name)()
-                    output = utils.format_ouput(output, metadata)
+                    output = format_ouput(output, metadata)
                     formatter = data.get('formatter', metadata.get('formatter'))
                     if formatter:
                         output['formatter'] = formatter

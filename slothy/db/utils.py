@@ -1,5 +1,6 @@
-import inspect
+# -*- coding: utf-8 -*-
 import datetime
+import inspect
 import collections
 from django.conf import settings
 from django.db.models import signals
@@ -113,104 +114,10 @@ def pre_delete(instance):
                     user.groups.remove(group)
 
 
-def format_value(value):
-    from slothy.api.models import QuerySet
-    if value is not None:
-        if isinstance(value, datetime.datetime):
-            return value.strftime('%d/%m/%Y %H:%M')
-        elif isinstance(value, datetime.date):
-            return value.strftime('%d/%m/%Y')
-        elif isinstance(value, bool):
-            return 'Sim' if value else 'Não'
-        elif isinstance(value, QuerySet) or isinstance(value, list):
-            if value:
-                return ','.join([str(obj) for obj in value])
-        else:
-            return str(value)
-    return None
-
-
-def format_ouput(output, metadata):
-    from slothy.api import models
-    if isinstance(output, models.QuerySet):
-        if metadata['name'] == 'all':
-            name = metadata['verbose_name']
-        else:
-            name = '{} {}'.format(
-                output.model.get_metadata('verbose_name_plural'),
-                metadata['verbose_name']
-            )
-        response = output.serialize(name)
-    elif isinstance(output, models.Model):
-        response = output.serialize()
-    else:
-        response = output
-    return response
-
-
 def get_model(func):
     app_label = inspect.getmodule(func).__name__.split('.')[0]
     model_name = func.__qualname__.split('.')[0].replace('Manager', '')
     return apps.get_model(app_label, model_name)
-
-
-def custom_serialize(obj, detail=False):
-    from django.db.models.fields.files import FieldFile
-    from slothy.api.models import QuerySet, ValueSet, Model
-    if isinstance(obj, bool):
-        return obj and 'Sim' or 'Não'
-    elif isinstance(obj, datetime.datetime):
-        return obj.strftime('%d/%m/%Y %H:%M')
-    elif isinstance(obj, datetime.date):
-        return obj.strftime('%d/%m/%Y')
-    elif isinstance(obj, QuerySet):
-        if detail:
-            return obj.serialize()
-        else:
-            return ', '.join((str(instance) for instance in obj)) or None
-    elif isinstance(obj, ValueSet):
-        if detail:
-            return dict(type='valueset', fields=obj.get_nested_values(), actions=obj.actions)
-        else:
-            for key in obj:
-                obj[key] = custom_serialize(obj[key], detail=False)
-            return obj
-    elif isinstance(obj, Model):
-        return str(obj)
-    elif isinstance(obj, FieldFile):
-        return obj.name or None
-    elif isinstance(obj, dict):
-        if detail:
-            for key in obj:
-                obj[key] = custom_serialize(obj[key], detail=False)
-            return dict(type='valueset', fields=[[{k: v}] for k, v in obj.items()], actions=[])
-        else:
-            pass
-    return obj
-
-
-def make_choices(name, field, custom_choices):
-    from django.forms.fields import BooleanField
-    if name in custom_choices:
-        choices = []
-        for obj in custom_choices[name]:
-            choices.append([obj.id, str(obj)])
-        return choices
-    elif hasattr(field, 'choices'):
-        if hasattr(field.choices, 'queryset'):
-            if field.choices.queryset.count() < 1:
-                choices = []
-                for obj in field.choices.queryset:
-                    choices.append([obj.id, str(obj)])
-                return choices
-            else:
-                return field.choices.queryset.display('__str__').serialize(field.label)
-        else:
-            return field.choices
-    else:
-        if isinstance(field, BooleanField):
-            return [[True, 'Sim'], [False, 'Não']]
-    return None
 
 
 def getattrr(obj, args, request=None):
@@ -246,3 +153,37 @@ def _getattr_rec(obj, attrs, request=None):
         return _getattr_rec(value, attrs, request=request) if attrs else value
     return None
 
+
+def serialize(obj, detail=False):
+    from django.db.models.fields.files import FieldFile
+    from slothy.db.models import QuerySet, ValueSet, Model
+    if isinstance(obj, bool):
+        return obj and 'Sim' or 'Não'
+    elif isinstance(obj, datetime.datetime):
+        return obj.strftime('%d/%m/%Y %H:%M')
+    elif isinstance(obj, datetime.date):
+        return obj.strftime('%d/%m/%Y')
+    elif isinstance(obj, QuerySet):
+        if detail:
+            return obj.serialize()
+        else:
+            return ', '.join((str(instance) for instance in obj)) or None
+    elif isinstance(obj, ValueSet):
+        if detail:
+            return dict(type='valueset', fields=obj.get_nested_values(), actions=obj.actions)
+        else:
+            for key in obj:
+                obj[key] = serialize(obj[key], detail=False)
+            return obj
+    elif isinstance(obj, Model):
+        return str(obj)
+    elif isinstance(obj, FieldFile):
+        return obj.name or None
+    elif isinstance(obj, dict):
+        if detail:
+            for key in obj:
+                obj[key] = serialize(obj[key], detail=False)
+            return dict(type='valueset', fields=[[{k: v}] for k, v in obj.items()], actions=[])
+        else:
+            pass
+    return obj

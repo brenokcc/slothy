@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import os
 import sys
 import json
@@ -15,7 +17,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from slothy.api.models import ValidationError, ManyToManyField, ForeignKey, ValueSet, QuerySet, Model
+from slothy.db.models import ValidationError, ManyToManyField, ValueSet, QuerySet, Model
 from slothy.forms import ModelForm, InputValidationError
 
 
@@ -129,8 +131,14 @@ class Api(APIView):
                             input=dict(username=None, password=None),
                             fieldsets={
                                 'Acesso ao Sistema': {
-                                    'username': dict(label='Login', type='char', required=True, mask=None, value=None, choices=None, help_text=None),
-                                    'password': dict(label='Senha', type='password', required=True, mask='', value=None, choices=None, help_text=None)
+                                    'username': dict(
+                                        label='Login', type='char', required=True, mask=None,
+                                        value=None,choices=None, help_text=None
+                                    ),
+                                    'password': dict(
+                                        label='Senha', type='password', required=True, mask='',
+                                        value=None, choices=None, help_text=None
+                                    )
                                 }
                             }
                         )

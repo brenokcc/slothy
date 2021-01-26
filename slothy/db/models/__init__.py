@@ -1,30 +1,25 @@
 # -*- coding: utf-8 -*-
+
 import six
 import json
-from django.contrib.auth import base_user
 from django.db.models import query, base, manager, Sum, Count, Avg
-from django.db import models
 from django.db.models.fields import *
-from django.db.models.fields.files import *
 from django.db.models.fields.related import *
 from django.core.exceptions import FieldDoesNotExist
 from slothy import decorators
-from slothy.api.utils import getattrr
-from slothy.api import utils
+from slothy.db.utils import getattrr
+from slothy.db import utils
 import zlib
 import base64
 import _pickle as cpickle
-from django.apps import apps
 from django.core import signing
 from django.db.models import Q
 import operator
-import codecs
 from collections import UserDict
 from functools import reduce
 from django.core import exceptions
 from django.conf import settings
-from slothy.api.models.fields import *
-
+from slothy.db.models.fields import *
 
 ValidationError = exceptions.ValidationError
 
@@ -51,7 +46,6 @@ class ModelIterable(query.ModelIterable):
 
 
 class QuerySetStatistic(object):
-
     MONTHS = ('JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ')
 
     def __init__(self, qs, x, y=None, func=Count, z='id'):
@@ -67,7 +61,7 @@ class QuerySetStatistic(object):
         self._values_dict = None
 
         if '__month' in x:
-            self._xdict = {i+1: month for i, month in enumerate(QuerySetStatistic.MONTHS)}
+            self._xdict = {i + 1: month for i, month in enumerate(QuerySetStatistic.MONTHS)}
         if y and '__month' in y:
             self._ydict = {i + 1: month for i, month in enumerate(QuerySetStatistic.MONTHS)}
 
@@ -243,7 +237,7 @@ class ValueSet(UserDict):
             values = []
             for key in key_list:
                 value = self[key]
-                value = utils.custom_serialize(value, False)
+                value = utils.serialize(value, False)
                 values.append({key: value})
             _values.append(values)
         return _values
@@ -251,7 +245,7 @@ class ValueSet(UserDict):
     def serialize(self):
         serialized = []
         for name, value in self.items():
-            value = utils.custom_serialize(value, True)
+            value = utils.serialize(value, True)
             serialized.append(dict(type='fieldset', name=name, data=value))
         return serialized
 
@@ -515,7 +509,8 @@ class QuerySet(query.QuerySet):
             metadata = getattr(attr, '_metadata', {})
             qss = attr()
             self._subsets.append(
-                {'name': lookup, 'label': metadata.get('verbose_name'), 'count': qss.count(), 'query': qss.dump_query(), 'active': False}
+                {'name': lookup, 'label': metadata.get('verbose_name'),
+                 'count': qss.count(), 'query': qss.dump_query(), 'active': False}
             )
         for lookup in self._list_filter:
             choices = []
@@ -530,11 +525,13 @@ class QuerySet(query.QuerySet):
             elif isinstance(field, BooleanField):
                 choices = [[True, 'Sim'], [False, 'Não']]
             self._filters.append(
-                {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None, 'display': None, 'choices': choices}
+                {'name': lookup, 'label': self.model.get_verbose_name(lookup),
+                 'value': None, 'display': None, 'choices': choices}
             )
         for lookup in self._list_sort:
             self._sort.append(
-                {'name': lookup, 'label': self.model.get_verbose_name(lookup), 'value': None, 'display': None}
+                {'name': lookup, 'label': self.model.get_verbose_name(lookup),
+                 'value': None, 'display': None}
             )
         for lookup in self._list_search:
             self._search.append(
@@ -581,7 +578,8 @@ class QuerySet(query.QuerySet):
                 if action_metadata['name'] not in ('add', 'edit') and not action_metadata['params']:
                     action_params = False
             self._actions.append(
-                {'name': lookup, 'label': action_label, 'type': action_type, 'icon': action_icon, 'url': action_url, 'params': action_params}
+                {'name': lookup, 'label': action_label, 'type': action_type,
+                 'icon': action_icon, 'url': action_url, 'params': action_params}
             )
         for lookup in self._list_display or ('id', '__str__'):
             self._display.append(
@@ -609,7 +607,7 @@ class QuerySet(query.QuerySet):
                 value = getattrr(obj, display['name'])
                 if callable(value):
                     value = value()
-                item.append(utils.custom_serialize(value, detail=False))
+                item.append(utils.serialize(value, detail=False))
             actions = []
             for action in self._actions:
                 if action['type'] == 'instance':
@@ -707,6 +705,7 @@ class ModelBase(base.ModelBase):
 
                     def get_by_natural_key(self, username):
                         return self.get(**{self.model.USERNAME_FIELD: username})
+
                 attrs.update(
                     objects=LocalManager()
                 )
@@ -923,49 +922,3 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             if filters and type(self).objects.filter(reduce(operator.__or__, filters)).exists():
                 return True
         return False
-
-
-class Group(Model):
-    name = models.CharField(verbose_name='Name', max_length=255)
-    lookup = models.CharField(verbose_name='Chave', max_length=255)
-
-    class Meta:
-        verbose_name = 'Grupo'
-        verbose_name_plural = 'Grupos'
-
-    def get_users(self):
-        from django.conf import settings
-        user_model_name = settings.AUTH_USER_MODEL.split('.')[1].lower()
-        return getattr(self, '{}_set'.format(user_model_name)).all()
-
-    def __str__(self):
-        return self.name
-
-
-class AbstractUser(six.with_metaclass(ModelBase, base_user.AbstractBaseUser, Model)):
-
-    password = models.CharField(verbose_name='Senha', null=True, blank=True, default='!', max_length=255)
-    last_login = models.DateTimeField(verbose_name='Último Login', null=True, blank=True)
-    groups = models.ManyToManyField(Group, verbose_name='Grupos', blank=True)
-
-    class Meta:
-        abstract = True
-
-    def change_password(self, raw_password):
-        super().set_password(raw_password)
-        super().save()
-
-    def send_access_email(self, email):
-        from dp.admin.utils.mail import send_mail
-        subject = 'Acesso ao Sistema'
-        message = 'Clique no botão abaixo para (re)definir sua senha de acesso'
-        token = signing.dumps(dict(username=self.get_username(), pk=self.pk))
-        token = codecs.encode(token.encode(), 'hex').decode()
-        actions = [('(Re)definir Senha', '/admin/login/?reset={}'.format(token))]
-        send_mail(subject, message, email, actions=actions)
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        token_model = apps.get_model('authtoken', 'Token')
-        token_model.objects.get_or_create(user=self)
-

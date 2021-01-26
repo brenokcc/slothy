@@ -2,7 +2,7 @@ from django.test import TestCase
 from base.models import Pessoa, Estado, Cidade, PontoTuristico, Presidente, Governador, Telefone
 from slothy.api.models import Group
 import json
-from slothy.api.utils import setup_signals
+from slothy.db.utils import setup_signals
 
 # /queryset
 # /queryset/<filter>

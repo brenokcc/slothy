@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from django.conf import settings
 from django.conf.urls import url
 from slothy.api.views import Api, QuerysetView, UploadView
@@ -12,4 +14,3 @@ urlpatterns += [
     url(r"^upload/", UploadView.as_view()),
     url(r"^(?P<service>\w+)/(?P<path>.*)?$", Api.as_view())
 ]
-

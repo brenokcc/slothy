@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
-from slothy.api import models
+from slothy.db import models
+from slothy.api.models import AbstractUser
 from slothy.decorators import user, role, attr, action, param, fieldset, dashboard, fieldsets
 
 
@@ -85,9 +86,9 @@ class EstadoManager(models.DefaultManager):
 
 class Estado(models.Model):
     nome = models.CharField(verbose_name='Nome', max_length=255)
-    sigla = models.CharField(verbose_name='Sigla', max_length=255)
+    sigla = models.CpfField(verbose_name='Sigla', max_length=255)
     ativo = models.BooleanField(verbose_name='Ativo', default=True)
-    cor = models.ColorField(verbose_name='Cor', max_length=10)
+    cor = models.ColorField(verbose_name='Cor', max_length=10, blank=True)
 
     class Meta:
         verbose_name = 'Estado'
@@ -287,7 +288,7 @@ class PessoaManager(models.DefaultManager):
 
 
 @user('email')
-class Pessoa(models.AbstractUser):
+class Pessoa(AbstractUser):
 
     nome = models.CharField(verbose_name='Nome', max_length=255)
     email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255)
