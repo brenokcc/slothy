@@ -115,7 +115,7 @@ def pre_delete(instance):
 
 
 def get_model(func):
-    app_label = inspect.getmodule(func).__name__.split('.')[0]
+    app_label = inspect.getmodule(func).__name__.split('.')[-2]
     model_name = func.__qualname__.split('.')[0].replace('Manager', '')
     return apps.get_model(app_label, model_name)
 

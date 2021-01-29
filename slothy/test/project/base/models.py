@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import datetime
 from slothy.db import models
+from slothy.regional.brasil.enderecos import models as enderecos
 from slothy.api.models import AbstractUser
 from slothy.decorators import user, role, attr, action, param, fieldset, dashboard, fieldsets
 
@@ -256,6 +257,53 @@ class Cidade(models.Model):
         self.save()
 
 
+class MunicipioManager(models.DefaultManager):
+
+    @attr('Municípios', icon='map')
+    def all(self):
+        return self.display('nome', 'estado', 'codigo')
+
+    @dashboard.top(formatter='rnmap')
+    @attr('Geolocalizados', icon='map')
+    def geolocalizados(self):
+        return self.filter(estado__sigla='RN', nome__icontains='mo').display('nome', 'estado', 'codigo', 'get_cor').paginate(200)
+
+
+class Municipio(enderecos.Municipio):
+
+    class Meta:
+        verbose_name = 'Município'
+        verbose_name_plural = 'Municípios'
+        proxy = True
+
+    def __str__(self):
+        return '{}/{}'.format(self.nome, self.estado)
+
+    @attr('Cor')
+    def get_cor(self):
+        if self.nome.startswith('Moss'):
+            return '#FF0000'
+        else:
+            return '#00FF00'
+
+    @action('Cadastrar')
+    @fieldsets({'Dados Gerais': ('nome', 'estado', 'codigo')})
+    def add(self):
+        super().add()
+
+    @action('Editar', icon='edit')
+    def edit(self):
+        super().edit()
+
+    @action('Excluir')
+    def delete(self):
+        super().delete()
+
+    @action('Visualizar')
+    def view(self):
+        return super().view()
+
+
 class Endereco(models.Model):
     logradouro = models.CharField(verbose_name='Logradouro', max_length=100)
     numero = models.IntegerField(verbose_name='Número')
@@ -360,7 +408,7 @@ class Pessoa(AbstractUser):
 
 class PontoTuristicoManager(models.DefaultManager):
 
-    @dashboard.top(formatter='round_image')
+    #@dashboard.top(formatter='round_image')
     @dashboard.shortcut()
     @dashboard.bottom_bar()
     @dashboard.floating()

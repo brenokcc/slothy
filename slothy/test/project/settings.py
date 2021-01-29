@@ -36,6 +36,7 @@ INSTALLED_APPS = (
     'slothy.api',
     'sslserver',
     'base',
+    'slothy.regional.brasil.enderecos',
 )
 COLORS = '#f1948a', '#af7ac5', '#f7dc6f', '#73c6b6', '#5dade2', '#82e0aa'
 TEMPLATES = [

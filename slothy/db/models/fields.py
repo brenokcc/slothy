@@ -9,6 +9,13 @@ ImageField = file_fields.ImageField
 FileField = file_fields.FileField
 
 
+class CharField(models.CharField):
+    def __init__(self, *args, **kwargs):
+        if 'max_length' not in kwargs:
+            kwargs.update(max_length=255)
+        super().__init__(*args, **kwargs)
+
+
 class ForeignKey(models.ForeignKey):
     def __init__(self, to, **kwargs):
         on_delete = kwargs.pop('on_delete', models.CASCADE)
@@ -55,7 +62,7 @@ class ColorField(models.CharField):
         return super().formfield(**defaults)
 
 
-class MaskedField(models.CharField):
+class MaskedField(CharField):
     mask = None
 
     def __init__(self, *args, **kwargs):
