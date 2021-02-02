@@ -65,31 +65,6 @@ class QuerySetStatistic(object):
         if y and '__month' in y:
             self._ydict = {i + 1: month for i, month in enumerate(QuerySetStatistic.MONTHS)}
 
-    @property
-    def xfield(self):
-        self._calc()
-        return self._xfield
-
-    @property
-    def yfield(self):
-        self._calc()
-        return self._yfield
-
-    @property
-    def xdict(self):
-        self._calc()
-        return self._xdict
-
-    @property
-    def ydict(self):
-        self._calc()
-        return self._ydict
-
-    @property
-    def values_dict(self):
-        self._calc()
-        return self._values_dict
-
     def _calc(self):
         if self._values_dict is None:
             self.calc()
@@ -102,8 +77,8 @@ class QuerySetStatistic(object):
         return value
 
     def _yfield_display_value(self, value):
-        if hasattr(self._yfield, 'choices') and self.yfield.choices:
-            for choice in self.yfield.choices:
+        if hasattr(self._yfield, 'choices') and self._yfield.choices:
+            for choice in self._yfield.choices:
                 if choice[0] == value:
                     return choice[1]
         return value
@@ -121,32 +96,35 @@ class QuerySetStatistic(object):
             self.func(self.z)) if self.y else self.qs.values_list(self.x).annotate(self.func(self.z))
         self._xfield = self.qs.model.get_field(self.x.replace('__year', '').replace('__month', ''))
         if self._xdict == {}:
+            xvalues = self.qs.values_list(self.x, flat=True).order_by(self.x).distinct()
             if self._xfield.related_model:
                 self._xdict = {
-                    obj.pk: str(obj) for obj in self._xfield.related_model.objects.filter(
-                        pk__in=self.qs.values_list(self.x, flat=True).order_by(self.x).distinct())
+                    obj.pk: str(obj) for obj in self._xfield.related_model.objects.filter(pk__in=xvalues)
                 }
             else:
                 self._xdict = {
-                    value: value for value in self.qs.values_list(self.x, flat=True).order_by(self.x).distinct()
+                    value: value for value in self.qs.values_list(self.x, flat=True)
                 }
+            if None in xvalues:
+                self._xdict[None] = 'Não-Informado'
         if self.y:
             self._yfield = self.qs.model.get_field(self.y.replace('__year', '').replace('__month', ''))
+            yvalues = self.qs.values_list(self.y, flat=True).order_by(self.y).distinct()
             if self._ydict == {}:
                 if self._yfield.related_model:
                     self._ydict = {
-                        obj.pk: str(obj) for obj in self._yfield.related_model.objects.filter(
-                            pk__in=self.qs.values_list(self.y, flat=True).order_by(self.y).distinct())
+                        obj.pk: str(obj) for obj in self._yfield.related_model.objects.filter(pk__in=yvalues)
                     }
                 else:
                     self._ydict = {
-                        value: value for value in self.qs.values_list(self.y, flat=True).order_by(self.y).distinct()
+                        value: value for value in yvalues
                     }
             self._values_dict = {(vx, vy): calc for vx, vy, calc in values_list}
+            if None in yvalues:
+                self._ydict[None] = 'Não-Informado'
         else:
             self._ydict = {}
             self._values_dict = {(vx, None): calc for vx, calc in values_list}
-        self._xdict[None] = self._ydict[None] = None
 
     def filter(self, **kwargs):
         self._clear()
@@ -160,26 +138,24 @@ class QuerySetStatistic(object):
         self.qs = self.qs.apply_lookups(user, lookups)
         return self
 
-    def list(self):
+    def serialize(self, name=None):
         self._calc()
-        rows = []
-        if self._yfield:
-            row = [('', None)]
-            for key, value in self._ydict.items():
-                if key is not None:
-                    row.append((self._yfield_display_value(value), None))
-            rows.append(row)
-        for xkey, xvalue in self._xdict.items():
-            if xkey is not None:
-                row = [(str(self._xfield_display_value(xvalue)), None)]
-                if self._yfield:
-                    for ykey, yvalue in self._ydict.items():
-                        if ykey is not None:
-                            row.append((self._values_dict.get((xkey, ykey), 0), {self.x: xkey, self.y: ykey}))
-                else:
-                    row.append((self._values_dict.get((xkey, None), 0), {self.x: xkey}))
-                rows.append(row)
-        return rows
+        series = dict()
+        formatter = {True: 'Sim', False: 'Não', None: 'Não-Informado'}
+        if not self._ydict:
+            self._ydict[None] = 'Não-Informado'
+        for i, (yk, yv) in enumerate(self._ydict.items()):
+            data = []
+            for j, (xk, xv) in enumerate(self._xdict.items()):
+                color = i if len(self._ydict.items()) > 1 else j
+                data.append([formatter.get(xv, str(xv)), self._values_dict.get((xk, yk), 0), settings.COLORS[color]])
+            series.update(**{formatter.get(yv, str(yv)): data})
+
+        return dict(
+            type='statistic',
+            name=name,
+            series=series
+        )
 
 
 class ValueSet(UserDict):

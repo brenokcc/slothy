@@ -8,6 +8,7 @@ import uuid
 import tempfile
 import pdfkit
 import slothy
+import requests
 from slothy.decorators import App
 from django.conf import settings
 from django.apps import apps
@@ -17,7 +18,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.contrib.auth import login, logout, authenticate
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
-from slothy.db.models import ValidationError, ManyToManyField, ValueSet, QuerySet, Model
+from slothy.db.models import ValidationError, ManyToManyField, ValueSet, QuerySet, Model, QuerySetStatistic
 from slothy.forms import ModelForm, InputValidationError
 
 
@@ -73,6 +74,20 @@ class QuerysetView(APIView):
             qs = qs if subset == 'all' else getattr(qs, subset)()
         d = qs.serialize()
         return Response(d)
+
+    def get(self, *args, **kwargs):
+        return Response({})
+
+
+class GeoLocationView(APIView):
+    def post(self, request):
+        body = request.body
+        s = request.POST or body
+        data = json.loads(s)
+        url = 'https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input={}&inputtype=textquery&fields=formatted_address,name,geometry&key=AIzaSyCcUFnAPOln_KVa6oiQw_DAkvzFd6sSqFw'.format(data['q'])
+        response = requests.post(url)
+        print(response.text)
+        return Response(json.loads(response.text))
 
     def get(self, *args, **kwargs):
         return Response({})
@@ -279,11 +294,12 @@ class Api(APIView):
                                         metadata['verbose_name']
                                     )
                                 response = output.serialize(name)
-                                formatter = metadata.get('formatter')
-                                if formatter:
-                                    response['formatter'] = formatter
+                                response['formatter'] = metadata.get('formatter')
                             elif isinstance(output, Model):
                                 response = output.serialize()
+                            elif isinstance(output, QuerySetStatistic):
+                                response = output.serialize(metadata['verbose_name'])
+                                response['formatter'] = metadata.get('formatter')
                             else:
                                 response = output
 

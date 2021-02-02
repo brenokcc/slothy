@@ -171,6 +171,7 @@ class Cidade(models.Model):
     prefeito = models.RoleForeignKey('base.Pessoa', verbose_name='Prefeito', null=True, blank=True)
     vereadores = models.RoleManyToManyField('base.Pessoa', verbose_name='Vereadores', blank=True, related_name='cidades_legisladas')
     pontos_turisticos = models.ManyToManyField('base.PontoTuristico', verbose_name='Pontos Turísticos', blank=True)
+    localizacao = models.GeoLocationField(verbose_name='Localização', null=True)
 
     class Meta:
         verbose_name = 'Cidade'
@@ -182,7 +183,8 @@ class Cidade(models.Model):
     @action('Adicionar')
     @fieldsets({
         'Dados Gerais': (('nome', 'estado'),),
-        'Administração': ('prefeito', 'vereadores')
+        'Administração': ('prefeito', 'vereadores'),
+        'Localização': ('localizacao',)
     })
     def add(self):
         super().add()
@@ -198,7 +200,7 @@ class Cidade(models.Model):
         return dict(nome='Rio Grande do Norte')
 
     @action('Editar', lookups=('self__prefeito', 'self__estado__governador__pessoa', 'presidente'))
-    def edit(self):
+    def edit(self, localizacao):
         super().edit()
 
     @action('Visualizar')
@@ -251,6 +253,10 @@ class Cidade(models.Model):
             'População Adulta': 9389332
         }
 
+    @fieldset('Localização')
+    def get_localizacao(self):
+        return self.localizacao
+
     @action('Definir Prefeito')
     def set_prefeito(self, prefeito):
         self.prefeito = prefeito
@@ -263,7 +269,7 @@ class MunicipioManager(models.DefaultManager):
     def all(self):
         return self.display('nome', 'estado', 'codigo')
 
-    @dashboard.top(formatter='rnmap')
+    #@dashboard.top(formatter='rnmap')
     @attr('Geolocalizados', icon='map')
     def geolocalizados(self):
         return self.filter(estado__sigla='RN', nome__icontains='mo').display('nome', 'estado', 'codigo', 'get_cor').paginate(200)
@@ -353,7 +359,7 @@ class Pessoa(AbstractUser):
     def __str__(self):
         return self.nome
 
-    @action('Cadastrar', atomic=True)
+    @action('Cadastrar', atomic=True, icon='people_alt')
     @fieldsets({
         'Dados Gerais': ('nome', ('email', 'foto', 'password', 'last_login'),),
         'Endereço': 'endereco',
@@ -441,10 +447,21 @@ class PontoTuristicoManager(models.DefaultManager):
     def teste(self, data):
         print(self.count(), data)
 
+    @dashboard.top()
+    @attr('Total por Cidade', icon='pie_chart')
+    def total_por_cidade(self):
+        return self.count('cidade')
+
+    @dashboard.floating()
+    @attr('Total por Cidade e Status', icon='insert_chart_outlined', formatter='bar_chart')
+    def total_por_cidade_ativo(self):
+        return self.count('ativo', 'cidade')
+
 
 class PontoTuristico(models.Model):
     foto = models.ImageField(verbose_name='Foto', upload_to='fotos', null=True, blank=True)
     nome = models.CharField(verbose_name='Nome', max_length=255)
+    ativo = models.BooleanField(verbose_name='Ativo', default=True)
 
     class Meta:
         verbose_name = 'Ponto Turístico'

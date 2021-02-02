@@ -31,6 +31,9 @@ def format_ouput(output, metadata):
                 metadata['verbose_name']
             )
         response = output.serialize(name)
+    elif isinstance(output, models.QuerySetStatistic):
+        response = output.serialize(metadata['verbose_name'])
+        response['formatter'] = metadata['formatter']
     elif isinstance(output, models.Model):
         response = output.serialize()
     else:
