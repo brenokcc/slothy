@@ -70,9 +70,20 @@ class QuerysetView(APIView):
         metadata = json.loads(s)
         qs = model.objects.load_query(metadata['query'])
         qs.load(metadata)
-        if subset:
-            qs = qs if subset == 'all' else getattr(qs, subset)()
-        d = qs.serialize()
+        # calendar request
+        if 'year' in request.GET and 'month' in request.GET:
+            if 'day' in request.GET:
+                # get data for a specific day of the month
+                qs = qs.filter_by_date(int(request.GET['year']), int(request.GET['month']), int(request.GET['day']))
+                d = qs.serialize()
+            else:
+                # count each day of the month
+                d = qs.count_by_date(int(request.GET['year']), int(request.GET['month']))
+        # simple request
+        else:
+            if subset:
+                qs = qs if subset == 'all' else getattr(qs, subset)()
+            d = qs.serialize()
         return Response(d)
 
     def get(self, *args, **kwargs):

@@ -79,3 +79,10 @@ def floating(lookups=None, priority=0):
         return func
     return decorate
 
+
+def calendar(lookups=None, priority=0):
+    def decorate(func):
+        setdata('calendar', func, lookups, priority)
+        return func
+    return decorate
+

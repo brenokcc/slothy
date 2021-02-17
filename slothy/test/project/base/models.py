@@ -154,6 +154,7 @@ class Estado(models.Model):
 class CidadeManager(models.DefaultManager):
 
     @dashboard.shortcut()
+    # @dashboard.calendar()
     @attr('Cidades', lookups=('governador', 'prefeito', 'presidente'), icon='house')
     def all(self):
         return self.filter_by(
@@ -171,7 +172,7 @@ class Cidade(models.Model):
     prefeito = models.RoleForeignKey('base.Pessoa', verbose_name='Prefeito', null=True, blank=True)
     vereadores = models.RoleManyToManyField('base.Pessoa', verbose_name='Vereadores', blank=True, related_name='cidades_legisladas')
     pontos_turisticos = models.ManyToManyField('base.PontoTuristico', verbose_name='Pontos Turísticos', blank=True)
-    localizacao = models.GeoLocationField(verbose_name='Localização', null=True)
+    localizacao = models.GeoLocationField(verbose_name='Localização', null=True, blank=True)
 
     class Meta:
         verbose_name = 'Cidade'
@@ -265,11 +266,12 @@ class Cidade(models.Model):
 
 class MunicipioManager(models.DefaultManager):
 
+    @dashboard.card()
     @attr('Municípios', icon='map')
     def all(self):
         return self.display('nome', 'estado', 'codigo')
 
-    #@dashboard.top(formatter='rnmap')
+    @dashboard.top(formatter='rnmap')
     @attr('Geolocalizados', icon='map')
     def geolocalizados(self):
         return self.filter(estado__sigla='RN', nome__icontains='mo').display('nome', 'estado', 'codigo', 'get_cor').paginate(200)
@@ -336,16 +338,21 @@ class PessoaManager(models.DefaultManager):
     @dashboard.shortcut()
     @dashboard.bottom_bar()
     @dashboard.floating()
+    @dashboard.calendar()
     @attr('Pessoas', icon='people_alt')
     def all(self):
         return self.display('nome').allow('add', 'view')
 
+    @dashboard.calendar()
+    @attr('Pessoas Inativas', icon='people_alt')
+    def all2(self):
+        return self.display('nome', 'last_login')
 
-@user('email')
+
 class Pessoa(AbstractUser):
 
     nome = models.CharField(verbose_name='Nome', max_length=255)
-    email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255)
+    email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255, is_username=True)
     foto = models.ImageField(verbose_name='Foto', null=True, blank=True, upload_to='fotos')
 
     endereco = models.OneToOneField(Endereco, verbose_name='Endereço', null=True, blank=True)
@@ -447,7 +454,7 @@ class PontoTuristicoManager(models.DefaultManager):
     def teste(self, data):
         print(self.count(), data)
 
-    @dashboard.top()
+    @dashboard.center()
     @attr('Total por Cidade', icon='pie_chart')
     def total_por_cidade(self):
         return self.count('cidade')

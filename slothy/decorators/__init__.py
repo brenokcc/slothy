@@ -202,3 +202,13 @@ class App(UserDict):
                     if formatter:
                         output['formatter'] = formatter
                 self[key].append(output)
+
+        for key in ('calendar',):
+            self[key] = []
+            for data in dashboard.DATA.get(key, ()):
+                func_name = data['func'].__name__
+                metadata = getattr(data['func'], '_metadata')
+                verbose_name = metadata['verbose_name']
+                model = utils.get_model(data['func'])
+                qs = getattr(model.objects, func_name)()
+                self[key].append(qs.serialize(verbose_name))

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import datetime
 import six
 import json
 from django.db.models import query, base, manager, Sum, Count, Avg
@@ -20,7 +20,7 @@ from functools import reduce
 from django.core import exceptions
 from django.conf import settings
 from slothy.db.models.fields import *
-
+from django.db.models.functions import TruncDay
 ValidationError = exceptions.ValidationError
 
 
@@ -244,6 +244,7 @@ class QuerySet(query.QuerySet):
         self._q = None
         self._sorter = None
         self._filters = []
+        self._hidden_filters = []
         self._actions = []
         self._subsets = []
         self._display = []
@@ -353,6 +354,7 @@ class QuerySet(query.QuerySet):
         clone._q = self._q
         clone._sorter = self._sorter
         clone._filters = self._filters
+        clone._hidden_filters = self._hidden_filters
         clone._actions = self._actions
         clone._subsets = self._subsets
         clone._display = self._display
@@ -413,6 +415,33 @@ class QuerySet(query.QuerySet):
     def get_by_natural_key(self, username):
         return self.get(**{self.model.USERNAME_FIELD: username})
 
+    def get_calendar_field(self):
+        return [field for field in self.model.get_metadata('fields') if type(field).__name__ in ('DateField', 'DateTimeField')][0]
+
+    def count_by_date(self, year, month):
+        filters = dict()
+        data = dict()
+        field = self.get_calendar_field()
+        first_day_of_month = datetime.date(year, month, 1)
+        filters['{}__gte'.format(field.name)] = first_day_of_month
+        while first_day_of_month.month == month:
+            first_day_of_month += datetime.timedelta(1)
+        filters['{}__lt'.format(field.name)] = first_day_of_month
+        for item in self.filter(**filters).annotate(day=TruncDay(field.name)).values('day').annotate(value=Count('id')):
+            data[item['day'].strftime('%d/%m/%Y')] = item['value']
+        return dict(verbose_name=field.verbose_name, data=data)
+
+    def filter_by_date(self, year, month, day):
+        filters = dict()
+        start = datetime.date(year, month, day)
+        end = start + datetime.timedelta(1)
+        field = self.get_calendar_field()
+        filters['{}__gte'.format(field.name)] = start
+        filters['{}__lt'.format(field.name)] = end
+        for name, value in filters.items():
+            self._hidden_filters.append(dict(name=name, value=value))
+        return self.filter(**filters)
+
     def lookups(self, *lookups):
         self._lookups = lookups
         return self
@@ -470,6 +499,8 @@ class QuerySet(query.QuerySet):
         self._page_size = metadata['page']['size']
         for name, value in metadata['filters'].items():
             self._filters.append(dict(name=name, value=value))
+        for name, value in metadata['hidden_filters'].items():
+            self._hidden_filters.append(dict(name=name, value=value))
         self._list_display = metadata['display']
         self._list_actions = metadata['actions']
         if 'subsets' in metadata:
@@ -573,9 +604,10 @@ class QuerySet(query.QuerySet):
         if self._sorter:
             qs = qs.order_by(self._sorter)
 
-        for _filter in self._filters:
-            if _filter['value'] is not None:
-                qs = qs.filter(**{_filter['name']: _filter['value']})
+        for filter_type in (self._filters, self._hidden_filters):
+            for _filter in filter_type:
+                if _filter['value'] is not None:
+                    qs = qs.filter(**{_filter['name']: _filter['value']})
 
         for obj in qs[self._page * self._page_size:self._page * self._page_size + self._page_size]:
             item = []
@@ -622,10 +654,14 @@ class QuerySet(query.QuerySet):
             serialized['input']['filters'] = dict()
             for _filter in self._filters:
                 serialized['input']['filters'][_filter['name']] = _filter['value']
+            serialized['input']['hidden_filters'] = dict()
+            for _filter in self._hidden_filters:
+                serialized['input']['hidden_filters'][_filter['name']] = _filter['value']
 
             serialized['metadata'] = {
                 'search': self._search,
                 'filters': self._filters,
+                'hidden_filters': self._hidden_filters,
                 'actions': self._actions,
                 'subsets': self._subsets,
                 'display': self._display,
@@ -690,7 +726,7 @@ class ModelBase(base.ModelBase):
             username_field = None
             for attr_name in attrs:
                 attr = attrs[attr_name]
-                if getattr(attr, '_username', False):
+                if getattr(attr, 'is_username', False):
                     username_field = attr_name
             if username_field:
                 attrs.update(USERNAME_FIELD=username_field)

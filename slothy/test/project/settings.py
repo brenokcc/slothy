@@ -30,13 +30,14 @@ INSTALLED_APPS = (
     'django.contrib.contenttypes',
     'django.contrib.auth',
     'rest_framework',
-    'rest_framework.authtoken',
     'netifaces',
     'corsheaders',
+    'slothy.core',
     'slothy.api',
-    'sslserver',
+    # 'sslserver',
     'base',
     'slothy.regional.brasil.enderecos',
+    'rest_framework.authtoken',
 )
 COLORS = '#f1948a', '#af7ac5', '#f7dc6f', '#73c6b6', '#5dade2', '#82e0aa'
 TEMPLATES = [
@@ -48,4 +49,4 @@ TEMPLATES = [
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 STATIC_URL = '/static/'
 MEDIA_URL = '/media/'
-AUTH_USER_MODEL = 'base.pessoa'
+
