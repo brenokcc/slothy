@@ -169,7 +169,6 @@ class MainTestCase(TestCase):
         self.assertEqual(len(r['data']), 1)
         # view
         r = self.get('/api/base/pontoturistico/1/')
-        print(r['data'][0])
         self.assertIn([{'Nome': 'Parque do Povo'}], r['data'][0]['data']['fields'])
         # edit
         data = dict(nome='Parque da Cidade')
@@ -195,7 +194,6 @@ class MainTestCase(TestCase):
         self.assertEqual(r['data']['Cidades']['total'], 0)
         data = dict(nome='Natal')
         r = self.post('/api/base/estado/1/get_cidades/add/', data=data)
-        log(r)
         self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
         r = self.get('/api/base/estado/1/get_cidades/')
         self.assertEqual(r['data']['Cidades']['total'], 1)

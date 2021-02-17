@@ -24,6 +24,9 @@ from django.db.models.functions import TruncDay
 ValidationError = exceptions.ValidationError
 
 
+AUTH_USER_MODEL = None
+
+
 class ModelGeneratorWrapper:
     def __init__(self, generator, user):
         self.generator = generator
@@ -699,6 +702,7 @@ class Manager(manager.BaseManager.from_queryset(QuerySet)):
 class ModelBase(base.ModelBase):
 
     def __new__(mcs, name, bases, attrs):
+        global AUTH_USER_MODEL
         fromlist = list(map(str, attrs['__module__'].split('.')))
         module = __import__(attrs['__module__'], fromlist=fromlist)
         if hasattr(module, '{}Manager'.format(name)):
@@ -733,6 +737,20 @@ class ModelBase(base.ModelBase):
             setattr(settings, 'AUTH_USER_MODEL', '{}.{}'.format(fromlist[-2], name))
 
         cls = super().__new__(mcs, name, bases, attrs)
+
+        if 'AbstractUser' in (cls.__name__ for cls in bases):
+            AUTH_USER_MODEL = cls
+
+        for field in cls._meta.fields:
+            if hasattr(field, 'inherits_role'):
+                metadata = getattr(cls, '_metadata', {})
+                metadata.update(role_field_name=field.name)
+                setattr(cls, '_metadata', metadata)
+
+        if AUTH_USER_MODEL and issubclass(cls, AUTH_USER_MODEL):
+            metadata = getattr(cls, '_metadata', {})
+            metadata.update(role_field_name='id')
+            setattr(cls, '_metadata', metadata)
 
         return cls
 

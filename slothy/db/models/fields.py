@@ -47,6 +47,10 @@ class RoleForeignKey(ForeignKey):
     pass
 
 
+class RoleField(ForeignKey):
+    inherits_role = True
+
+
 class OneToManyField(models.ManyToManyField):
     def formfield(self, *args, **kwargs):
         field = super().formfield(*args, **kwargs)
@@ -64,7 +68,6 @@ class ColorField(models.CharField):
         super().__init__(*args, **kwargs)
 
     def formfield(self, **defaults):
-        print(dir(form_fields.ColorField))
         defaults.update(form_class=form_fields.ColorField)
         if 'initial' not in defaults:
             defaults.update(initial='#FFFFFF')

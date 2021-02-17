@@ -5,7 +5,6 @@ from django.conf import settings
 
 class ColorField(forms.ChoiceField):
     def __init__(self, *args, **kwargs):
-        print(kwargs.keys())
         kwargs.update(initial='#FFFFFF')
         kwargs.pop('max_length')
         if 'choices' not in kwargs:

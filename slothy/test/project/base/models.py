@@ -521,7 +521,6 @@ class PresidenteManager(models.DefaultManager):
         return self
 
 
-@role()
 class Presidente(Pessoa):
 
     class Meta:
@@ -538,9 +537,8 @@ class GovernadorManager(models.DefaultManager):
         return self
 
 
-@role('pessoa')
 class Governador(models.Model):
-    pessoa = models.ForeignKey(Pessoa, verbose_name='Pessoa')
+    pessoa = models.RoleField(Pessoa, verbose_name='Pessoa')
     estado = models.ForeignKey(Estado, verbose_name='Estado')
 
     class Meta:

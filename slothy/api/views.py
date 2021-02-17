@@ -97,7 +97,6 @@ class GeoLocationView(APIView):
         data = json.loads(s)
         url = 'https://maps.googleapis.com/maps/api/place/findplacefromtext/json?input={}&inputtype=textquery&fields=formatted_address,name,geometry&key=AIzaSyCcUFnAPOln_KVa6oiQw_DAkvzFd6sSqFw'.format(data['q'])
         response = requests.post(url)
-        print(response.text)
         return Response(json.loads(response.text))
 
     def get(self, *args, **kwargs):
