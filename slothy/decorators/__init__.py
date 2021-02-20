@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+import inspect
 from slothy.db import utils
 from collections import UserDict
 from slothy.decorators import dashboard
@@ -74,19 +74,28 @@ def fieldset(verbose_name, condition=None, formatter=None, lookups=(), icon=None
 
 def action(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None, message=None, atomic=False):
     def decorate(func):
-        name = func.__name__
+        func_name = func.__name__
         metadata = getattr(func, '_metadata', {})
-        params = func.__code__.co_varnames[1:func.__code__.co_argcount]
-        if name == 'add':
+        params = []
+        if func_name == 'add':
             default_message = 'Cadastro realizado com sucesso'
-        elif name == 'edit':
+        elif func_name == 'edit':
             default_message = 'Edição realizada com sucesso'
-        elif name == 'delete':
+        elif func_name == 'delete':
             default_message = 'Exclusão realizada com sucesso'
         else:
             default_message = 'Ação realizada com sucesso'
+
+        fields = {}
+        for name, parameter in inspect.signature(func).parameters.items():
+            if not name == 'self':
+                is_annotated = parameter.annotation is not None and parameter.annotation != inspect.Parameter.empty
+                if is_annotated:
+                    fields[name] = parameter.annotation
+                params.append(name)
+
         metadata.update(
-            name=name,
+            name=func_name,
             params=params,
             type='action',
             verbose_name=verbose_name,
@@ -96,7 +105,8 @@ def action(verbose_name, condition=None, formatter=None, lookups=(), category=No
             formatter=formatter,
             lookups=lookups,
             message=message or default_message,
-            atomic=atomic
+            atomic=atomic,
+            fields=fields
         )
         setattr(func, '_metadata', metadata)
         return func

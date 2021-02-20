@@ -106,6 +106,10 @@ class Estado(models.Model):
     def edit(self):
         super().edit()
 
+    @action('Testar')
+    def testar(self):
+        print()
+
     @action('Excluir')
     def delete(self):
         super().delete()

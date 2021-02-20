@@ -137,15 +137,21 @@ class ModelForm(forms.ModelForm):
         # fieldsets
         if fieldsets is None:
             fieldsets = dict()
-            fieldsets['Dados Gerais'] = []
-            for field_name in self.fields:
-                fieldsets['Dados Gerais'].append((field_name,))
+            if self.fields:
+                fieldsets['Dados Gerais'] = []
+                for field_name in self.fields:
+                    fieldsets['Dados Gerais'].append((field_name,))
 
         field_width = dict()
+        forgotten_fields = list(self.fields.keys())
         for verbose_name, field_lists in fieldsets.items():
             for field_list in field_lists:
                 for field_name in field_list:
                     field_width[field_name] = 100 // len(field_list)
+                    if field_name in forgotten_fields:
+                        forgotten_fields.remove(field_name)
+        if forgotten_fields:
+            fieldsets['Extra'] = forgotten_fields
 
         # custom choices
         method_name = '{}_choices'.format(func.__name__)
@@ -351,7 +357,8 @@ class ModelForm(forms.ModelForm):
                 params[param] = self.cleaned_data.get(param)
             try:
                 self.result = self.func(**params)
-                self._save_m2m()
+                if self.base_fields:
+                    self._save_m2m()
             except ValidationError as ve:
                 error = ''.join(ve.message)
 

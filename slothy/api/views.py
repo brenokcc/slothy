@@ -115,7 +115,7 @@ class Api(APIView):
             data = json.loads(body)
         else:
             data = {}
-        return self.do(request, service, path, data)
+        return self.do(request, service, path, None)
 
     def post(self, request, service, path):
         body = request.body
@@ -200,7 +200,8 @@ class Api(APIView):
                         else:
                             instance = model.objects.get(pk=tokens[2])
                             if len(tokens) == 3:  # view object
-                                setattr(instance, '_current_display_name', data.get('dimension'))
+                                if data:
+                                    setattr(instance, '_current_display_name', data.get('dimension'))
                                 func = instance.view
                             else:
 
@@ -230,6 +231,8 @@ class Api(APIView):
                                                     qs.remove(int(tokens[5]))
                                                 metadata = dict(
                                                     name='_',
+                                                    type='action',
+                                                    params=[],
                                                     verbose_name='Remover',
                                                     message='Ação realizada com sucesso',
                                                 )
@@ -241,6 +244,7 @@ class Api(APIView):
                                                         qs.add(pk)
                                                 metadata = dict(
                                                     name='_',
+                                                    type='action',
                                                     params=('ids',),
                                                     verbose_name='Adicionar',
                                                     message='Ação realizada com sucesso',
@@ -255,6 +259,8 @@ class Api(APIView):
                                                     qs.remove(int(tokens[5]))
                                                 metadata = dict(
                                                     name='_',
+                                                    type='action',
+                                                    params=[],
                                                     verbose_name='Remover',
                                                     message='Ação realizada com sucesso',
                                                 )
@@ -266,10 +272,10 @@ class Api(APIView):
                         meta_func = getattr(model.objects, '_queryset_class').all
 
                     metadata = getattr(meta_func or func, '_metadata')
-                    form_cls = self.build_form(model, func, metadata, exclude_field)
-                    if form_cls:
+                    if metadata['type'] == 'action' and metadata['name'] != 'view':
+                        form_cls = self.build_form(model, func, metadata, exclude_field)
                         form = form_cls(data=data or None, instance=instance)
-                        if data:
+                        if data is not None:
                             if metadata.get('atomic'):
                                 with transaction.atomic():
                                     form.save()
@@ -335,49 +341,37 @@ class Api(APIView):
             return output
 
     def build_form(self, _model, func, metadata, exclude_field):
-        # print(metadata)
-        if 'params' in metadata:
-            custom_fields = metadata.get('fields', {})
-            fields = []
-            fieldsets = metadata.get('fieldsets')
-            if fieldsets:
-                for verbose_name, field_lists in fieldsets.items():
-                    for field_list in field_lists:
-                        for field_name in field_list:
-                            fields.append(field_name)
-            if metadata['params']:
-                # we are adding or editing an object and all params are custom fields
-                if metadata['name'] in ('add', 'edit') and len(metadata['params']) == len(custom_fields):
-                    _fields = fields or None
-                    _exclude = ()
-                # the params are both own and custom fields, so lets explicitally specify the form fields
-                else:
-                    _fields = [name for name in metadata['params'] if name not in custom_fields]
-                    _exclude = None
+        params = metadata.get('params', {})
+        fields = metadata.get('fields', {})
+        fieldsets = metadata.get('fieldsets')
+        if fieldsets:
+            _exclude = None
+            _fields = []
+            for verbose_name, field_lists in fieldsets.items():
+                for field_list in field_lists:
+                    for field_name in field_list:
+                        if field_name not in fields:
+                            _fields.append(field_name)
+        else:
+            if metadata['name'] in ('add', 'edit'):
+                _fields = None
+                _exclude = ()
             else:
-                # lets include all model fields
-                if metadata['name'] in ('add', 'edit'):
-                    _fields = fields or None
-                    _exclude = ()
-                else:  # lets include no model fields
-                    if custom_fields:
-                        _fields = ()
-                        _exclude = None
-                    else:  # no form is needed
-                        return None
+                _fields = [name for name in params if name not in fields]
+                _exclude = None
 
-            class Form(ModelForm):
+        class Form(ModelForm):
 
-                class Meta:
-                    model = _model
-                    fields = _fields
-                    exclude = _exclude
+            class Meta:
+                model = _model
+                fields = _fields
+                exclude = _exclude
 
-                def __init__(self, *args, **kwargs):
-                    super().__init__(
-                        title=metadata['verbose_name'], func=func, params=metadata['params'], exclude=exclude_field,
-                        fields=custom_fields, fieldsets=fieldsets, **kwargs
-                    )
+            def __init__(self, *args, **kwargs):
+                super().__init__(
+                    title=metadata['verbose_name'], func=func, params=metadata['params'], exclude=exclude_field,
+                    fields=fields, fieldsets=fieldsets, **kwargs
+                )
 
-            return Form
-        return None
+        return Form
+
