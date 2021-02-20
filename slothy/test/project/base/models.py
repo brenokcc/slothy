@@ -22,7 +22,7 @@ class Telefone(models.Model):
         super().add()
 
 
-class EstadoManager(models.DefaultManager):
+class EstadoSet(models.Set):
 
     @dashboard.shortcut()
     @dashboard.card()
@@ -151,7 +151,7 @@ class Estado(models.Model):
         pass
 
 
-class CidadeManager(models.DefaultManager):
+class CidadeSet(models.Set):
 
     @dashboard.shortcut()
     # @dashboard.calendar()
@@ -264,14 +264,14 @@ class Cidade(models.Model):
         self.save()
 
 
-class MunicipioManager(models.DefaultManager):
+class MunicipioSet(models.Set):
 
     @dashboard.card()
     @attr('Municípios', icon='map')
     def all(self):
         return self.display('nome', 'estado', 'codigo')
 
-    @dashboard.top(formatter='rnmap')
+    #@dashboard.top(formatter='rnmap')
     @attr('Geolocalizados', icon='map')
     def geolocalizados(self):
         return self.filter(estado__sigla='RN', nome__icontains='mo').display('nome', 'estado', 'codigo', 'get_cor').paginate(200)
@@ -333,7 +333,7 @@ class Endereco(models.Model):
         return super().view()
 
 
-class PessoaManager(models.DefaultManager):
+class PessoaSet(models.Set):
 
     @dashboard.shortcut()
     @dashboard.bottom_bar()
@@ -419,7 +419,7 @@ class Pessoa(AbstractUser):
         return self.telefones.all()
 
 
-class PontoTuristicoManager(models.DefaultManager):
+class PontoTuristicoSet(models.Set):
 
     #@dashboard.top(formatter='round_image')
     @dashboard.shortcut()
@@ -515,7 +515,7 @@ class PontoTuristico(models.Model):
         print(self.id, data)
 
 
-class PresidenteManager(models.DefaultManager):
+class PresidenteSet(models.Set):
     @attr('Presidentes')
     def all(self):
         return self
@@ -531,7 +531,7 @@ class Presidente(Pessoa):
         return '{}'.format(self.nome)
 
 
-class GovernadorManager(models.DefaultManager):
+class GovernadorSet(models.Set):
     @attr('Governadores')
     def all(self):
         return self

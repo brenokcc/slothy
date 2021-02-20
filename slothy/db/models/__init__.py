@@ -679,7 +679,7 @@ class QuerySet(query.QuerySet):
         return json.dumps(self.serialize())
 
 
-class DefaultManager(QuerySet):
+class Set(QuerySet):
     pass
 
 
@@ -705,9 +705,9 @@ class ModelBase(base.ModelBase):
         global AUTH_USER_MODEL
         fromlist = list(map(str, attrs['__module__'].split('.')))
         module = __import__(attrs['__module__'], fromlist=fromlist)
-        if hasattr(module, '{}Manager'.format(name)):
-            queryset_class = getattr(module, '{}Manager'.format(name))
-            if issubclass(queryset_class, DefaultManager):
+        if hasattr(module, '{}Set'.format(name)):
+            queryset_class = getattr(module, '{}Set'.format(name))
+            if issubclass(queryset_class, Set):
                 class LocalManager(manager.BaseManager.from_queryset(queryset_class)):
                     def __init__(self, *args, **kwargs):
                         self.queryset_class = queryset_class

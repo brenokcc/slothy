@@ -4,7 +4,7 @@ from slothy.db import models
 from slothy.decorators import fieldsets, action, attr
 
 
-class RegiaoManager(models.DefaultManager):
+class RegiaoSet(models.Set):
 
     @attr('Regiões', icon='map')
     def all(self):
@@ -40,7 +40,7 @@ class Regiao(models.Model):
         return super().view()
 
 
-class EstadoManager(models.DefaultManager):
+class EstadoSet(models.Set):
 
     @attr('Estados', icon='map')
     def all(self):
@@ -78,7 +78,7 @@ class Estado(models.Model):
         return super().view()
 
 
-class MunicipioManager(models.DefaultManager):
+class MunicipioSet(models.Set):
 
     @attr('Municípios', icon='map')
     def all(self):

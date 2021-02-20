@@ -36,7 +36,7 @@ if sys.argv[1] == 'startproject':
 from slothy.api import models
 from slothy.api.models.decorators import user, role, attr, action, fieldset, param
 
-class PessoaManager(models.DefaultManager):
+class PessoaSet(models.Set):
 
     @attr('Pessoas')
     def all(self):
