@@ -11,7 +11,7 @@ from django.core.files.uploadedfile import InMemoryUploadedFile
 
 
 class InputValidationError(BaseException):
-    def __init__(self, error, errors):
+    def __init__(self, error, errors=()):
         self.error = error or 'Por favor, corriga os erros abaixo'
         self.errors = errors
 
@@ -20,12 +20,25 @@ class Form(forms.Form):
 
     def __init__(self, request, *args, **kwargs):
         self.request = request
-        self.title = 'Form'
+        self.title = None
+        self.icon = None
+        self.image = None
+        self.center = False
+        self.cancel = False
+
+        metaclass = getattr(self, 'Meta', None)
+        if metaclass:
+            self.title = getattr(metaclass, 'title', self.title)
+            self.icon = getattr(metaclass, 'icon', self.icon)
+            self.image = getattr(metaclass, 'image', self.image)
+            self.center = getattr(metaclass, 'center', self.center)
+            self.cancel = getattr(metaclass, 'cancel', self.cancel)
+
         super().__init__(*args, **kwargs)
 
         # fieldsets
-        if hasattr(self.Meta, 'fieldsets'):
-            fieldsets = self.Meta.fieldsets
+        if metaclass and hasattr(metaclass, 'fieldsets'):
+            fieldsets = metaclass.fieldsets
         else:
             fieldsets = dict()
             fieldsets['Dados Gerais'] = []
@@ -61,6 +74,8 @@ class Form(forms.Form):
         # fieldsets
         self.fieldsets = {}
         for verbose_name, field_lists in fieldsets.items():
+            if verbose_name is None:
+                verbose_name = ''
             self.fieldsets[verbose_name] = {}
             for field_list in field_lists:
                 if isinstance(field_list, str):
@@ -99,6 +114,10 @@ class Form(forms.Form):
             type='form',
             path='/api/forms/{}'.format(self.__class__.__name__.lower()),
             name=self.title,
+            icon=self.icon,
+            image=self.image,
+            center=self.center,
+            cancel=self.cancel,
             input=self.initial_data,
             fieldsets=self.fieldsets,
             result=self.result.serialize() if self.result is not None else None
@@ -110,8 +129,9 @@ class Form(forms.Form):
 
 class ModelForm(forms.ModelForm):
 
-    def __init__(self, title, func, params, exclude=None, fields=None, fieldsets=None, **kwargs):
+    def __init__(self, title, func, params, exclude=None, fields=None, fieldsets=None, icon=None, **kwargs):
         self.title = title
+        self.icon = icon
         self.func = func
         self.params = params
 
@@ -297,6 +317,8 @@ class ModelForm(forms.ModelForm):
         # fieldsets
         self.fieldsets = {}
         for verbose_name, field_lists in fieldsets.items():
+            if verbose_name is None:
+                verbose_name = ''
             self.fieldsets[verbose_name] = {}
             for field_list in field_lists:
                 for field_name in field_list:
@@ -386,6 +408,7 @@ class ModelForm(forms.ModelForm):
             type='form',
             path=path,
             name=self.title,
+            icon=self.icon,
             input=self.initial_data,
             fieldsets=self.fieldsets,
             result=self.result.serialize() if self.result is not None else None

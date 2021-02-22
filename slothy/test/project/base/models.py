@@ -49,7 +49,7 @@ class EstadoSet(models.Set):
     @attr('Ativos')
     def ativos(self):
         return self.filter(ativo=True).display('nome', 'sigla').lookups(
-            'presidente', 'self__governador__pessoa').allow('inativar').search_by('sigla')
+            'presidente', 'self__governador__pessoa').allow('inativar', 'edit').search_by('sigla')
 
     @attr('Inativos')
     def inativos(self):
@@ -92,6 +92,7 @@ class Estado(models.Model):
     cor = models.ColorField(verbose_name='Cor', max_length=10, blank=True)
 
     class Meta:
+        icon = 'map'
         verbose_name = 'Estado'
         verbose_name_plural = 'Estados'
 
@@ -120,7 +121,7 @@ class Estado(models.Model):
 
     @fieldset('Dados Gerais')
     def get_dados_gerais(self):
-        return self.values('nome', ('sigla', 'ativo'))
+        return self.values(('nome', 'sigla', 'ativo'),)
 
     @attr('Dados Populacionais')
     def get_dados_populacionais(self):
@@ -271,11 +272,11 @@ class Cidade(models.Model):
 class MunicipioSet(models.Set):
 
     @dashboard.card()
-    @attr('Municípios', icon='map')
+    @attr('Municípios')
     def all(self):
-        return self.display('nome', 'estado', 'codigo')
+        return self.display('nome', 'estado', 'codigo').search_by('nome')
 
-    #@dashboard.top(formatter='rnmap')
+    # @dashboard.center(formatter='rnmap')
     @attr('Geolocalizados', icon='map')
     def geolocalizados(self):
         return self.filter(estado__sigla='RN', nome__icontains='mo').display('nome', 'estado', 'codigo', 'get_cor').paginate(200)
@@ -284,6 +285,7 @@ class MunicipioSet(models.Set):
 class Municipio(enderecos.Municipio):
 
     class Meta:
+        icon = 'map'
         verbose_name = 'Município'
         verbose_name_plural = 'Municípios'
         proxy = True
@@ -364,6 +366,7 @@ class Pessoa(AbstractUser):
     telefones = models.OneToManyField(Telefone, verbose_name='Telefones')
 
     class Meta:
+        icon = 'people_alt'
         verbose_name = 'Pessoa'
         verbose_name_plural = 'Pessoas'
 
@@ -425,14 +428,14 @@ class Pessoa(AbstractUser):
 
 class PontoTuristicoSet(models.Set):
 
-    #@dashboard.top(formatter='round_image')
+    @dashboard.center(formatter='round_image', priority=10)
     @dashboard.shortcut()
     @dashboard.bottom_bar()
     @dashboard.floating()
-    @attr('Pontos Turísticos 2', icon='wb_sunny', formatter='round_image')
+    @attr('Pontos Turísticos', icon='wb_sunny')
     def all(self):
         return super().display('foto', 'nome').search_by('nome').order_by('nome').allow(
-            'add', 'edit', 'delete', 'teste2'
+            'add', 'edit', 'delete', 'teste2', 'view'
         )
 
     @attr('Referenciados')
@@ -495,7 +498,7 @@ class PontoTuristico(models.Model):
 
     @fieldset('Dados Gerais')
     def get_dados_gerais(self):
-        return self.values('nome')
+        return self.values('nome', 'ativo')
 
     @action('Atualizar Nome')
     def atualizar_nome(self, nome):

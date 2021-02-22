@@ -79,11 +79,15 @@ def action(verbose_name, condition=None, formatter=None, lookups=(), category=No
         params = []
         if func_name == 'add':
             default_message = 'Cadastro realizado com sucesso'
+            default_icon = 'add'
         elif func_name == 'edit':
             default_message = 'Edição realizada com sucesso'
+            default_icon = 'edit'
         elif func_name == 'delete':
             default_message = 'Exclusão realizada com sucesso'
+            default_icon = 'delete'
         else:
+            default_icon = None
             default_message = 'Ação realizada com sucesso'
 
         fields = {}
@@ -101,7 +105,7 @@ def action(verbose_name, condition=None, formatter=None, lookups=(), category=No
             verbose_name=verbose_name,
             condition=condition,
             category=category,
-            icon=icon,
+            icon=icon or default_icon,
             formatter=formatter,
             lookups=lookups,
             message=message or default_message,

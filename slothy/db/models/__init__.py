@@ -478,7 +478,7 @@ class QuerySet(query.QuerySet):
 
     def search(self, q):
         queryset = self.none()
-        search_fields = self.model.get_metadata('search_fields')
+        search_fields = self._list_search
         if not search_fields:
             local_fields = self.model.get_metadata('local_fields')
             search_fields = [field.name for field in local_fields if field.__class__.__name__ == 'CharField']
@@ -506,6 +506,7 @@ class QuerySet(query.QuerySet):
             self._hidden_filters.append(dict(name=name, value=value))
         self._list_display = metadata['display']
         self._list_actions = metadata['actions']
+        self._list_search = metadata['search']
         if 'subsets' in metadata:
             self._count_subsets = metadata['subsets']
         return self
@@ -638,6 +639,7 @@ class QuerySet(query.QuerySet):
             serialized = dict()
             serialized['type'] = 'queryset'
             serialized['name'] = name
+            serialized['icon'] = self.model.get_metadata('icon')
             serialized['path'] = '/queryset/{}/{}/'.format(
                 getattr(self.model, '_meta').app_label.lower(),
                 self.model.__name__.lower()
@@ -648,6 +650,7 @@ class QuerySet(query.QuerySet):
             serialized['input']['sorter'] = None
             serialized['input']['subset'] = self._subset
             serialized['input']['caller'] = self._caller
+            serialized['input']['search'] = self._list_search
             serialized['input']['page'] = {
                 'number': self._page + 1,
                 'size': self._page_size

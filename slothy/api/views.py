@@ -20,7 +20,7 @@ from django.contrib.auth import login, logout, authenticate
 from rest_framework.authentication import SessionAuthentication, TokenAuthentication
 from slothy.db.models import ValidationError, ManyToManyField, ValueSet, QuerySet, Model, QuerySetStatistic
 from slothy.forms import ModelForm, InputValidationError
-
+from slothy.api.forms import LoginForm
 
 slothy.initialize()
 
@@ -142,31 +142,7 @@ class Api(APIView):
                     else:
                         response = dict(type='error', text='Usuário não autenticado')
                 elif path == 'login':  # user login
-                    if data:
-                        user = authenticate(request, username=data['username'], password=data['password'])
-                        if user:
-                            login(request, user)
-                            token = dict(token=request.user.auth_token.key)
-                            response = dict(type='message', text='Login realizado com sucesso', data=token)
-                        else:
-                            response = dict(type='error', text='Usuário e senha não conferem')
-                    else:
-                        response = dict(
-                            type='form',
-                            input=dict(username=None, password=None),
-                            fieldsets={
-                                'Acesso ao Sistema': {
-                                    'username': dict(
-                                        label='Login', type='char', required=True, mask=None,
-                                        value=None,choices=None, help_text=None
-                                    ),
-                                    'password': dict(
-                                        label='Senha', type='password', required=True, mask='',
-                                        value=None, choices=None, help_text=None
-                                    )
-                                }
-                            }
-                        )
+                    response = LoginForm(request).serialize()
                 elif path == 'logout':  # user logout
                     logout(request)
                     response = dict(type='message', text='Logout realizado com sucesso')
@@ -176,8 +152,13 @@ class Api(APIView):
                 if tokens[0] == 'forms':
                     form = slothy.FORMS[tokens[1]](request, data=data)
                     if data:
-                        form.submit()
-                    response = form.serialize()
+                        try:
+                            response = form.submit()
+                        except ValidationError as ve:
+                            error = ''.join(ve.message)
+                            raise InputValidationError(error)
+                    else:
+                        response = form.serialize()
                 elif tokens[0] == 'views':
                     view = slothy.VIEWS[tokens[1]](request)
                     response = view.serialize()

@@ -44,7 +44,7 @@ class EstadoSet(models.Set):
 
     @attr('Estados', icon='map')
     def all(self):
-        return self.display('nome', 'sigla', 'codigo', 'regiao')
+        return self.display('nome', 'sigla', 'codigo', 'regiao').search_by('nome', 'sigla')
 
 
 class Estado(models.Model):
@@ -80,9 +80,9 @@ class Estado(models.Model):
 
 class MunicipioSet(models.Set):
 
-    @attr('Municípios', icon='map')
+    @attr('Municípios')
     def all(self):
-        return self.display('nome', 'estado', 'codigo')
+        return self.display('nome', 'estado', 'codigo').search_by('nome')
 
 
 class Municipio(models.Model):
@@ -91,6 +91,7 @@ class Municipio(models.Model):
     codigo = models.CharField(verbose_name='Código')
 
     class Meta:
+        icon = 'map'
         verbose_name = 'Município'
         verbose_name_plural = 'Municípios'
 

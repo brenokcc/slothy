@@ -10,7 +10,8 @@ class Teste(Form):
     data = forms.DateField(label='Data')
 
     class Meta:
-        verbose_name = 'Teste'
+        title = 'Formulário'
+        icon = 'play'
         lookups = ()
         fieldsets = {
             'Dados Gerais': ('nome', 'data')
