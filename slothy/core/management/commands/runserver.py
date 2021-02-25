@@ -3,7 +3,7 @@ import qrcode
 import netifaces
 from django.core.management.commands import runserver
 
-PRINT_QRCODE = False
+PRINT_QRCODE = True
 
 
 class Command(runserver.Command):

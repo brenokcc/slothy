@@ -6,9 +6,7 @@ import json
 import traceback
 import uuid
 import tempfile
-import pdfkit
 import slothy
-import requests
 from slothy.decorators import App
 from django.conf import settings
 from django.apps import apps
@@ -28,6 +26,7 @@ slothy.initialize()
 class PdfResponse(HttpResponse):
 
     def __init__(self, html=''):
+        import pdfkit
         file_name = tempfile.mktemp('.pdf')
         html = html.replace('/media', settings.MEDIA_ROOT)
         html = html.replace('/static', '{}/{}/static'.format(settings.BASE_DIR, settings.PROJECT_NAME))
@@ -89,7 +88,41 @@ def geolocation(request):
 
 
 def postman(request):
-    return JsonResponse(export_to_postman())
+    export_to_postman()
+    data = dict(
+        info=dict(
+            _postman_id='b49723c5-ab42-49fc-9b3c-842710e0dc68',
+            name='Slothy',
+            schema='https://schema.getpostman.com/json/collection/v2.1.0/collection.json'
+        ),
+        item=[
+            dict(
+                name='api',
+                item=[
+                    dict(
+                        name='api/app',
+                        request=dict(
+                            method='get',
+                            header=[],
+                            url=dict(
+                                raw='http://localhost:8000/api/app',
+                                protocol='http',
+                                host=['localhost'],
+                                port='8000',
+                                path=['api', 'app']
+                            )
+                        ),
+                        response=[]
+                    )
+                ]
+            )
+        ],
+        variable=dict(
+            key='id',
+            value='1'
+        )
+    )
+    return JsonResponse(data)
 
 
 def api(request, service, path):

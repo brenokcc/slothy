@@ -1,9 +1,7 @@
 six
 django
 django-cors-headers
-django-extensions
-django-sslserver
 Pillow
 wheel
-pyOpenSSL
 qrcode
+netifaces

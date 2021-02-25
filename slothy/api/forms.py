@@ -12,7 +12,8 @@ class LoginForm(Form):
     password = forms.CharField(label='Senha')
 
     class Meta:
-        image = '/static/round-blue.png'
+        title = 'Acesso ao Sistema'
+        # image = '/static/logo.png'
         center = True
         lookups = ()
         fieldsets = {

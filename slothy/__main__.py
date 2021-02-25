@@ -54,7 +54,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
 ]
-SECRET_KEY = '{}'
+SECRET_KEY = '%s'
 INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.contenttypes',
@@ -63,7 +63,7 @@ INSTALLED_APPS = (
     'corsheaders',
     'slothy.core',
     'slothy.api',
-    '{}',
+    '%s',
 )
 COLORS = '#f1948a', '#af7ac5', '#f7dc6f', '#73c6b6', '#5dade2', '#82e0aa'
 TEMPLATES = [
@@ -84,16 +84,17 @@ from slothy.api.models import AbstractUser
 from slothy.decorators import attr, action, param, fieldset, dashboard, fieldsets
 from slothy.decorators import user, role, attr, action, fieldset, param
 
+
 class PessoaSet(models.Set):
 
     @attr('Pessoas')
     def all(self):
         return self.display(
-        'foto', 'nome', 'email'
+            'foto', 'nome', 'email'
         ).search_by('nome')
 
 
-class Pessoa(models.AbstractUser):
+class Pessoa(AbstractUser):
 
     nome = models.CharField(verbose_name='Nome')
     email = models.EmailField(verbose_name='E-mail', unique=True, is_username=True)
@@ -134,7 +135,6 @@ class Pessoa(models.AbstractUser):
     @fieldset('Dados de Acesso')
     def get_dados_acesso(self):
         return self.values('nome', ('last_login', 'password'))
-
 '''
 
 if sys.argv[1] == 'startproject':
@@ -149,10 +149,10 @@ if sys.argv[1] == 'startproject':
         file.write(INIT_FILE_CONTENT)
 
     with open(os.path.join(project_path, 'manage.py'), 'w') as file:
-        file.write(MODEL_FILE_CONTENT)
+        file.write(MANAGE_FILE_CONTENT)
 
     with open(os.path.join(project_path, 'settings.py'), 'w') as file:
-        file.write(SETTINGS_FILE_CONTENT.format(uuid.uuid1().hex, project_name))
+        file.write(SETTINGS_FILE_CONTENT % (uuid.uuid1().hex, project_name))
 
     with open(os.path.join(project_path, project_name, '__init__.py'), 'w') as file:
         file.write(INIT_FILE_CONTENT)

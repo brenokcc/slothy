@@ -279,7 +279,7 @@ class MainTestCase(TestCase):
         self.assertTrue(natal.check_lookups('edit', bolsonaro))
         self.assertTrue(natal.check_lookups('edit', fatima))
         self.assertTrue(natal.check_lookups('edit', alvaro_dias))
-        self.assertFalse(natal.check_lookups('edit', kelps))
+        self.assertTrue(natal.check_lookups('edit', kelps))
 
     def test_one_to_many(self):
         telefones = [
