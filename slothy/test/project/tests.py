@@ -142,9 +142,9 @@ class MainTestCase(TestCase):
         # setting the data
         data['username'] = 'brenokcc@yahoo.com.br'
         data['password'] = 'senha'
-        r = self.post('/api/login', data=data)
-        self.assertEqual(r['text'], 'Login realizado com sucesso')
-        self.assertIsNotNone(r['data']['token'])
+        r = self.post('/api/forms/loginform', data=data)
+        self.assertEqual(r['message'], 'Login realizado com sucesso')
+        self.assertIsNotNone(r['token'])
         # getting authenticated user
         r = self.get('/api/user')
         self.assertIsNotNone(r['data'])
@@ -155,7 +155,7 @@ class MainTestCase(TestCase):
         self.assertEqual(r['text'], 'Usuário não autenticado')
         # wrong password
         data['password'] = '123'
-        r = self.post('/api/login', data=data)
+        r = self.post('/api/forms/loginform', data=data)
         self.assertEqual(r['text'], 'Usuário e senha não conferem')
 
     def test_api(self):

@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 import inspect
 from slothy.db import utils
-from collections import UserDict
 from slothy.decorators import dashboard
+from slothy.api import functions
 
 order = 0
 
@@ -29,6 +29,7 @@ def attr(verbose_name, condition=None, formatter=None, lookups=(), icon=None):
     def decorate(func):
         global order
         order += 1
+        functions.append(func)
         metadata = getattr(func, '_metadata', {})
         params = func.__code__.co_varnames[1:func.__code__.co_argcount]
         metadata.update(
@@ -52,6 +53,7 @@ def fieldset(verbose_name, condition=None, formatter=None, lookups=(), icon=None
     def decorate(func):
         global order
         order += 1
+        functions.append(func)
         metadata = getattr(func, '_metadata', {})
         params = func.__code__.co_varnames[1:func.__code__.co_argcount]
         metadata.update(
@@ -74,6 +76,7 @@ def fieldset(verbose_name, condition=None, formatter=None, lookups=(), icon=None
 
 def action(verbose_name, condition=None, formatter=None, lookups=(), category=None, icon=None, message=None, atomic=False):
     def decorate(func):
+        functions.append(func)
         func_name = func.__name__
         metadata = getattr(func, '_metadata', {})
         params = []
@@ -168,7 +171,7 @@ def fieldsets(data):
     return decorate
 
 
-class App(UserDict):
+class App(dict):
 
     def __init__(self, request):
         from slothy.api.utils import format_ouput

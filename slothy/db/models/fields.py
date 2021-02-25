@@ -20,6 +20,8 @@ class CharField(models.CharField):
 
 class EmailField(models.EmailField):
     def __init__(self, *args, **kwargs):
+        if 'max_length' not in kwargs:
+            kwargs.update(max_length=255)
         if 'is_username' in kwargs:
             self.is_username = kwargs.pop('is_username')
         super().__init__(*args, **kwargs)
@@ -109,4 +111,6 @@ class TelefoneField(MaskedField):
 
 
 class GeoLocationField(CharField):
-    pass
+    def formfield(self, **defaults):
+        defaults.update(form_class=form_fields.GeolocationField)
+        return super().formfield(**defaults)

@@ -1,6 +1,6 @@
 import sys
 import os
-import shutil
+import uuid
 
 # ~/Library/Preferences/PyCharmCE2019.3/templates/dp.xml
 # ~/.PyCharmCE2019.3
@@ -10,44 +10,93 @@ if len(sys.argv) < 2:
     print('Type one of the following options: startproject')
     sys.exit(0)
 
+INIT_FILE_CONTENT = '# -*- coding: utf-8 -*-'
 
-def replace_text(file_path, text, replace):
-    with open(file_path, 'r') as f:
-        data = f.read().replace(text, replace)
-    with open(file_path, 'w') as f:
-        f.write(data)
+MANAGE_FILE_CONTENT = '''#!/usr/bin/env python
+import os
+import sys
+import warnings
 
+warnings.filterwarnings(
+    "ignore", module='(rest_framework|ruamel|scipy|reportlab|django|jinja|corsheaders)'
+)
 
-if sys.argv[1] == 'startproject':
-    project_name = sys.argv[2]
-    project_path = os.path.join(os.path.abspath('.'), project_name)
-    test_path = os.path.join(os.path.dirname(__file__), 'test')
-    os.makedirs(project_path, exist_ok=True)
-    os.makedirs(os.path.join(project_path, project_name), exist_ok=True)
-    test_manage_path = os.path.join(test_path, 'project', 'manage.py')
-    test_settings_path = os.path.join(test_path, 'project', 'settings.py')
-    test_init_path = os.path.join(test_path, 'project', '__init__.py')
-    test_models_path = os.path.join(test_path, 'project', 'base', 'models.py')
-    shutil.copyfile(test_manage_path, os.path.join(project_path, 'manage.py'))
-    shutil.copyfile(test_settings_path, os.path.join(project_path, 'settings.py'))
-    shutil.copyfile(test_init_path, os.path.join(project_path, '__init__.py'))
-    shutil.copyfile(test_init_path, os.path.join(project_path, project_name, '__init__.py'))
-    open(os.path.join(project_path, project_name, 'models.py'), 'w').write('''# -*- coding: utf-8 -*-
-from slothy.api import models
-from slothy.api.models.decorators import user, role, attr, action, fieldset, param
+if __name__ == "__main__":
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+    from django.core.management import execute_from_command_line
+
+    execute_from_command_line(sys.argv)
+'''
+
+SETTINGS_FILE_CONTENT = '''# -*- coding: utf-8 -*-
+import os
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_NAME = __file__.split(os.sep)[-2]
+DEBUG = True
+ROOT_URLCONF = 'slothy.api.urls'
+ALLOWED_HOSTS = '*'
+CORS_ORIGIN_ALLOW_ALL = True
+LANGUAGE_CODE = 'pt-br'
+TIME_ZONE = 'America/Recife'
+USE_I18N = True
+USE_L10N = True
+USE_TZ = False
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
+    }
+}
+MIDDLEWARE = [
+    'django.middleware.security.SecurityMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
+    'django.middleware.common.CommonMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+]
+SECRET_KEY = '{}'
+INSTALLED_APPS = (
+    'django.contrib.sessions',
+    'django.contrib.contenttypes',
+    'django.contrib.auth',
+    'netifaces',
+    'corsheaders',
+    'slothy.core',
+    'slothy.api',
+    '{}',
+)
+COLORS = '#f1948a', '#af7ac5', '#f7dc6f', '#73c6b6', '#5dade2', '#82e0aa'
+TEMPLATES = [
+    {
+        'BACKEND': 'django.template.backends.django.DjangoTemplates',
+        'APP_DIRS': True,
+    }
+]
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+STATIC_URL = '/static/'
+MEDIA_URL = '/media/'
+
+'''
+
+MODEL_FILE_CONTENT = '''# -*- coding: utf-8 -*-
+from slothy.db import models
+from slothy.api.models import AbstractUser
+from slothy.decorators import attr, action, param, fieldset, dashboard, fieldsets
+from slothy.decorators import user, role, attr, action, fieldset, param
 
 class PessoaSet(models.Set):
 
     @attr('Pessoas')
     def all(self):
-        return super().all().display('id', 'nome')
+        return self.display(
+        'foto', 'nome', 'email'
+        ).search_by('nome')
 
 
-@user('email')
 class Pessoa(models.AbstractUser):
 
-    nome = models.CharField(verbose_name='Nome', max_length=255)
-    email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255)
+    nome = models.CharField(verbose_name='Nome')
+    email = models.EmailField(verbose_name='E-mail', unique=True, is_username=True)
     foto = models.ImageField(verbose_name='Foto', null=True, blank=True, upload_to='fotos')
 
     class Meta:
@@ -57,6 +106,7 @@ class Pessoa(models.AbstractUser):
     def __str__(self):
         return self.nome
 
+    @fieldsets({'Dados Gerais': ('nome', ('email', 'foto'))})
     @action('Cadastrar')
     def add(self):
         super().add()
@@ -71,22 +121,45 @@ class Pessoa(models.AbstractUser):
 
     @action('Visualizar')
     def view(self):
-        return super().view('dados_gerais', 'dados_acesso')
+        return super().view()
  
     @action('Alterar Senha')
     def alterar_senha(self, senha):
         super().change_password(senha)
 
-    @attr('Dados Gerais')
-    def dados_gerais(self):
+    @fieldset('Dados Gerais')
+    def get_dados_gerais(self):
         return self.values('nome', ('email', 'foto'))
 
-    @attr('Dados de Acesso')
-    def dados_acesso(self):
+    @fieldset('Dados de Acesso')
+    def get_dados_acesso(self):
         return self.values('nome', ('last_login', 'password'))
-    
-''')
-    replace_text(os.path.join(project_path, 'settings.py'), 'base', project_name)
+
+'''
+
+if sys.argv[1] == 'startproject':
+    project_name = sys.argv[2]
+    project_path = os.path.join(os.path.abspath('.'), project_name)
+    os.makedirs(project_path, exist_ok=True)
+    os.makedirs(os.path.join(project_path, 'media'), exist_ok=True)
+    os.makedirs(os.path.join(project_path, project_name), exist_ok=True)
+    os.makedirs(os.path.join(project_path, project_name, 'static'), exist_ok=True)
+
+    with open(os.path.join(project_path, '__init__.py'), 'w') as file:
+        file.write(INIT_FILE_CONTENT)
+
+    with open(os.path.join(project_path, 'manage.py'), 'w') as file:
+        file.write(MODEL_FILE_CONTENT)
+
+    with open(os.path.join(project_path, 'settings.py'), 'w') as file:
+        file.write(SETTINGS_FILE_CONTENT.format(uuid.uuid1().hex, project_name))
+
+    with open(os.path.join(project_path, project_name, '__init__.py'), 'w') as file:
+        file.write(INIT_FILE_CONTENT)
+
+    with open(os.path.join(project_path, project_name, 'models.py'), 'w') as file:
+        file.write(MODEL_FILE_CONTENT)
+
     print('Project successfully created!'.format(project_name))
 
 elif sys.argv[1] == 'configure':

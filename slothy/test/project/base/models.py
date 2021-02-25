@@ -3,7 +3,7 @@ import datetime
 from slothy.db import models
 from slothy.regional.brasil.enderecos import models as enderecos
 from slothy.api.models import AbstractUser
-from slothy.decorators import user, role, attr, action, param, fieldset, dashboard, fieldsets
+from slothy.decorators import attr, action, param, fieldset, dashboard, fieldsets
 
 
 class Telefone(models.Model):
@@ -159,7 +159,6 @@ class Estado(models.Model):
 class CidadeSet(models.Set):
 
     @dashboard.shortcut()
-    # @dashboard.calendar()
     @attr('Cidades', lookups=('governador', 'prefeito', 'presidente'), icon='house')
     def all(self):
         return self.filter_by(
@@ -205,8 +204,8 @@ class Cidade(models.Model):
     def add_initial():
         return dict(nome='Rio Grande do Norte')
 
-    @action('Editar', lookups=('self__prefeito', 'self__estado__governador__pessoa', 'presidente'))
-    def edit(self, localizacao):
+    @action('Editar')
+    def edit(self):
         super().edit()
 
     @action('Visualizar')
@@ -354,6 +353,11 @@ class PessoaSet(models.Set):
     def all2(self):
         return self.display('nome', 'last_login')
 
+    @dashboard.calendar()
+    @attr('Pessoas Ativas', icon='people_alt')
+    def all3(self):
+        return self.display('nome', 'email', 'foto')
+
 
 class Pessoa(AbstractUser):
 
@@ -469,7 +473,7 @@ class PontoTuristicoSet(models.Set):
     @dashboard.floating()
     @attr('Total por Cidade e Status', icon='insert_chart_outlined', formatter='bar_chart')
     def total_por_cidade_ativo(self):
-        return self.count('ativo', 'cidade')
+        return self.count('cidade', 'ativo')
 
 
 class PontoTuristico(models.Model):

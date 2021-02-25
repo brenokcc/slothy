@@ -1,8 +1,10 @@
-from django.core.exceptions import ValidationError
+# -*- coding: utf-8 -*-
 
-from slothy.forms import Form
 from django import forms
-from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth import login, authenticate
+from django.core import signing
+from django.core.exceptions import ValidationError
+from slothy.forms import Form
 
 
 class LoginForm(Form):
@@ -27,7 +29,9 @@ class LoginForm(Form):
         )
         if user:
             login(self.request, user)
-            token = self.request.user.auth_token.key
-            if token:
-                return dict(type='login', message='Login realizado com sucesso', token=token)
+            return dict(
+                type='login',
+                message='Login realizado com sucesso',
+                token=signing.dumps(self.request.user.id)
+            )
         raise ValidationError('Usuário e senha não conferem')

@@ -22,6 +22,10 @@ class MaskedField(forms.CharField):
         super().__init__(*args, **kwargs)
 
 
+class GeolocationField(forms.CharField):
+    pass
+
+
 class CpfField(MaskedField):
     mask = '000.000.000-00'
 

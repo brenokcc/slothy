@@ -15,7 +15,6 @@ import _pickle as cpickle
 from django.core import signing
 from django.db.models import Q
 import operator
-from collections import UserDict
 from functools import reduce
 from django.core import exceptions
 from django.conf import settings
@@ -161,7 +160,7 @@ class QuerySetStatistic(object):
         )
 
 
-class ValueSet(UserDict):
+class ValueSet(dict):
 
     def __init__(self, obj, *lookups, verbose=True, detail=False):
         self.obj = obj

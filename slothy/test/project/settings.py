@@ -3,7 +3,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_NAME = __file__.split(os.sep)[-2]
 DEBUG = True
 ROOT_URLCONF = 'slothy.api.urls'
-RUNSERVERPLUS_SERVER_ADDRESS_PORT = 'localhost:8000'
 ALLOWED_HOSTS = '*'
 CORS_ORIGIN_ALLOW_ALL = True
 LANGUAGE_CODE = 'pt-br'
@@ -29,7 +28,6 @@ INSTALLED_APPS = (
     'django.contrib.sessions',
     'django.contrib.contenttypes',
     'django.contrib.auth',
-    'rest_framework',
     'netifaces',
     'corsheaders',
     'slothy.core',
@@ -37,7 +35,6 @@ INSTALLED_APPS = (
     # 'sslserver',
     'base',
     'slothy.regional.brasil.enderecos',
-    'rest_framework.authtoken',
 )
 COLORS = '#f1948a', '#af7ac5', '#f7dc6f', '#73c6b6', '#5dade2', '#82e0aa'
 TEMPLATES = [

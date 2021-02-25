@@ -35,8 +35,3 @@ class AbstractUser(six.with_metaclass(models.ModelBase, base_user.AbstractBaseUs
     def change_password(self, raw_password):
         super().set_password(raw_password)
         super().save()
-
-    def save(self, *args, **kwargs):
-        super().save(*args, **kwargs)
-        token_model = apps.get_model('authtoken', 'Token')
-        token_model.objects.get_or_create(user=self)
