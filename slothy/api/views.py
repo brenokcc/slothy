@@ -126,8 +126,9 @@ def postman(request):
 
 
 def api(request, service, path):
-    token = request.headers.get('Authorization', '').split(' ')[-1]
-    if token:
+    auhtorization = request.headers.get('Authorization', '')
+    if auhtorization.startswith('Token'):
+        token = auhtorization.split(' ')[-1]
         user_model = apps.get_model(settings.AUTH_USER_MODEL)
         request.user = user_model.objects.get(pk=signing.loads(token))
     body = request.body
@@ -330,6 +331,7 @@ def api(request, service, path):
     else:
         output = JsonResponse(response)
         output["Access-Control-Allow-Origin"] = "*"
+        output["Access-Control-Allow-Headers"] = "*"
         return output
 
 

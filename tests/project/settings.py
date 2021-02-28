@@ -1,4 +1,7 @@
 import os
+from corsheaders.defaults import default_headers
+
+CORS_ALLOW_HEADERS = list(default_headers) + ['X-Proxy']
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 PROJECT_NAME = __file__.split(os.sep)[-2]
 DEBUG = True

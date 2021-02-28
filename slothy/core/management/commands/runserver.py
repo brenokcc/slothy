@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
+import json
+import base64
 import qrcode
 import netifaces
 from django.core.management.commands import runserver
+from slothy.api.proxy import Client
 
 PRINT_QRCODE = True
 
@@ -24,11 +27,15 @@ class Command(runserver.Command):
             for ip in ips:
                 if ip != '127.0.0.1':
                     if self.addr == '0.0.0.0' or ip == self.addr:
-                        url = 'abrir://aplicativo.click?host={}&port={}'.format(ip, self.port)
-                        urls.append(url)
-            url = 'http://aplicativo.click/#host=127.0.0.1&port=8000'
-            urls.append(url)
-            for url in urls:
+                        url = 'abrir://aplicativo.click#{}'.format(
+                            base64.b64encode(
+                                json.dumps(
+                                    dict(host='http://{}:{}'.format(ip, self.port))
+                                ).encode()
+                            ).decode()
+                        )
+                        urls.append((ip, url))
+            for ip, url in urls:
                 qr = qrcode.QRCode(
                     version=1,
                     error_correction=qrcode.constants.ERROR_CORRECT_L,
@@ -37,9 +44,15 @@ class Command(runserver.Command):
                 )
                 qr.add_data(url)
                 qr.make(fit=True)
-                qr.print_tty()
-                print(url)
-                print('\n\n\n')
+                # print(ip)
+                # qr.print_tty()
+                # print(url)
+                # print('\n\n\n')
+            url = 'http://127.0.0.1:9000#{}'.format(
+                base64.b64encode(json.dumps(dict(host='http://127.0.0.1:8080', proxy='1234567890')).encode()).decode()
+            )
+            print(url)
+        Client.start()
         super().inner_run(*args, **options)
 
     def handle(self, *args, **options):
