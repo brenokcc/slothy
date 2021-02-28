@@ -1,6 +1,7 @@
 import sys
 import os
 import uuid
+import stat
 
 # ~/Library/Preferences/PyCharmCE2019.3/templates/dp.xml
 # ~/.PyCharmCE2019.3
@@ -12,6 +13,20 @@ if len(sys.argv) < 2:
 
 INIT_FILE_CONTENT = '# -*- coding: utf-8 -*-'
 
+GIT_IGNORE_FILE_CONTENT = '''*.pyc
+.svn
+.DS_Store
+.DS_Store?
+._*
+*˜
+.idea/
+db.sqlite3
+.project
+.pydevproject
+media
+logs
+'''
+
 MANAGE_FILE_CONTENT = '''#!/usr/bin/env python
 import os
 import sys
@@ -22,10 +37,36 @@ warnings.filterwarnings(
 )
 
 if __name__ == "__main__":
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "settings")
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "%s.settings")
     from django.core.management import execute_from_command_line
 
     execute_from_command_line(sys.argv)
+'''
+
+WSGI_FILE_CONTENT = '''import os
+
+from django.core.wsgi import get_wsgi_application
+
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', '%s.settings')
+
+application = get_wsgi_application()
+'''
+
+GUNICORN_FILE_CONTENT = '''#!/bin/bash
+set -e
+if [ ! -d ".virtualenv" ]; then
+ python -m pip install virtualenv
+ python -m virtualenv .virtualenv
+ source .virtualenv/bin/activate
+ python -m pip install -r requirements.txt
+else
+ source .virtualenv/bin/activate
+fi
+
+mkdir -p logs
+python manage.py sync
+echo "Starting gunicorn..."
+exec gunicorn %s.wsgi:application -w 1 -b 127.0.0.1:${1:-8000} --timeout=600 --user=${2:-$(whoami)} --log-level=_debug --log-file=logs/gunicorn.log 2>>logs/gunicorn.log
 '''
 
 SETTINGS_FILE_CONTENT = '''# -*- coding: utf-8 -*-
@@ -149,9 +190,25 @@ if sys.argv[1] == 'startproject':
         file.write(INIT_FILE_CONTENT)
 
     with open(os.path.join(project_path, 'manage.py'), 'w') as file:
-        file.write(MANAGE_FILE_CONTENT)
+        file.write(MANAGE_FILE_CONTENT % project_name)
 
-    with open(os.path.join(project_path, 'settings.py'), 'w') as file:
+    with open(os.path.join(project_path, 'requirements.txt'), 'w') as file:
+        if os.path.exists('/Users/breno/'):
+            file.write('/Users/breno/Documents/Slothy/Backend/')
+        file.write('slothy')
+
+    with open(os.path.join(project_path, '.gitignore'), 'w') as file:
+        file.write(GIT_IGNORE_FILE_CONTENT)
+
+    with open(os.path.join(project_path, project_name, 'wsgi.py'), 'w') as file:
+        file.write(WSGI_FILE_CONTENT % project_name)
+
+    with open(os.path.join(project_path, '%s.sh' % project_name), 'w') as file:
+        file.write(GUNICORN_FILE_CONTENT % project_name)
+    st = os.stat(os.path.join(project_path, '%s.sh' % project_name))
+    os.chmod(os.path.join(project_path, '%s.sh' % project_name), st.st_mode | stat.S_IEXEC)
+
+    with open(os.path.join(project_path, project_name, 'settings.py'), 'w') as file:
         file.write(SETTINGS_FILE_CONTENT % (uuid.uuid1().hex, project_name))
 
     with open(os.path.join(project_path, project_name, '__init__.py'), 'w') as file:
@@ -160,7 +217,7 @@ if sys.argv[1] == 'startproject':
     with open(os.path.join(project_path, project_name, 'models.py'), 'w') as file:
         file.write(MODEL_FILE_CONTENT)
 
-    print('Project successfully created!'.format(project_name))
+    print('Project "{}" successfully created!'.format(project_name))
 
 elif sys.argv[1] == 'configure':
     home_dir = os.path.expanduser('~')
