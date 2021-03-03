@@ -1,5 +1,4 @@
 
-from slothy.db.utils import get_model
 
 functions = []
 

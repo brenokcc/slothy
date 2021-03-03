@@ -52,7 +52,7 @@ class Command(runserver.Command):
                 base64.b64encode(json.dumps(dict(host='http://127.0.0.1:8080', proxy='1234567890')).encode()).decode()
             )
             print(url)
-        Client.start()
+        # Client.start()
         super().inner_run(*args, **options)
 
     def handle(self, *args, **options):

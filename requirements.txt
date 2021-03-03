@@ -5,3 +5,4 @@ Pillow
 wheel
 qrcode
 netifaces
+requests

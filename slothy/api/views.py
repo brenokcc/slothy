@@ -7,6 +7,7 @@ import traceback
 import uuid
 import tempfile
 import slothy
+import requests
 from slothy.decorators import App
 from django.conf import settings
 from django.apps import apps
@@ -37,13 +38,13 @@ class PdfResponse(HttpResponse):
 
 
 def upload(request):
-    ouput = dict()
+    output = dict()
     for name in request.FILES:
         uploaded_file = request.FILES[name]
         file_name = '{}.{}'.format(uuid.uuid1().hex, uploaded_file.name.split('.')[-1])
         file_path = os.path.join(settings.MEDIA_ROOT, file_name)
         open(file_path, 'wb').write(uploaded_file.read())
-        ouput.update(
+        output.update(
             name=file_name,
             field_name=name,
             path='/media/{}'.format(file_name),
@@ -51,7 +52,26 @@ def upload(request):
             size=uploaded_file.size,
             charset=uploaded_file.charset
         )
-    return JsonResponse(ouput)
+    return JsonResponse(output)
+
+
+def index(request):
+    output = dict(
+        PROJECT_NAME=settings.PROJECT_NAME,
+        TEXT_COLOR=settings.TEXT_COLOR,
+        DARK_TEXT_COLOR=settings.DARK_TEXT_COLOR,
+        BACKGROUND_COLOR=settings.BACKGROUND_COLOR,
+        PRIMARY_COLOR=settings.PRIMARY_COLOR,
+        BAR_FONT_COLOR=settings.BAR_FONT_COLOR,
+        BAR_BACKGROUND_COLOR=settings.BAR_BACKGROUND_COLOR,
+        LOCATION_SHARING_INTERVAL=settings.LOCATION_SHARING_INTERVAL,
+        CARD_BACKGROUND_COLOR=settings.CARD_BACKGROUND_COLOR,
+        CARD_TEXT_COLOR=settings.CARD_TEXT_COLOR,
+        CARD_ICON_COLOR=settings.CARD_ICON_COLOR,
+        SHORTCUT_ICON_COLOR=settings.SHORTCUT_ICON_COLOR,
+        COLORS=settings.COLORS,
+    )
+    return JsonResponse(output)
 
 
 def queryset(request, app_label, model_name, subset=None):
@@ -300,7 +320,7 @@ def api(request, service, path):
                                     model.get_metadata('verbose_name_plural'),
                                     metadata['verbose_name']
                                 )
-                            response = output.serialize(name)
+                            response = output.serialize(name, icon=metadata['icon'])
                             response['formatter'] = metadata.get('formatter')
                         elif isinstance(output, Model):
                             response = output.serialize()

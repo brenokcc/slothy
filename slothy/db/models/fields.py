@@ -18,6 +18,15 @@ class CharField(models.CharField):
         super().__init__(*args, **kwargs)
 
 
+class DecimalField(models.DecimalField):
+    def __init__(self, *args, **kwargs):
+        if 'decimal_places' not in kwargs:
+            kwargs.update(decimal_places=2)
+        if 'max_digits' not in kwargs:
+            kwargs.update(max_digits=7)
+        super().__init__(*args, **kwargs)
+
+
 class EmailField(models.EmailField):
     def __init__(self, *args, **kwargs):
         if 'max_length' not in kwargs:

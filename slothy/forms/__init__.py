@@ -356,7 +356,7 @@ class ModelForm(forms.ModelForm):
         errors = []
         # print(data, form.cleaned_data)
         # print(form.fields.keys(), custom_fields.keys(), metadata['params'])
-
+        print(self.data)
         if self.errors:
             for inner_field_name, inner_messages in self.errors.items():
                 errors.append(dict(field=inner_field_name, message=','.join(inner_messages)))

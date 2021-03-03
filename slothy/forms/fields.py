@@ -1,4 +1,5 @@
-
+from decimal import Decimal
+from django.core import validators
 from django import forms
 from django.conf import settings
 
@@ -44,3 +45,4 @@ class PlacaField(MaskedField):
 
 class TelefoneField(MaskedField):
     mask = '(00) 00000-0000'
+

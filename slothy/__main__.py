@@ -71,7 +71,7 @@ exec gunicorn %s.wsgi:application -w 1 -b 127.0.0.1:${1:-8000} --timeout=600 --u
 
 SETTINGS_FILE_CONTENT = '''# -*- coding: utf-8 -*-
 import os
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_NAME = __file__.split(os.sep)[-2]
 DEBUG = True
 ROOT_URLCONF = 'slothy.api.urls'

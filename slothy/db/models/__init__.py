@@ -50,11 +50,11 @@ class ModelIterable(query.ModelIterable):
 class QuerySetStatistic(object):
     MONTHS = ('JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ')
 
-    def __init__(self, qs, x, y=None, func=Count, z='id'):
+    def __init__(self, qs, x, y=None, func=None, z='id'):
         self.qs = qs
         self.x = x
         self.y = y
-        self.func = func
+        self.func = func or Count
         self.z = z
         self._xfield = None
         self._yfield = None
@@ -96,6 +96,7 @@ class QuerySetStatistic(object):
         self._values_dict = {}
         values_list = self.qs.values_list(self.x, self.y).annotate(
             self.func(self.z)) if self.y else self.qs.values_list(self.x).annotate(self.func(self.z))
+
         self._xfield = self.qs.model.get_field(self.x.replace('__year', '').replace('__month', ''))
         if self._xdict == {}:
             xvalues = self.qs.values_list(self.x, flat=True).order_by(self.x).distinct()
@@ -203,9 +204,20 @@ class ValueSet(dict):
         return self
 
     def allow(self, *lookups):
+        model = type(self.obj)
         for lookup in lookups:
+            action_func = getattr(model, lookup)
+            action_metadata = getattr(action_func, '_metadata')
+            action_verbose_name = action_metadata['verbose_name']
+            action_icon = action_metadata['icon']
+            action_params = bool(action_metadata['params'])
+            action_url = '/api/{}/{}/{}/{}'.format(
+                model.get_metadata('app_label'),
+                model.get_metadata('model_name'),
+                self.obj.pk, lookup
+            )
             self.actions.append(
-                {'name': lookup, 'label': self.obj.get_verbose_name(lookup)}
+                {'name': lookup, 'label': action_verbose_name, 'icon': action_icon, 'params': action_params, 'url': action_url}
             )
         return self
 
@@ -414,6 +426,12 @@ class QuerySet(query.QuerySet):
     def count(self, x=None, y=None):
         return QuerySetStatistic(self, x, y=y) if x else super().count()
 
+    def sum(self, x, y=None, z=None):
+        if y:
+            return QuerySetStatistic(self, x, y=y, func=Sum, z=z)
+        else:
+            return QuerySetStatistic(self, x, func=Sum, z=z)
+
     def get_by_natural_key(self, username):
         return self.get(**{self.model.USERNAME_FIELD: username})
 
@@ -510,7 +528,7 @@ class QuerySet(query.QuerySet):
             self._count_subsets = metadata['subsets']
         return self
 
-    def serialize(self, name=''):
+    def serialize(self, name='', icon=None):
         data = []
         s = self.dump_query()
 
@@ -638,7 +656,7 @@ class QuerySet(query.QuerySet):
             serialized = dict()
             serialized['type'] = 'queryset'
             serialized['name'] = name
-            serialized['icon'] = self.model.get_metadata('icon')
+            serialized['icon'] = icon or self.model.get_metadata('icon')
             serialized['path'] = '/queryset/{}/{}/'.format(
                 getattr(self.model, '_meta').app_label.lower(),
                 self.model.__name__.lower()
@@ -852,6 +870,7 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
         serialized = dict(
             type='object',
             name=str(self),
+            icon=self.get_metadata('icon'),
             input=dict(dimension=current_display_name),
             data=self.values(*fieldset_names, verbose=True, detail=True).serialize(),
             dimensions=dimensions

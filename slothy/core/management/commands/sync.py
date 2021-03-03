@@ -7,7 +7,7 @@ from django.core.management.base import BaseCommand
 class Command(BaseCommand):
     def handle(self, *args, **options):
 
-        app_labels = []
+        app_labels = ['api']
         for app_label in settings.INSTALLED_APPS:
             if '.' not in app_label:
                 app_labels.append(app_label)
