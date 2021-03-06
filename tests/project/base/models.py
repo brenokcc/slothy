@@ -2,7 +2,7 @@
 import datetime
 from slothy.db import models
 from slothy.regional.brasil.enderecos import models as enderecos
-from slothy.api.models import AbstractUser
+from slothy.api.models import User
 from slothy.decorators import attr, action, param, fieldset, dashboard, fieldsets
 
 
@@ -367,7 +367,7 @@ class PessoaSet(models.Set):
         )
 
 
-class Pessoa(AbstractUser):
+class Pessoa(User):
 
     nome = models.CharField(verbose_name='Nome', max_length=255)
     email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255, is_username=True)

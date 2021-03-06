@@ -7,24 +7,6 @@ from slothy.api import functions
 order = 0
 
 
-def user(username_field_name):
-    def decorate(cls):
-        cls.USERNAME_FIELD = username_field_name
-        return cls
-
-    return decorate
-
-
-def role(field='id'):
-    def decorate(cls):
-        metadata = getattr(cls, '_metadata', {})
-        metadata.update(role_field_name=field)
-        setattr(cls, '_metadata', metadata)
-        return cls
-
-    return decorate
-
-
 def attr(verbose_name, condition=None, formatter=None, lookups=(), icon=None):
     def decorate(func):
         global order

@@ -17,7 +17,7 @@ DATABASES = {
 }
 
 INSTALLED_APPS = DEFAULT_APPS + (
-    'base',
+    'projeto',
     'slothy.regional.brasil.enderecos',
 )
 

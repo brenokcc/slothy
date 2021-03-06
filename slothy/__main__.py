@@ -121,7 +121,7 @@ MEDIA_URL = '/media/'
 
 MODEL_FILE_CONTENT = '''# -*- coding: utf-8 -*-
 from slothy.db import models
-from slothy.api.models import AbstractUser
+from slothy.api.models import User
 from slothy.decorators import attr, action, param, fieldset, dashboard, fieldsets
 from slothy.decorators import user, role, attr, action, fieldset, param
 
@@ -135,7 +135,7 @@ class PessoaSet(models.Set):
         ).search_by('nome')
 
 
-class Pessoa(AbstractUser):
+class Pessoa(User):
 
     nome = models.CharField(verbose_name='Nome')
     email = models.EmailField(verbose_name='E-mail', unique=True, is_username=True)

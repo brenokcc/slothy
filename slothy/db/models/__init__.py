@@ -471,6 +471,8 @@ class QuerySet(query.QuerySet):
 
         if user.pk is None:
             return self
+        elif user.is_superuser:
+            return self
         elif lookups == ():
             return self
         else:
@@ -571,6 +573,7 @@ class QuerySet(query.QuerySet):
                 {'name': lookup, 'label': self.model.get_verbose_name(lookup)}
             )
         for lookup in self._list_actions:
+            action_condition = None
             action_params = True
             if self._caller:
                 action_url = '/api/{}/{}/{}/{}/{}'.format(
@@ -758,31 +761,7 @@ class ModelBase(base.ModelBase):
                     objects=LocalManager()
                 )
 
-        if 'AbstractUser' in (cls.__name__ for cls in bases):
-            username_field = None
-            for attr_name in attrs:
-                attr = attrs[attr_name]
-                if getattr(attr, 'is_username', False):
-                    username_field = attr_name
-            if username_field:
-                attrs.update(USERNAME_FIELD=username_field)
-            setattr(settings, 'AUTH_USER_MODEL', '{}.{}'.format(fromlist[-2], name))
-
         cls = super().__new__(mcs, name, bases, attrs)
-
-        if 'AbstractUser' in (cls.__name__ for cls in bases):
-            AUTH_USER_MODEL = cls
-
-        for field in cls._meta.fields:
-            if hasattr(field, 'inherits_role'):
-                metadata = getattr(cls, '_metadata', {})
-                metadata.update(role_field_name=field.name)
-                setattr(cls, '_metadata', metadata)
-
-        if AUTH_USER_MODEL and issubclass(cls, AUTH_USER_MODEL):
-            metadata = getattr(cls, '_metadata', {})
-            metadata.update(role_field_name='id')
-            setattr(cls, '_metadata', metadata)
 
         return cls
 
@@ -824,7 +803,7 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
                         fieldsets.append(item)
                     data[item['key']].append(item)
 
-        fieldsets = sorted(fieldsets, key=lambda item: item['order'])
+        fieldsets = sorted(fieldsets, key=lambda tmp: tmp['order'])
 
         current_display_name = getattr(self, '_current_display_name', None)
         if current_display_name is None:
@@ -927,6 +906,8 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
         lookups = metadata['lookups']
 
         if user.pk is None:
+            return True
+        elif user.is_superuser:
             return True
         elif lookups == ():
             return True

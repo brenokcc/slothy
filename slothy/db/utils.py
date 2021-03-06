@@ -30,7 +30,7 @@ def get_link(func_or_class):
         elif hasattr(func_or_class, 'markdown'):
             module_name = 'markdown'
         url = '/api/{}/{}'.format(module_name, func_or_class.__name__.lower())
-        return dict(icon=None, url=url, label=None)
+        return dict(icon=None, url=url, label='')
     else:
         func_name = func_or_class.__name__
         metadata = getattr(func_or_class, '_metadata')

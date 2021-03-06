@@ -8,7 +8,7 @@ from slothy.forms import Form
 
 
 class LoginForm(Form):
-    username = forms.CharField(label='Usuário')
+    username = forms.CharField(label='Login')
     password = forms.CharField(label='Senha')
 
     class Meta:
