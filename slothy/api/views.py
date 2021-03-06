@@ -64,6 +64,7 @@ def index(request):
         PRIMARY_COLOR=settings.PRIMARY_COLOR,
         BAR_FONT_COLOR=settings.BAR_FONT_COLOR,
         BAR_BACKGROUND_COLOR=settings.BAR_BACKGROUND_COLOR,
+        BAR_GRADIENT_COLOR=settings.BAR_GRADIENT_COLOR,
         LOCATION_SHARING_INTERVAL=settings.LOCATION_SHARING_INTERVAL,
         CARD_BACKGROUND_COLOR=settings.CARD_BACKGROUND_COLOR,
         CARD_TEXT_COLOR=settings.CARD_TEXT_COLOR,
@@ -120,12 +121,12 @@ def postman(request):
                 name='api',
                 item=[
                     dict(
-                        name='api/app',
+                        name='api/admin',
                         request=dict(
                             method='get',
                             header=[],
                             url=dict(
-                                raw='http://localhost:8000/api/app',
+                                raw='http://localhost:8000/api/admin',
                                 protocol='http',
                                 host=['localhost'],
                                 port='8000',
@@ -147,6 +148,7 @@ def postman(request):
 
 def api(request, service, path):
     auhtorization = request.headers.get('Authorization', '')
+    print(auhtorization)
     if auhtorization.startswith('Token'):
         token = auhtorization.split(' ')[-1]
         user_model = apps.get_model(settings.AUTH_USER_MODEL)
@@ -164,8 +166,10 @@ def api(request, service, path):
     data = request.POST or request.GET or data
     try:
         if len(tokens) == 1:
-            if path == 'app':  # authenticated user
-                response = App(request)
+            if path == 'public':
+                response = App().public()
+            elif path == 'admin':
+                response = App().admin(request)
             elif path == 'user':  # authenticated user
                 if request.user.is_authenticated:
                     response = request.user.view()
@@ -189,6 +193,9 @@ def api(request, service, path):
                         raise InputValidationError(error)
                 else:
                     response = form.serialize()
+            elif tokens[0] == 'markdown':
+                markdown = slothy.MARKDOWN[tokens[1]](request)
+                response = markdown.serialize()
             elif tokens[0] == 'views':
                 view = slothy.VIEWS[tokens[1]](request)
                 response = view.serialize()
@@ -285,7 +292,7 @@ def api(request, service, path):
                 metadata = getattr(meta_func or func, '_metadata')
                 if metadata['type'] == 'action' and metadata['name'] != 'view':
                     form_cls = build_form(model, func, metadata, exclude_field)
-                    form = form_cls(data=data or None, instance=instance)
+                    form = form_cls(data=data or None, instance=instance, request=request)
                     if data is not None:
                         if metadata.get('atomic'):
                             with transaction.atomic():
@@ -313,6 +320,7 @@ def api(request, service, path):
                                     output, 'serialize') else output}
                                 response = dict(type='object', name=str(instance), data=fieldset)
                         elif isinstance(output, QuerySet):
+                            output = output.apply_lookups(request.user)
                             if metadata['name'] == 'all':
                                 name = metadata['verbose_name']
                             else:
@@ -359,6 +367,9 @@ def build_form(_model, func, metadata, exclude_field):
     params = metadata.get('params', {})
     fields = metadata.get('fields', {})
     fieldsets = metadata.get('fieldsets')
+    if func.__name__ == 'edit' and fieldsets is None:
+        fieldsets = getattr(getattr(func.__self__, 'add'), '_metadata', {}).get('fieldsets')
+
     if fieldsets:
         _exclude = None
         _fields = []

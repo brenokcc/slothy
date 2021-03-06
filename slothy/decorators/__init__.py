@@ -173,41 +173,29 @@ def fieldsets(data):
 
 class App(dict):
 
-    def __init__(self, request):
-        from slothy.api.utils import format_ouput
+    def __init__(self):
+
         super().__init__()
-        self.update(type='app')
+
+    def public(self):
+        links = [dict(icon='apps', url='/api/login/', label='')]
+        for data in dashboard.DATA.get('public', ()):
+            links.append(utils.get_link(data['func']))
+        self.update(type='public')
+        self.update(links=links)
+        return self
+
+    def admin(self, request):
+        self.update(type='admin')
+        from slothy.api.utils import format_ouput
         for key in ('shortcut', 'card', 'top_bar', 'bottom_bar', 'floating'):
             self[key] = []
             for data in dashboard.DATA.get(key, ()):
-                if hasattr(data['func'], 'submit') or hasattr(data['func'], 'view'):
-                    module_name = 'forms' if hasattr(data['func'], 'submit') else 'views'
-                    self[key].append(
-                        dict(
-                            icon='apps',
-                            url='/api/{}/{}'.format(module_name, data['func'].__name__.lower()),
-                            label=module_name,
-                        )
-                    )
-                else:
-                    func_name = data['func'].__name__
-                    metadata = getattr(data['func'], '_metadata')
-                    model = utils.get_model(data['func'])
-                    self[key].append(
-                        dict(
-                            icon=metadata.get('icon') or 'apps',
-                            url='/api/{}/{}{}'.format(
-                                model.get_metadata('app_label'),
-                                model.get_metadata('model_name'),
-                                '/{}'.format(func_name) if func_name != 'all' else ''
-                            ),
-                            label=metadata.get('verbose_name'),
-                        )
-                    )
+                self[key].append(utils.get_link(data['func']))
         for key in ('top', 'left', 'center', 'right', 'bottom'):
             self[key] = []
             for data in dashboard.DATA.get(key, ()):
-                if hasattr(data['func'], 'submit') or hasattr(data['func'], 'view'):
+                if inspect.isclass(data['func']):
                     output = data['func'](request).serialize()
                 else:
                     func_name = data['func'].__name__
@@ -229,3 +217,5 @@ class App(dict):
                 model = utils.get_model(data['func'])
                 qs = getattr(model.objects, func_name)()
                 self[key].append(qs.serialize(verbose_name))
+
+        return self

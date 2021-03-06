@@ -63,3 +63,4 @@ def make_choices(name, field, custom_choices):
         if isinstance(field, BooleanField):
             return [[True, 'Sim'], [False, 'Não']]
     return None
+

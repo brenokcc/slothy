@@ -3,6 +3,7 @@ from slothy import forms
 
 FORMS = {}
 VIEWS = {}
+MARKDOWN = {}
 INITIALIZED = False
 
 
@@ -22,6 +23,8 @@ def initialize():
                             FORMS[attr_name.lower()] = attr
                         if hasattr(attr, 'view'):
                             VIEWS[attr_name.lower()] = attr
+                        if hasattr(attr, 'markdown'):
+                            MARKDOWN[attr_name.lower()] = attr
                 except ImportError as e:
                     if not e.msg.startswith('No module named'):
                         raise e

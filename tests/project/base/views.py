@@ -1,4 +1,4 @@
-from slothy.api.ui.views import View
+from slothy.api.ui.views import View, Markdown
 from .models import Cidade
 from slothy.decorators import dashboard
 
@@ -13,3 +13,7 @@ class Teste(View):
     def view(self):
         print(self.request.user)
         return Cidade.objects.all()
+
+
+class Texto(Markdown):
+    pass

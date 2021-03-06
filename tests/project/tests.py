@@ -1,8 +1,7 @@
 from django.test import TestCase
-from base.models import Pessoa, Estado, Cidade, PontoTuristico, Presidente, Governador, Telefone
+from base.models import Pessoa, Estado, Cidade, PontoTuristico, Presidente, Governador, Telefone, Endereco
 from slothy.api.models import Group
 import json
-from slothy.db.utils import setup_signals
 
 # /queryset
 # /queryset/<filter>
@@ -29,8 +28,6 @@ from slothy.db.utils import setup_signals
 # curl -H "Content-Type: application/json" -H "Authorization: Token 3853ded71e2cb8299a1e1c7e45c4722a787a45e9" -X GET http://localhost:8000/api/base/estado/
 
 
-setup_signals()
-
 
 def log(response):
     print(json.dumps(response, indent=2, sort_keys=False, ensure_ascii=False))
@@ -50,53 +47,6 @@ class MainTestCase(TestCase):
         data = json.dumps(data) if data is not None else None
         response = self.client.post(url, data=data, content_type='application/json')
         return json.loads(response.content)
-
-    def test_direct_inherited_role(self):
-        self.assertFalse(Group.objects.filter(name='Presidente').exists())
-        presidente = Presidente.objects.create(nome='Jair Bolsonaro')
-        self.assertTrue(Group.objects.filter(name='Presidente').exists())
-        self.assertTrue(presidente.groups.filter(name='Presidente').exists())
-
-    def test_indirect_inherited_role(self):
-        self.assertFalse(Group.objects.filter(name='Governador').exists())
-        rn = Estado.objects.create(nome='Rio Grande do Norte', sigla='RN')
-        pessoa = Pessoa.objects.create(nome='Fátima', email='fatima@mail.com')
-        governador_rn = Governador.objects.create(pessoa=pessoa, estado=rn)
-        self.assertTrue(Group.objects.filter(name='Governador').exists())
-        self.assertTrue(pessoa.groups.filter(name='Governador').exists())
-
-        rj = Estado.objects.create(nome='Rio de Janeiro', sigla='RJ')
-        governador_rj = Governador.objects.create(pessoa=pessoa, estado=rj)
-        governador_rn.delete()
-        self.assertTrue(pessoa.groups.filter(name='Governador').exists())
-        governador_rj.delete()
-        self.assertFalse(pessoa.groups.filter(name='Governador').exists())
-
-    def test_fk_inherited_role(self):
-        self.assertFalse(Group.objects.filter(name='Prefeito').exists())
-        rn = Estado.objects.create(nome='Rio Grande do Norte', sigla='RN')
-        natal = Cidade.objects.create(nome='Natal', estado=rn)
-        alvaro_dias = Pessoa.objects.create(nome='Álvaro Dias', email='alvaro@mail.com')
-        self.assertFalse(alvaro_dias.groups.filter(name='Prefeito').exists())
-        natal.prefeito = alvaro_dias
-        natal.save()
-        self.assertTrue(Group.objects.filter(name='Prefeito').exists())
-        self.assertTrue(alvaro_dias.groups.filter(name='Prefeito').exists())
-        natal.prefeito = None
-        natal.save()
-        self.assertFalse(alvaro_dias.groups.filter(name='Prefeito').exists())
-
-    def test_m2m_inherited_role(self):
-        self.assertFalse(Group.objects.filter(name='Vereadores').exists())
-        rn = Estado.objects.create(nome='Rio Grande do Norte', sigla='RN')
-        natal = Cidade.objects.create(nome='Natal', estado=rn)
-        kelps = Pessoa.objects.create(nome='Kelps', email='kelps@mail.com')
-        self.assertFalse(kelps.groups.filter(name='Vereadores').exists())
-        natal.vereadores.add(kelps)
-        self.assertTrue(Group.objects.filter(name='Vereadores').exists())
-        self.assertTrue(kelps.groups.filter(name='Vereadores').exists())
-        natal.vereadores.remove(kelps)
-        self.assertFalse(kelps.groups.filter(name='Vereadores').exists())
 
     def test_models(self):
 
@@ -262,9 +212,20 @@ class MainTestCase(TestCase):
         Governador.objects.create(pessoa=fatima, estado=rn)
 
         natal = Cidade.objects.create(nome='Natal', estado=rn, prefeito=alvaro_dias)
-        Cidade.objects.create(nome='Parnamirim', estado=rn)
-        Cidade.objects.create(nome='São Paulo', estado=sp)
+
+        parnamirim = Cidade.objects.create(nome='Parnamirim', estado=rn)
+        sao_paulo = Cidade.objects.create(nome='São Paulo', estado=sp)
         Cidade.objects.create(nome='Guarulhos', estado=sp)
+
+        endereco = Endereco.objects.create(logradouro='Centro', numero=1, cidade=parnamirim)
+        Pessoa.objects.create(nome='Fulano', email='fulano@mail.com', endereco=endereco)
+
+        endereco = Endereco.objects.create(logradouro='Centro', numero=1, cidade=natal)
+        Pessoa.objects.create(nome='Beltrano', email='beltrano@mail.com', endereco=endereco)
+
+        endereco = Endereco.objects.create(logradouro='Centro', numero=1, cidade=sao_paulo)
+        Pessoa.objects.create(nome='Cicrano', email='cicrano@mail.com', endereco=endereco)
+
 
         # states
         self.assertEqual(Estado.objects.all().apply_lookups(bolsonaro).count(), 2)
@@ -276,10 +237,22 @@ class MainTestCase(TestCase):
         self.assertEqual(Cidade.objects.all().apply_lookups(kelps).count(), 0)
 
         # action lookups
-        self.assertTrue(natal.check_lookups('edit', bolsonaro))
-        self.assertTrue(natal.check_lookups('edit', fatima))
-        self.assertTrue(natal.check_lookups('edit', alvaro_dias))
-        self.assertTrue(natal.check_lookups('edit', kelps))
+        self.assertTrue(natal.check_lookups('teste2', bolsonaro))
+        self.assertTrue(natal.check_lookups('teste2', fatima))
+        natal.prefeito = None
+        natal.save()
+        self.assertFalse(natal.check_lookups('teste2', alvaro_dias))
+        natal.prefeito = alvaro_dias
+        natal.save()
+        self.assertTrue(natal.check_lookups('teste2', alvaro_dias))
+        self.assertFalse(natal.check_lookups('teste2', kelps))
+        natal.vereadores.add(kelps)
+        self.assertTrue(natal.check_lookups('teste2', kelps))
+
+        self.assertEqual(Pessoa.objects.all3().apply_lookups(bolsonaro).count(), Pessoa.objects.count())
+        self.assertEqual(Pessoa.objects.all3().apply_lookups(fatima).count(), 2)
+        self.assertEqual(Pessoa.objects.all3().apply_lookups(alvaro_dias).count(), 1)
+        self.assertEqual(Pessoa.objects.all3().apply_lookups(kelps).count(), 1)
 
     def test_one_to_many(self):
         telefones = [

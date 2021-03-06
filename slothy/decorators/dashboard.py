@@ -86,3 +86,9 @@ def calendar(lookups=None, priority=0):
         return func
     return decorate
 
+
+def public(priority=0):
+    def decorate(func):
+        setdata('public', func, (), priority)
+        return func
+    return decorate

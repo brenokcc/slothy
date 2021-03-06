@@ -3,6 +3,7 @@
 from django.db import models
 from slothy.forms import fields as form_fields
 from django.db.models.fields import files as file_fields
+from slothy.db.utils import iterable
 
 
 ImageField = file_fields.ImageField
@@ -38,9 +39,19 @@ class EmailField(models.EmailField):
 
 class ForeignKey(models.ForeignKey):
     def __init__(self, to, **kwargs):
+        self.lookup = iterable(kwargs.pop('lookup', ()))
+        self.exclude = iterable(kwargs.pop('exclude', ()))
+        self.readonly = iterable(kwargs.pop('readonly', ()))
         on_delete = kwargs.pop('on_delete', models.CASCADE)
         self.filter_display = kwargs.pop('filter_display', ('__str__',))
         super().__init__(to, on_delete, **kwargs)
+
+    def formfield(self, *args, **kwargs):
+        field = super().formfield(**kwargs)
+        setattr(field, 'lookup', self.lookup + self.exclude + self.readonly)
+        setattr(field, 'exclude', self.exclude)
+        setattr(field, 'readonly', self.readonly)
+        return field
 
 
 class OneToOneField(models.OneToOneField):
@@ -54,14 +65,6 @@ class OneToOneField(models.OneToOneField):
         return field
 
 
-class RoleForeignKey(ForeignKey):
-    pass
-
-
-class RoleField(ForeignKey):
-    inherits_role = True
-
-
 class OneToManyField(models.ManyToManyField):
     def formfield(self, *args, **kwargs):
         field = super().formfield(*args, **kwargs)
@@ -69,7 +72,7 @@ class OneToManyField(models.ManyToManyField):
         return field
 
 
-class RoleManyToManyField(models.ManyToManyField):
+class ManyToManyField(models.ManyToManyField):
     pass
 
 

@@ -129,7 +129,8 @@ class Form(forms.Form):
 
 class ModelForm(forms.ModelForm):
 
-    def __init__(self, title, func, params, exclude=None, fields=None, fieldsets=None, icon=None, **kwargs):
+    def __init__(self, title, func, params, exclude=None, fields=None, fieldsets=None, icon=None, request=None, **kwargs):
+        self.request = request
         self.title = title
         self.icon = icon
         self.func = func
@@ -152,7 +153,15 @@ class ModelForm(forms.ModelForm):
 
         # exclude fields
         if exclude and exclude in self.fields:
-            del (self.fields[exclude])
+            del self.fields[exclude]
+
+        for name in list(self.fields.keys()):
+            field = self.fields[name]
+            if hasattr(field, 'exclude'):
+                queryset = field.queryset.apply_lookups(self.request.user, field.lookup)
+                if queryset.count() == 1:
+                    setattr(self.instance, name, queryset.first())
+                    del self.fields[name]
 
         # fieldsets
         if fieldsets is None:
@@ -179,12 +188,19 @@ class ModelForm(forms.ModelForm):
 
         # metadata
         self.metadata = {}
+        exclude = []
         for name, field in self.fields.items():
+            readonly = False
+            if hasattr(field, 'readonly'):
+                queryset = field.queryset.apply_lookups(self.request.user, field.lookup)
+                if queryset.count() == 1:
+                    setattr(self.instance, name, queryset.first())
+                    readonly = True
             choices = make_choices(name, field, custom_choices)
             field_type = type(field).__name__.replace('Field', '').lower()
             mask = field.mask if hasattr(field, 'mask') else None
             item = OrderedDict(
-                label=field.label, type=field_type, required=field.required,
+                label=field.label, type=field_type, required=field.required, readonly=readonly,
                 mask=mask, value=None, display=None, choices=choices, help_text=field.help_text,
                 error=None, width=field_width.get(name, 100)
             )
@@ -288,18 +304,19 @@ class ModelForm(forms.ModelForm):
         # initial data
         self.initial_data = {}
         for name, field in self.fields.items():
-            value = self.initial.get(name)
-            is_cf = isinstance(field, forms.MultipleChoiceField) or isinstance(field, forms.ModelMultipleChoiceField)
-            if value is None and is_cf:
-                value = []
-            if isinstance(value, FieldFile):
-                display = value.name
-                value = None
-            else:
-                display = format_value(field.to_python(value))
-            self.initial_data[name] = value
-            self.metadata[name]['value'] = value
-            self.metadata[name]['display'] = display
+            if name in self.metadata:
+                value = self.initial.get(name)
+                is_cf = isinstance(field, forms.MultipleChoiceField) or isinstance(field, forms.ModelMultipleChoiceField)
+                if value is None and is_cf:
+                    value = []
+                if isinstance(value, FieldFile):
+                    display = value.name
+                    value = None
+                else:
+                    display = format_value(field.to_python(value))
+                self.initial_data[name] = value
+                self.metadata[name]['value'] = value
+                self.metadata[name]['display'] = display
         for one_to_one_field_name, one_to_one_form in self.one_to_one_forms.items():
             self.initial_data[one_to_one_field_name] = {}
             for name, field in one_to_one_form.fields.items():
@@ -379,7 +396,7 @@ class ModelForm(forms.ModelForm):
                 params[param] = self.cleaned_data.get(param)
             try:
                 self.result = self.func(**params)
-                if self.base_fields:
+                if self.base_fields and hasattr(self, 'cleaned_data'):
                     self._save_m2m()
             except ValidationError as ve:
                 error = ''.join(ve.message)

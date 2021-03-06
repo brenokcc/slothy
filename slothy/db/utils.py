@@ -1,117 +1,14 @@
 # -*- coding: utf-8 -*-
 import datetime
 import inspect
-import collections
-from django.conf import settings
-from django.db.models import signals
 from django.apps import apps
 
-FOREIGNKEY_GROUP_FIELDS = collections.defaultdict(list)
 
-
-def m2m_signal(sender, **kwargs):
-    from slothy.api.models import Group
-    action = kwargs['action']
-    instance = kwargs['instance']
-    pks = kwargs['pk_set']
-    if action in ('post_add', 'post_clear', 'post_remove'):
-        field_name = getattr(sender, '_meta').object_name.split('_')[-1]
-        field = instance.get_field(field_name)
-        group = Group.objects.get_or_create(
-            name=field.verbose_name, lookup=field_name
-        )[0]
-        for user in field.related_model.objects.filter(pk__in=pks):
-            if action in ('post_clear', 'post_remove'):
-                user.groups.remove(group)
-            else:
-                user.groups.add(group)
-
-
-def setup_signals():
-    if hasattr(settings, 'AUTH_USER_MODEL'):
-        from slothy.api.models import Group
-        auth_user_model = apps.get_model(settings.AUTH_USER_MODEL)
-        group_related_objects = [
-            related_object for related_object in getattr(auth_user_model, '_meta').related_objects if
-            type(related_object.field).__name__ in ('RoleForeignKey', 'RoleManyToManyField')
-        ]
-        for related_object in group_related_objects:
-            descriptor = getattr(related_object.field.model, related_object.field.name)
-            if hasattr(descriptor, 'through'):
-                signals.m2m_changed.connect(
-                    m2m_signal, sender=descriptor.through
-                )
-            else:
-                FOREIGNKEY_GROUP_FIELDS[related_object.related_model].append(related_object.field.name)
-
-
-def pre_save(instance):
-    if type(instance) in FOREIGNKEY_GROUP_FIELDS:
-        values = type(instance).objects.filter(pk=instance.pk).values(
-            *FOREIGNKEY_GROUP_FIELDS[type(instance)]
-        )
-        setattr(instance, '_foreignkey_group_values', values.first() or {})
-
-
-def check_group_membership(instance, remove=False):
-    from slothy.api.models import Group
-    role_field_name = getattr(type(instance), '_metadata', {}).get('role_field_name')
-    if role_field_name:
-        group_name = instance.get_metadata('verbose_name')
-        group_lookup = instance.get_metadata('model_name')
-        group = Group.objects.get_or_create(name=group_name, lookup=group_lookup)[0]
-        if role_field_name == 'id':
-            user = instance
-        else:
-            user = getattr(instance, role_field_name)
-        if remove:
-            remove_lookup = {role_field_name: user}
-            if type(instance).objects.filter(**remove_lookup).count() == 1:
-                user.groups.remove(group)
-        else:
-            user.groups.add(group)
-
-
-def post_save(instance):
-    check_group_membership(instance)
-    if type(instance) in FOREIGNKEY_GROUP_FIELDS:
-        from slothy.api.models import Group
-        previous_values = getattr(instance, '_foreignkey_group_values')
-        for field_name in FOREIGNKEY_GROUP_FIELDS[type(instance)]:
-            field = instance.get_field(field_name)
-            user = getattr(instance, field_name)
-            group = Group.objects.get_or_create(
-                name=field.verbose_name,
-                lookup=field_name
-            )[0]
-            if user:
-                user.groups.add(group)
-            else:
-                previous_value = previous_values.get(field_name)
-                if previous_value:
-                    user = field.related_model.objects.filter(pk=previous_value).first()
-                    if user:
-                        lookup = {field_name: previous_value}
-                        if not type(instance).objects.filter(**lookup).exists():
-                            user.groups.remove(group)
-
-
-def pre_delete(instance):
-    check_group_membership(instance, remove=True)
-
-    if type(instance) in FOREIGNKEY_GROUP_FIELDS:
-        from slothy.api.models import Group
-        for field_name in FOREIGNKEY_GROUP_FIELDS[type(instance)]:
-            field = instance.get_field(field_name)
-            user = getattr(instance, field_name)
-            group = Group.objects.get_or_create(
-                name=field.verbose_name,
-                lookup=field_name
-            )[0]
-            if user:
-                lookup = {field_name: user.pk}
-                if type(instance).objects.filter(**lookup).count() == 1:
-                    user.groups.remove(group)
+def iterable(string_or_iterable):
+    if string_or_iterable is not None:
+        if type(string_or_iterable) not in (list, tuple):
+            return string_or_iterable,
+    return string_or_iterable
 
 
 def get_model(func):
@@ -121,6 +18,32 @@ def get_model(func):
         return apps.get_model(app_label, model_name)
     except LookupError:
         return None
+
+
+def get_link(func_or_class):
+    if inspect.isclass(func_or_class):
+        module_name = None
+        if hasattr(func_or_class, 'submit'):
+            module_name = 'forms'
+        elif hasattr(func_or_class, 'view'):
+            module_name = 'views'
+        elif hasattr(func_or_class, 'markdown'):
+            module_name = 'markdown'
+        url = '/api/{}/{}'.format(module_name, func_or_class.__name__.lower())
+        return dict(icon=None, url=url, label=None)
+    else:
+        func_name = func_or_class.__name__
+        metadata = getattr(func_or_class, '_metadata')
+        model = get_model(func_or_class)
+        return dict(
+            icon=metadata.get('icon') or model.get_metadata('icon'),
+            url='/api/{}/{}{}'.format(
+                model.get_metadata('app_label'),
+                model.get_metadata('model_name'),
+                '/{}'.format(func_name) if func_name != 'all' else ''
+            ),
+            label=metadata.get('verbose_name'),
+        )
 
 
 def getattrr(obj, args, request=None):

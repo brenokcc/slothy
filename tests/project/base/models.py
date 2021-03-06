@@ -173,8 +173,8 @@ class CidadeSet(models.Set):
 class Cidade(models.Model):
     nome = models.CharField(verbose_name='Nome', max_length=255)
     estado = models.ForeignKey(Estado, verbose_name='Estado', on_delete=models.CASCADE, filter_display=('nome', 'sigla'))
-    prefeito = models.RoleForeignKey('base.Pessoa', verbose_name='Prefeito', null=True, blank=True)
-    vereadores = models.RoleManyToManyField('base.Pessoa', verbose_name='Vereadores', blank=True, related_name='cidades_legisladas')
+    prefeito = models.ForeignKey('base.Pessoa', verbose_name='Prefeito', null=True, blank=True)
+    vereadores = models.ManyToManyField('base.Pessoa', verbose_name='Vereadores', blank=True, related_name='cidades_legisladas')
     pontos_turisticos = models.ManyToManyField('base.PontoTuristico', verbose_name='Pontos Turísticos', blank=True)
     localizacao = models.GeoLocationField(verbose_name='Localização', null=True, blank=True)
 
@@ -231,6 +231,10 @@ class Cidade(models.Model):
 
     @attr('Teste')
     def teste(self):
+        return self.values('get_dados_gerais', 'get_qtd_pontos_turisticos')
+
+    @attr('Teste 2', lookups=('presidente', 'governador__pessoa', 'self__prefeito', 'self__vereadores'))
+    def teste2(self):
         return self.values('get_dados_gerais', 'get_qtd_pontos_turisticos')
 
     # Dados Turísticos
@@ -356,7 +360,11 @@ class PessoaSet(models.Set):
     @dashboard.calendar()
     @attr('Pessoas Ativas', icon='people_alt')
     def all3(self):
-        return self.display('nome', 'email', 'foto')
+        return self.display('nome', 'email', 'foto').lookups(
+            'self__endereco__cidade__estado__governador__pessoa',
+            'self__endereco__cidade__prefeito', 'presidente',
+            'self__endereco__cidade__vereadores'
+        )
 
 
 class Pessoa(AbstractUser):
@@ -549,7 +557,7 @@ class GovernadorSet(models.Set):
 
 
 class Governador(models.Model):
-    pessoa = models.RoleField(Pessoa, verbose_name='Pessoa')
+    pessoa = models.ForeignKey(Pessoa, verbose_name='Pessoa')
     estado = models.ForeignKey(Estado, verbose_name='Estado')
 
     class Meta:

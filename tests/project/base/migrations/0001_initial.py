@@ -128,12 +128,12 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='cidade',
             name='prefeito',
-            field=slothy.db.models.fields.RoleForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL, verbose_name='Prefeito'),
+            field=slothy.db.models.fields.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL, verbose_name='Prefeito'),
         ),
         migrations.AddField(
             model_name='cidade',
             name='vereadores',
-            field=slothy.db.models.fields.RoleManyToManyField(blank=True, related_name='cidades_legisladas', to=settings.AUTH_USER_MODEL, verbose_name='Vereadores'),
+            field=slothy.db.models.fields.ManyToManyField(blank=True, related_name='cidades_legisladas', to=settings.AUTH_USER_MODEL, verbose_name='Vereadores'),
         ),
         migrations.AddField(
             model_name='pessoa',

@@ -27,6 +27,7 @@ class AbstractUser(six.with_metaclass(models.ModelBase, base_user.AbstractBaseUs
 
     password = models.CharField(verbose_name='Senha', null=True, blank=True, default='!', max_length=255)
     last_login = models.DateTimeField(verbose_name='Último Login', null=True, blank=True)
+    #is_superuser = models.BooleanField(verbose_name='Superusuário', default=False)
     groups = models.ManyToManyField(Group, verbose_name='Grupos', blank=True)
 
     class Meta:

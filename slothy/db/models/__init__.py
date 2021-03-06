@@ -134,10 +134,8 @@ class QuerySetStatistic(object):
         self.qs = self.qs.filter(**kwargs)
         return self
 
-    def apply_lookups(self, user, lookups=None):
+    def apply_lookups(self, user, lookups):
         self._clear()
-        if lookups is None:
-            lookups = self.qs.model.get_metadata('list_lookups')
         self.qs = self.qs.apply_lookups(user, lookups)
         return self
 
@@ -466,32 +464,39 @@ class QuerySet(query.QuerySet):
         self._lookups = lookups
         return self
 
-    def apply_lookups(self, user):
+    def apply_lookups(self, user, lookups=None):
         self._user = user
+        if lookups is None:
+            lookups = self._lookups
+
         if user.pk is None:
-            queryset = self.all()
-        elif self._lookups is ():
-            queryset = self.all()
+            return self
+        elif lookups == ():
+            return self
         else:
             filters = []
-            group_lookups = []
-            for lookup_key in self._lookups:
+            model_filters = {}
+            for lookup_key in lookups:
                 if lookup_key.startswith('self'):  # self or self__<attr>
                     if lookup_key == 'self':  # self
                         lookup_key = 'pk'
                     else:  # self__<attr>
                         lookup_key = lookup_key[6:]
-                    lookup = {lookup_key: user.pk}
-                    filters.append(Q(**lookup))
-                else:  # group
-                    group_lookups.append(lookup_key)
-            if group_lookups and user.groups.filter(lookup__in=group_lookups).exists():
-                queryset = self.all()
-            elif filters:
-                queryset = self.filter(reduce(operator.__or__, filters)).distinct()
-            else:
-                queryset = self.all()
-        return queryset
+                    filters.append(Q(**{lookup_key: user.pk}))
+                else:
+                    app_label = self.model.get_metadata('app_label')
+                    tokens = lookup_key.split('__')
+                    model = apps.get_model(app_label, tokens[0])
+                    lookup_key = len(tokens) > 1 and '__'.join(tokens[1:]) or 'pk'
+                    if model not in model_filters:
+                        model_filters[model] = []
+                    model_filters[model].append(Q(**{lookup_key: user.pk}))
+            for model in model_filters:
+                if model.objects.filter(reduce(operator.__or__, model_filters[model])).exists():
+                    return self
+            if filters:
+                return self.filter(reduce(operator.__or__, filters))
+        return self.none()
 
     def search(self, q):
         queryset = self.none()
@@ -597,6 +602,7 @@ class QuerySet(query.QuerySet):
 
                 action_metadata = getattr(action_func, '_metadata')
                 action_icon = action_metadata['icon']
+                action_condition = action_metadata['condition']
                 if action_metadata['name'] == 'add':
                     action_type = 'subset'
                 if action_type == 'instance':
@@ -605,9 +611,13 @@ class QuerySet(query.QuerySet):
                 action_label = self.model.get_verbose_name(lookup)
                 if action_metadata['name'] not in ('add', 'edit') and not action_metadata['params']:
                     action_params = False
+
             self._actions.append(
-                {'name': lookup, 'label': action_label, 'type': action_type,
-                 'icon': action_icon, 'url': action_url, 'params': action_params}
+                {
+                    'name': lookup, 'label': action_label, 'type': action_type,
+                    'icon': action_icon, 'url': action_url, 'params': action_params,
+                    'condition': action_condition
+                }
             )
         for lookup in self._list_display or ('id', '__str__'):
             self._display.append(
@@ -640,7 +650,9 @@ class QuerySet(query.QuerySet):
             actions = []
             for action in self._actions:
                 if action['type'] == 'instance':
-                    actions.append(action['name'])
+                    if obj.check_method_condition(action['name']):
+                        if obj.check_condition(action['condition']):
+                            actions.append(action['name'])
             item.append(actions)
             data.append(item)
 
@@ -794,43 +806,6 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             return queryset
         return value
 
-    def save(self, *args, **kwargs):
-        utils.pre_save(self)
-        super().save(*args, **kwargs)
-        utils.post_save(self)
-
-    def delete(self, *args, **kwargs):
-        utils.pre_delete(self)
-        super().delete(*args, **kwargs)
-
-    def satisfies(self, condition):
-        satisfied = True
-        if condition in ('can_add', 'can_edit', 'can_delete'):
-            attr = getattr(self, condition, None)
-            if attr:
-                satisfied = attr()
-        elif self.pk and condition:
-            attr_name = condition.replace('not ', '')
-            if hasattr(self, attr_name):  # model attribute or method
-                attr = getattr(self, attr_name)
-                if callable(attr):
-                    satisfied = attr()
-                else:
-                    satisfied = bool(attr)
-            else:  # manager subset method
-                qs = type(self).objects.all()
-                if hasattr(qs, attr_name):
-                    attr = getattr(qs, attr_name)
-                    satisfied = attr().filter(pk=self.pk).exists()
-                else:
-                    raise Exception(
-                        'The condition "{}" is invalid for "{}" because'
-                        'it is not an attribute or a method of {},'
-                        ' neither a method of its manager'.format(condition, self, type(self)))
-            if 'not ' in condition:
-                satisfied = not satisfied
-        return satisfied
-
     def serialize(self, *lookups):
         fieldsets = []
         displays = []
@@ -953,23 +928,58 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
 
         if user.pk is None:
             return True
-        elif not lookups:
+        elif lookups == ():
             return True
         else:
-            filters = []
-            group_lookups = []
+            filters = {}
             for lookup_key in lookups:
                 if lookup_key.startswith('self'):  # self or self__<attr>
+                    model = type(self)
                     if lookup_key == 'self':  # self
                         lookup_key = 'pk'
                     else:  # self__<attr>
                         lookup_key = lookup_key[6:]
-                    lookup = {lookup_key: user.pk}
-                    filters.append(Q(**lookup))
                 else:  # group
-                    group_lookups.append(lookup_key)
-            if group_lookups and user.groups.filter(lookup__in=group_lookups).exists():
-                return True
-            if filters and type(self).objects.filter(reduce(operator.__or__, filters)).exists():
-                return True
+                    app_label = self.get_metadata('app_label')
+                    tokens = lookup_key.split('__')
+                    model = apps.get_model(app_label, tokens[0])
+                    lookup_key = len(tokens) > 1 and '__'.join(tokens[1:]) or 'pk'
+                if model not in filters:
+                    filters[model] = []
+                filters[model].append(Q(**{lookup_key: user.pk}))
+            for model in filters:
+                if model.objects.filter(reduce(operator.__or__, filters[model])).exists():
+                    return True
         return False
+
+    def check_method_condition(self, method_name):
+        attrname = 'can_{}'.format(method_name)
+        if hasattr(self, attrname):
+            return getattr(self, attrname)()
+        return True
+
+    def check_condition(self, condition):
+        satisfied = True
+        if self.pk and condition:
+            model = type(self)
+            attr_name = condition.replace('not ', '')
+            # the method is defined in the model
+            if hasattr(self, attr_name):
+                attr = getattr(self, attr_name)
+                if callable(attr):
+                    satisfied = attr()
+                else:
+                    satisfied = bool(attr)
+            else:
+                # the method is defined in the manager as a subset
+                qs = model.objects.all()
+                if hasattr(qs, attr_name):
+                    attr = getattr(qs, attr_name)
+                    satisfied = attr().filter(pk=self.pk).exists()
+                else:
+                    raise Exception(
+                        'The condition "{}" is invalid for {} because it is not an attribute or a method of {},'
+                        ' neither a method of its manager'.format(condition, self, model))
+            if 'not ' in condition:
+                satisfied = not satisfied
+        return satisfied
