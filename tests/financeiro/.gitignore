@@ -1,0 +1,12 @@
+*.pyc
+.svn
+.DS_Store
+.DS_Store?
+._*
+*˜
+.idea/
+db.sqlite3
+.project
+.pydevproject
+media
+logs

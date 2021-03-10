@@ -132,7 +132,7 @@ class PessoaSet(models.Set):
     def all(self):
         return self.display(
             'foto', 'nome', 'email'
-        ).search_by('nome')
+        ).search('nome')
 
 
 class Pessoa(User):

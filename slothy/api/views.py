@@ -148,7 +148,6 @@ def postman(request):
 
 def api(request, service, path):
     auhtorization = request.headers.get('Authorization', '')
-    print(auhtorization)
     if auhtorization.startswith('Token'):
         token = auhtorization.split(' ')[-1]
         user_model = apps.get_model(settings.AUTH_USER_MODEL)
@@ -223,14 +222,20 @@ def api(request, service, path):
                             func = instance.view
                         else:
 
-                            if len(tokens) == 4:  # object subset, meta or action
-                                func = getattr(instance, tokens[3])  # object meta or action
-                                caller = dict(
-                                    app_label=tokens[0],
-                                    model_name=tokens[1],
-                                    id=tokens[2],
-                                    attr_name=tokens[3],
-                                )
+                            if len(tokens) == 4:  # object attr or action
+                                func = getattr(instance, tokens[3])
+                                metadata = getattr(func, '_metadata')
+                                if metadata['type'] in ('attr', 'attrs'):  # object attr
+                                    if metadata['type'] == 'attr':
+                                        def func():
+                                            return instance.serialize(tokens[3])
+                                    else:
+                                        def func():
+                                            tmp = instance.serialize(tokens[3])
+                                            tmp['data'] = tmp['data'][0]['data'][0]['data']
+                                            tmp['input']['tab'] = None
+                                            return tmp
+                                    setattr(func, '_metadata', metadata)
                             else:  # object relation (add or remove)
                                 qs = getattr(instance, tokens[3])()
 
@@ -310,15 +315,6 @@ def api(request, service, path):
                         output = func()
                         if output is None:
                             response = dict(type="message", text=metadata.get('message'))
-                        elif caller and metadata['type'] == 'attr':
-                            if isinstance(output, ValueSet) and output.nested:
-                                response = dict(type='object', name=str(instance), data=output)
-                            else:
-                                if isinstance(output, QuerySet):
-                                    setattr(output, '_caller', caller)
-                                fieldset = {metadata['verbose_name']: output.serialize() if hasattr(
-                                    output, 'serialize') else output}
-                                response = dict(type='object', name=str(instance), data=fieldset)
                         elif isinstance(output, QuerySet):
                             output = output.apply_lookups(request.user)
                             if metadata['name'] == 'all':

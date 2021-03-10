@@ -3,7 +3,7 @@ import datetime
 from slothy.db import models
 from slothy.regional.brasil.enderecos import models as enderecos
 from slothy.api.models import User
-from slothy.decorators import attr, action, param, fieldset, dashboard, fieldsets
+from slothy.decorators import attr, action, param, dashboard, fieldsets, attrs
 
 
 class Telefone(models.Model):
@@ -26,13 +26,13 @@ class EstadoSet(models.Set):
 
     @dashboard.shortcut()
     @dashboard.card()
-    @attr('Estados com Descrição', icon='map')
+    @attr('Estados', icon='map')
     def all(self):
         return self.display(
             'nome', 'cor'
-        ).filter_by(
+        ).filters(
             'ativo'
-        ).search_by(
+        ).search(
             'nome', 'sigla'
         ).subsets(
             'ativos', 'inativos'
@@ -41,7 +41,7 @@ class EstadoSet(models.Set):
         ).lookups(
             'presidente',
             'self__governador__pessoa'
-        ).allow(
+        ).actions(
             'add', 'edit', 'delete', 'view', 'ativar', 'inativar'
         )
 
@@ -49,11 +49,11 @@ class EstadoSet(models.Set):
     @attr('Ativos')
     def ativos(self):
         return self.filter(ativo=True).display('nome', 'sigla').lookups(
-            'presidente', 'self__governador__pessoa').allow('inativar', 'edit').search_by('sigla')
+            'presidente', 'self__governador__pessoa').actions('inativar', 'edit').search('sigla')
 
     @attr('Inativos')
     def inativos(self):
-        return self.filter(ativo=False).allow('ativar').search_by('sigla')
+        return self.filter(ativo=False).actions('ativar').search('sigla')
 
     @action('Ativar')
     def ativar_todos(self):
@@ -87,7 +87,7 @@ class EstadoSet(models.Set):
 
 class Estado(models.Model):
     nome = models.CharField(verbose_name='Nome', max_length=255)
-    sigla = models.CpfField(verbose_name='Sigla', max_length=255)
+    sigla = models.CharField(verbose_name='Sigla', max_length=255)
     ativo = models.BooleanField(verbose_name='Ativo', default=True)
     cor = models.ColorField(verbose_name='Cor', max_length=10, blank=True)
 
@@ -117,9 +117,9 @@ class Estado(models.Model):
 
     @action('Visualizar')
     def view(self):
-        return super().view()
+        return super().view('get_dados_gerais', 'get_cidades')
 
-    @fieldset('Dados Gerais')
+    @attr('Dados Gerais')
     def get_dados_gerais(self):
         return self.values(('nome', 'sigla', 'ativo'),)
 
@@ -127,9 +127,9 @@ class Estado(models.Model):
     def get_dados_populacionais(self):
         return self.values('get_populacao')
 
-    @fieldset('Cidades')
+    @attr('Cidades')
     def get_cidades(self):
-        return self.cidade_set.allow('add', 'remove')
+        return self.cidade_set.actions('add', 'remove')
 
     @action('Ativar')
     def ativar(self):
@@ -161,21 +161,21 @@ class CidadeSet(models.Set):
     @dashboard.shortcut()
     @attr('Cidades', lookups=('governador', 'prefeito', 'presidente'), icon='house')
     def all(self):
-        return self.filter_by(
+        return self.filters(
             'estado', 'prefeito', 'estado__ativo', 'vereadores'
         ).display(
             'get_dados_gerais'
         ).lookups(
             'self__estado__governador__pessoa', 'self__prefeito', 'presidente'
-        ).sort_by('nome', 'estado').allow('add', 'view', 'edit')
+        ).sort_by('nome', 'estado').actions('add', 'view', 'edit')
 
 
 class Cidade(models.Model):
     nome = models.CharField(verbose_name='Nome', max_length=255)
     estado = models.ForeignKey(Estado, verbose_name='Estado', on_delete=models.CASCADE, filter_display=('nome', 'sigla'))
-    prefeito = models.ForeignKey('base.Pessoa', verbose_name='Prefeito', null=True, blank=True)
-    vereadores = models.ManyToManyField('base.Pessoa', verbose_name='Vereadores', blank=True, related_name='cidades_legisladas')
-    pontos_turisticos = models.ManyToManyField('base.PontoTuristico', verbose_name='Pontos Turísticos', blank=True)
+    prefeito = models.ForeignKey('projeto.Pessoa', verbose_name='Prefeito', null=True, blank=True)
+    vereadores = models.ManyToManyField('projeto.Pessoa', verbose_name='Vereadores', blank=True, related_name='cidades_legisladas')
+    pontos_turisticos = models.ManyToManyField('projeto.PontoTuristico', verbose_name='Pontos Turísticos', blank=True)
     localizacao = models.GeoLocationField(verbose_name='Localização', null=True, blank=True)
 
     class Meta:
@@ -200,30 +200,26 @@ class Cidade(models.Model):
             prefeito=Pessoa.objects.filter(id__lt=3)
         )
 
-    @staticmethod
-    def add_initial():
-        return dict(nome='Rio Grande do Norte')
-
     @action('Editar')
     def edit(self):
         super().edit()
 
     @action('Visualizar')
     def view(self):
-        return super().view()
+        return super().view('get_dados_gerais', 'get_pontos_turisticos', 'get_localizacao', 'get_dados_administrativos', 'get_dados_turisticos', 'get_dados_estatisticos')
 
-    @fieldset('Dados Gerais')
+    @attr('Dados Gerais')
     def get_dados_gerais(self):
-        return self.values('nome', ('estado', 'get_qtd_pontos_turisticos')).allow('edit')
+        return self.values('nome', ('estado', 'get_qtd_pontos_turisticos')).actions('edit')
 
     # Dados Administrativos
-    @fieldsets('Dados Administrativos')
+    @attrs('Dados Administrativos')
     def get_dados_administrativos(self):
         return self.values('get_prefeito', 'get_vereadores')
 
     @attr('Prefeito')
     def get_prefeito(self):
-        return self.values('prefeito__nome', 'prefeito__email').allow('set_prefeito')
+        return self.values('prefeito__nome', 'prefeito__email').actions('set_prefeito')
 
     @attr('Vereadores')
     def get_vereadores(self):
@@ -231,14 +227,14 @@ class Cidade(models.Model):
 
     @attr('Teste')
     def teste(self):
-        return self.values('get_dados_gerais', 'get_qtd_pontos_turisticos')
+        return self.values('get_dados_gerais', 'get_qtd_pontos_turisticos', 'get_localizacao')
 
     @attr('Teste 2', lookups=('presidente', 'governador__pessoa', 'self__prefeito', 'self__vereadores'))
     def teste2(self):
         return self.values('get_dados_gerais', 'get_qtd_pontos_turisticos')
 
     # Dados Turísticos
-    @fieldsets('Dados Turísticos')
+    @attrs('Dados Turísticos')
     def get_dados_turisticos(self):
         return self.values('get_qtd_pontos_turisticos', 'get_pontos_turisticos')
 
@@ -246,12 +242,12 @@ class Cidade(models.Model):
     def get_qtd_pontos_turisticos(self):
         return self.pontos_turisticos.count()
 
-    @fieldset('Pontos Turísticos')
+    @attr('Pontos Turísticos')
     def get_pontos_turisticos(self):
-        return self.pontos_turisticos.display('nome').allow('add', 'remove')
+        return self.pontos_turisticos.display('nome').actions('add', 'remove')
 
     # Dados Estatísticos
-    @fieldsets('Dados Estatísticos')
+    @attrs('Dados Estatísticos')
     def get_dados_estatisticos(self):
         return self.values('get_estatisticas')
 
@@ -262,8 +258,9 @@ class Cidade(models.Model):
             'População Adulta': 9389332
         }
 
-    @fieldset('Localização')
+    @attr('Localização')
     def get_localizacao(self):
+        print(self.localizacao)
         return self.localizacao
 
     @action('Definir Prefeito')
@@ -277,7 +274,7 @@ class MunicipioSet(models.Set):
     @dashboard.card()
     @attr('Municípios')
     def all(self):
-        return self.display('nome', 'estado', 'codigo').search_by('nome')
+        return self.display('nome', 'estado', 'codigo').search('nome')
 
     # @dashboard.center(formatter='rnmap')
     @attr('Geolocalizados', icon='map')
@@ -350,7 +347,7 @@ class PessoaSet(models.Set):
     @dashboard.calendar()
     @attr('Pessoas', icon='people_alt')
     def all(self):
-        return self.display('nome').allow('add', 'view')
+        return self.display('nome').actions('add', 'view')
 
     @dashboard.calendar()
     @attr('Pessoas Inativas', icon='people_alt')
@@ -370,7 +367,7 @@ class PessoaSet(models.Set):
 class Pessoa(User):
 
     nome = models.CharField(verbose_name='Nome', max_length=255)
-    email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255, is_username=True)
+    email = models.EmailField(verbose_name='E-mail', unique=True, max_length=255)
     foto = models.ImageField(verbose_name='Foto', null=True, blank=True, upload_to='fotos')
 
     endereco = models.OneToOneField(Endereco, verbose_name='Endereço', null=True, blank=True)
@@ -392,6 +389,7 @@ class Pessoa(User):
         'Telefones': 'telefones'
     })
     def add(self):
+        self.username = self.email
         super().add()
 
     @action('Editar')
@@ -404,15 +402,15 @@ class Pessoa(User):
 
     @action('Visualizar')
     def view(self):
-        return super().view()
+        return super().view('get_dados_gerais', 'get_dados_acesso')
 
-    @fieldset('Dados Gerais')
+    @attr('Dados Gerais')
     def get_dados_gerais(self):
         return self.values('nome', ('email', 'foto'))
 
-    @fieldset('Dados de Acesso')
+    @attr('Dados de Acesso')
     def get_dados_acesso(self):
-        return self.values(('last_login', 'get_senha'), 'groups')
+        return self.values(('last_login', 'get_senha'),)
 
     @attr('Grupos')
     def get_grupos(self):
@@ -446,7 +444,7 @@ class PontoTuristicoSet(models.Set):
     @dashboard.floating()
     @attr('Pontos Turísticos', icon='wb_sunny')
     def all(self):
-        return super().display('foto', 'nome').search_by('nome').order_by('nome').allow(
+        return super().display('foto', 'nome').search('nome').order_by('nome').actions(
             'add', 'edit', 'delete', 'teste2', 'view'
         )
 
@@ -473,7 +471,7 @@ class PontoTuristicoSet(models.Set):
     def teste(self, data):
         print(self.count(), data)
 
-    @dashboard.center()
+    @dashboard.shortcut()
     @attr('Total por Cidade', icon='pie_chart')
     def total_por_cidade(self):
         return self.count('cidade')
@@ -490,6 +488,7 @@ class PontoTuristico(models.Model):
     ativo = models.BooleanField(verbose_name='Ativo', default=True)
 
     class Meta:
+        icon = 'wb_sunny'
         verbose_name = 'Ponto Turístico'
         verbose_name_plural = 'Pontos Turísticos'
 
@@ -498,7 +497,7 @@ class PontoTuristico(models.Model):
 
     @action('Visualizar')
     def view(self):
-        return super().view()
+        return super().view('get_dados_gerais', 'get_x', 'get_y')
 
     @action('Cadastrar')
     def add(self):
@@ -508,7 +507,7 @@ class PontoTuristico(models.Model):
     def edit(self):
         super().edit()
 
-    @fieldset('Dados Gerais')
+    @attr('Dados Gerais')
     def get_dados_gerais(self):
         return self.values('nome', 'ativo')
 
@@ -532,6 +531,18 @@ class PontoTuristico(models.Model):
     @param(data=models.DateField('Data'))
     def teste2(self, data):
         print(self.id, data)
+
+    @attr('Status')
+    def get_status(self):
+        return self.values('ativo')
+
+    @attrs('Tab X')
+    def get_x(self):
+        return self.values('get_dados_gerais', 'get_status')
+
+    @attrs('Tab Y')
+    def get_y(self):
+        return self.values('get_status')
 
 
 class PresidenteSet(models.Set):

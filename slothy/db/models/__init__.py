@@ -164,9 +164,10 @@ class ValueSet(dict):
     def __init__(self, obj, *lookups, verbose=True, detail=False):
         self.obj = obj
         self.thumbnail = None
-        self.actions = []
+        self.action_list = []
         self.nested_keys = []
         self.nested = False
+        self.verbose_names = {}
         super().__init__()
         _values = []
         for lookup in lookups:
@@ -193,15 +194,16 @@ class ValueSet(dict):
                             model_name=type(obj).get_metadata('model_name')
                         )
                         setattr(value, '_caller', caller)
-                self[verbose_name] = value
-                keys.append(verbose_name)
+                self[attr_name] = value
+                self.verbose_names[attr_name] = verbose_name
+                keys.append(attr_name)
             self.nested_keys.append(keys)
 
     def thumbnail(self, lookup):
         self.thumbnail = getattr(self.obj, lookup)
         return self
 
-    def allow(self, *lookups):
+    def actions(self, *lookups):
         model = type(self.obj)
         for lookup in lookups:
             action_func = getattr(model, lookup)
@@ -214,7 +216,7 @@ class ValueSet(dict):
                 model.get_metadata('model_name'),
                 self.obj.pk, lookup
             )
-            self.actions.append(
+            self.action_list.append(
                 {'name': lookup, 'label': action_verbose_name, 'icon': action_icon, 'params': action_params, 'url': action_url}
             )
         return self
@@ -234,7 +236,7 @@ class ValueSet(dict):
         serialized = []
         for name, value in self.items():
             value = utils.serialize(value, True)
-            serialized.append(dict(type='fieldset', name=name, data=value))
+            serialized.append(dict(type='fieldset', name=name, label=self.verbose_names[name], data=value))
         return serialized
 
 
@@ -268,6 +270,13 @@ class QuerySet(query.QuerySet):
         self._iterable_class = ModelIterable
         self._lookups = ()
         self._caller = None
+        self._applied = False
+
+    # def _fetch_all(self):
+    #     print(999)
+    #     if not self._applied and self._user:
+    #         qs = self.apply_lookups()
+    #     return super()._fetch_all()
 
     def filter(self, *args, **kwargs):
         low_mark = self.query.low_mark
@@ -290,7 +299,7 @@ class QuerySet(query.QuerySet):
             self._list_display.append(lookup)
         return self
 
-    def filter_by(self, *list_filter):
+    def filters(self, *list_filter):
         self._list_filter = list_filter
         return self
 
@@ -308,7 +317,7 @@ class QuerySet(query.QuerySet):
             self._list_subsets = self.model.get_metadata('list_subsets')
         return self._list_subsets
 
-    def allow(self, *list_actions):
+    def actions(self, *list_actions):
         self._list_actions = list_actions
         return self
 
@@ -327,9 +336,21 @@ class QuerySet(query.QuerySet):
     def get_page_size(self):
         return self._page_size
 
-    def search_by(self, *search_fields):
-        self._list_search = search_fields
-        return self
+    def search(self, *search_fields, q=None):
+        if search_fields:
+            self._list_search = search_fields
+        if q is None:
+            return self
+        else:
+            search_fields = self._list_search
+            queryset = self.none()
+            if not search_fields:
+                local_fields = self.model.get_metadata('local_fields')
+                search_fields = [field.name for field in local_fields if field.__class__.__name__ == 'CharField']
+            for search_field in search_fields:
+                queryset = queryset | self.filter(**{'{}__icontains'.format(search_field): q})
+            return queryset
+
 
     def get_list_search(self):
         return self._list_search
@@ -500,16 +521,6 @@ class QuerySet(query.QuerySet):
                 return self.filter(reduce(operator.__or__, filters))
         return self.none()
 
-    def search(self, q):
-        queryset = self.none()
-        search_fields = self._list_search
-        if not search_fields:
-            local_fields = self.model.get_metadata('local_fields')
-            search_fields = [field.name for field in local_fields if field.__class__.__name__ == 'CharField']
-        for search_field in search_fields:
-            queryset = queryset | self.filter(**{'{}__icontains'.format(search_field): q})
-        return queryset
-
     def dump_query(self):
         return signing.dumps(base64.b64encode(zlib.compress(cpickle.dumps(self.query))).decode())
 
@@ -633,7 +644,7 @@ class QuerySet(query.QuerySet):
             qs = self
 
         if self._q:
-            qs = qs.search(self._q)
+            qs = qs.search(q=self._q)
 
         if self._sorter:
             qs = qs.order_by(self._sorter)
@@ -782,60 +793,50 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             queryset = value.get_queryset()
             queryset._related_manager = value
             queryset._related_attribute = item
+            queryset._caller = dict(
+                app_label=self.get_metadata('app_label'),
+                model_name=self.get_metadata('model_name'),
+                id=self.id,
+                attr_name=item,
+            )
             return queryset
         return value
 
     def serialize(self, *lookups):
         fieldsets = []
-        displays = []
-        default_display = None
-        data = dict(fieldset=[], tab=[], shortcut=[], card=[], top=[], left=[], center=[], right=[], bottom=[])
-        for attr_name in dir(self):
-            if attr_name.startswith('get'):
-                attr = getattr(self, attr_name)
-                if hasattr(attr, '__page'):
-                    item = getattr(attr, '__page')
-                    if item['key'] == 'tab':
-                        if not displays:
-                            default_display = item['verbose_name']
-                        displays.append(item)
-                    else:
-                        fieldsets.append(item)
-                    data[item['key']].append(item)
+        tabs = []
+        tab = getattr(self, '_current_display_name', None)
+        for attr_name in lookups:
+            attr = getattr(self, attr_name)
+            metadata = getattr(attr, '_metadata')
+            if metadata['type'] == 'attrs':
+                if tab is None:
+                    tab = metadata['name']
+                if attr_name == tab:
+                    tab_data = attr().serialize()
+                else:
+                    tab_data = []
+                tabs.append(dict(type='tab', name=attr_name, label=metadata['verbose_name'], data=tab_data))
+            elif metadata['type'] == 'attr':
+                fieldsets.append(attr_name)
 
-        fieldsets = sorted(fieldsets, key=lambda tmp: tmp['order'])
-
-        current_display_name = getattr(self, '_current_display_name', None)
-        if current_display_name is None:
-            current_display_name = default_display
-
-        dimensions = {}
-        for item in displays:
-            if item['verbose_name'] == current_display_name:
-                dimensions[item['verbose_name']] = getattr(self, item['name'])().serialize()
-            else:
-                dimensions[item['verbose_name']] = []
-
-        if not fieldsets:
-            fieldsets.append(dict(name='default_viewset'))
-        fieldset_names = []
-        for item in fieldsets:
-            fieldset_names.append(item['name'])
+        data = self.values(*fieldsets, verbose=True, detail=True).serialize()
+        if tabs:
+            data.append(dict(type='tabs', data=tabs))
         serialized = dict(
             type='object',
             name=str(self),
             icon=self.get_metadata('icon'),
-            input=dict(dimension=current_display_name),
-            data=self.values(*fieldset_names, verbose=True, detail=True).serialize(),
-            dimensions=dimensions
+            input=dict(tab=tab),
+            data=data
         )
         return serialized
 
     def values(self, *lookups, verbose=True, detail=False):
         return ValueSet(self, *lookups, verbose=verbose, detail=detail)
 
-    def view(self, *lookups):
-        return self.serialize(*lookups)
+    def view(self, *fieldsets):
+        return self.serialize(*fieldsets)
 
     def add(self):
         self.save()

@@ -96,7 +96,7 @@ def serialize(obj, detail=False):
             return ', '.join((str(instance) for instance in obj)) or None
     elif isinstance(obj, ValueSet):
         if detail:
-            return dict(type='valueset', fields=obj.get_nested_values(), actions=obj.actions)
+            return dict(type='valueset', fields=obj.get_nested_values(), actions=obj.action_list)
         else:
             for key in obj:
                 obj[key] = serialize(obj[key], detail=False)

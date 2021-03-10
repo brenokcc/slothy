@@ -31,7 +31,7 @@ def attr(verbose_name, condition=None, formatter=None, lookups=(), icon=None):
     return decorate
 
 
-def fieldset(verbose_name, condition=None, formatter=None, lookups=(), icon=None):
+def attrs(verbose_name, condition=None, formatter=None, lookups=(), icon=None):
     def decorate(func):
         global order
         order += 1
@@ -41,7 +41,7 @@ def fieldset(verbose_name, condition=None, formatter=None, lookups=(), icon=None
         metadata.update(
             name=func.__name__,
             params=params,
-            type='attr',
+            type='attrs',
             verbose_name=verbose_name,
             condition=condition,
             icon=icon,
@@ -50,7 +50,6 @@ def fieldset(verbose_name, condition=None, formatter=None, lookups=(), icon=None
             order=order,
         )
         setattr(func, '_metadata', metadata)
-        setdata('fieldset', func, lookups)
         return func
 
     return decorate
@@ -115,39 +114,22 @@ def param(**kwargs):
     return decorate
 
 
-def setdata(key, func, lookups, formatter=None):
-    global order
-    order += 1
-    verbose_name = getattr(func, '_metadata', {}).get('verbose_name')
-    data = dict(
-        key=key, verbose_name=verbose_name, name=func.__name__, func=func,
-        lookups=lookups, formatter=formatter, order=order
-    )
-    setattr(func, '__page', data)
-
-
 def fieldsets(data):
     def decorate(func):
-        if isinstance(data, dict):
-            metadata = getattr(func, '_metadata', {})
-            _fieldsets = {}
-            for verbose_name, str_or_tuples in data.items():
-                _fieldsets[verbose_name] = []
-                if isinstance(str_or_tuples, str):  # sigle field
-                    _fieldsets[verbose_name].append((str_or_tuples,))
-                else:  # multiple fields
-                    for str_or_tuple in str_or_tuples:
-                        if isinstance(str_or_tuple, str):  # string
-                            _fieldsets[verbose_name].append((str_or_tuple,))
-                        else:  # tuple
-                            _fieldsets[verbose_name].append(str_or_tuple)
-            metadata.update(fieldsets=_fieldsets)
-            setattr(func, '_metadata', metadata)
-        else:
-            metadata = getattr(func, '_metadata', {})
-            metadata.update(verbose_name=data)
-            setattr(func, '_metadata', metadata)
-            setdata('tab', func, None)
+        metadata = getattr(func, '_metadata', {})
+        _fieldsets = {}
+        for verbose_name, str_or_tuples in data.items():
+            _fieldsets[verbose_name] = []
+            if isinstance(str_or_tuples, str):  # sigle field
+                _fieldsets[verbose_name].append((str_or_tuples,))
+            else:  # multiple fields
+                for str_or_tuple in str_or_tuples:
+                    if isinstance(str_or_tuple, str):  # string
+                        _fieldsets[verbose_name].append((str_or_tuple,))
+                    else:  # tuple
+                        _fieldsets[verbose_name].append(str_or_tuple)
+        metadata.update(fieldsets=_fieldsets)
+        setattr(func, '_metadata', metadata)
         return func
 
     return decorate

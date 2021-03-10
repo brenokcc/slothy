@@ -1,6 +1,5 @@
 from django.test import TestCase
-from base.models import Pessoa, Estado, Cidade, PontoTuristico, Presidente, Governador, Telefone, Endereco
-from slothy.api.models import Group
+from .models import Pessoa, Estado, Cidade, PontoTuristico, Presidente, Governador, Telefone, Endereco
 import json
 
 # /queryset
@@ -10,22 +9,22 @@ import json
 # /login
 # /logout
 
-# /base/estado
-# /base/estado/ativos
-# /base/estado/inativar
-# /base/estado/inativar_todos
-# /base/estado/<id>/view
-# /base/estado/<id>/edit
-# /base/estado/<id>/delete
-# /base/estado/<id>/altualizar_sigla
-# /base/estado/<id>/get_cidades
-# /base/estado/<id>/get_cidades/add
-# /base/estado/<id>/get_cidades/remove
-# /base/estado/<id>/get_pontos_turisticos/add
-# /base/estado/<id>/get_pontos_turisticos/remove
+# /projeto/estado
+# /projeto/estado/ativos
+# /projeto/estado/inativar
+# /projeto/estado/inativar_todos
+# /projeto/estado/<id>/view
+# /projeto/estado/<id>/edit
+# /projeto/estado/<id>/delete
+# /projeto/estado/<id>/altualizar_sigla
+# /projeto/estado/<id>/get_cidades
+# /projeto/estado/<id>/get_cidades/add
+# /projeto/estado/<id>/get_cidades/remove
+# /projeto/estado/<id>/get_pontos_turisticos/add
+# /projeto/estado/<id>/get_pontos_turisticos/remove
 
 # curl -H "Content-Type: application/json" -X POST http://localhost:8000/api/login/ -d '{"username": "brenokcc@yahoo.com.br", "password": "senha"}'
-# curl -H "Content-Type: application/json" -H "Authorization: Token 3853ded71e2cb8299a1e1c7e45c4722a787a45e9" -X GET http://localhost:8000/api/base/estado/
+# curl -H "Content-Type: application/json" -H "Authorization: Token 3853ded71e2cb8299a1e1c7e45c4722a787a45e9" -X GET http://localhost:8000/api/projeto/estado/
 
 
 
@@ -34,9 +33,6 @@ def log(response):
 
 
 class MainTestCase(TestCase):
-
-    def setUp(self):
-        Group.objects.all().delete()
 
     def get(self, url, data=None):
         data = json.dumps(data) if data is not None else None
@@ -84,7 +80,8 @@ class MainTestCase(TestCase):
         self.assertTrue(1)
 
     def test_login(self):
-        pessoa = Pessoa.objects.create(nome='Carlos Breno', email='brenokcc@yahoo.com.br')
+        pessoa = Pessoa(nome='Carlos Breno', email='brenokcc@yahoo.com.br')
+        pessoa.add()
         pessoa.alterar_senha('senha')
         # getting the metadata
         r = self.get('/api/login')
@@ -111,86 +108,86 @@ class MainTestCase(TestCase):
     def test_api(self):
         data = dict(nome='Parque do Povo')
         # add
-        r = self.post('/api/base/pontoturistico/add/', data=data)
+        r = self.post('/api/projeto/pontoturistico/add/', data=data)
         self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
         self.assertEqual(PontoTuristico.objects.count(), 1)
         # list
-        r = self.get('/api/base/pontoturistico/')
+        r = self.get('/api/projeto/pontoturistico/')
         self.assertEqual(len(r['data']), 1)
         # view
-        r = self.get('/api/base/pontoturistico/1/')
-        self.assertIn([{'Nome': 'Parque do Povo'}], r['data'][0]['data']['fields'])
+        r = self.get('/api/projeto/pontoturistico/1/')
+        self.assertIn([{'nome': 'Parque do Povo'}], r['data'][0]['data']['fields'])
         # edit
         data = dict(nome='Parque da Cidade')
-        r = self.post('/api/base/pontoturistico/1/edit/', data=data)
+        r = self.post('/api/projeto/pontoturistico/1/edit/', data=data)
         self.assertEqual(r, dict(type='message', text='Edição realizada com sucesso'))
-        r = self.get('/api/base/pontoturistico/1/')
-        self.assertIn([{'Nome': 'Parque da Cidade'}], r['data'][0]['data']['fields'])
+        r = self.get('/api/projeto/pontoturistico/1/')
+        self.assertIn([{'nome': 'Parque da Cidade'}], r['data'][0]['data']['fields'])
         self.assertEqual(PontoTuristico.objects.count(), 1)
         # validation error
         data = dict(nome='Parque da Cidade')
-        r = self.post('/api/base/pontoturistico/1/atualizar_nome/', data=data)
+        r = self.post('/api/projeto/pontoturistico/1/atualizar_nome/', data=data)
         self.assertEqual(r, dict(type='error', text='Período de edição ainda não está aberto', errors=[]))
         # delete
-        r = self.post('/api/base/pontoturistico/1/delete/')
+        r = self.post('/api/projeto/pontoturistico/1/delete/')
         self.assertEqual(r, dict(type='message', text='Exclusão realizada com sucesso'))
         self.assertEqual(PontoTuristico.objects.count(), 0)
 
         # one-to-many (add)
         data = dict(nome='Rio Grande do Norte', sigla='RN')
-        r = self.post('/api/base/estado/add/', data=data)
+        r = self.post('/api/projeto/estado/add/', data=data)
         self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
-        r = self.get('/api/base/estado/1/get_cidades/')
-        self.assertEqual(r['data']['Cidades']['total'], 0)
+        r = self.get('/api/projeto/estado/1/get_cidades/')
+        self.assertEqual(r['data'][0]['data']['total'], 0)
         data = dict(nome='Natal')
-        r = self.post('/api/base/estado/1/get_cidades/add/', data=data)
+        r = self.post('/api/projeto/estado/1/get_cidades/add/', data=data)
         self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
-        r = self.get('/api/base/estado/1/get_cidades/')
-        self.assertEqual(r['data']['Cidades']['total'], 1)
+        r = self.get('/api/projeto/estado/1/get_cidades/')
+        self.assertEqual(r['data'][0]['data']['total'], 1)
 
         # many-to-many (add)
         data = dict(nome='Morro do Careca')
-        r = self.post('/api/base/pontoturistico/add/', data=data)
+        r = self.post('/api/projeto/pontoturistico/add/', data=data)
         self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
-        r = self.get('/api/base/pontoturistico/')
+        r = self.get('/api/projeto/pontoturistico/')
         pk = r['data'][0][0]
-        r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
-        self.assertEqual(r['data']['Pontos Turísticos']['total'], 0)
+        r = self.get('/api/projeto/cidade/1/get_pontos_turisticos/')
+        self.assertEqual(r['data'][0]['data']['total'], 0)
         data = dict(ids=[pk])
-        r = self.post('/api/base/cidade/1/get_pontos_turisticos/add/', data=data)
+        r = self.post('/api/projeto/cidade/1/get_pontos_turisticos/add/', data=data)
         self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
-        r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
-        self.assertEqual(r['data']['Pontos Turísticos']['total'], 1)
+        r = self.get('/api/projeto/cidade/1/get_pontos_turisticos/')
+        self.assertEqual(r['data'][0]['data']['total'], 1)
 
         # many-to-many (remove)
-        r = self.post('/api/base/cidade/1/get_pontos_turisticos/remove/{}'.format(pk))
+        r = self.post('/api/projeto/cidade/1/get_pontos_turisticos/remove/{}'.format(pk))
         self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
-        r = self.get('/api/base/cidade/1/get_pontos_turisticos/')
-        self.assertEqual(r['data']['Pontos Turísticos']['total'], 0)
+        r = self.get('/api/projeto/cidade/1/get_pontos_turisticos/')
+        self.assertEqual(r['data'][0]['data']['total'], 0)
 
         # one-to-many (remove)
-        r = self.get('/api/base/estado/1/get_cidades/')
-        pk = r['data']['Cidades']['data'][0][0]
-        r = self.post('/api/base/estado/1/get_cidades/remove/{}'.format(pk))
+        r = self.get('/api/projeto/estado/1/get_cidades/')
+        pk = r['data'][0]['data']['data'][0][0]
+        r = self.post('/api/projeto/estado/1/get_cidades/remove/{}'.format(pk))
         self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
-        r = self.get('/api/base/estado/1/get_cidades/')
-        self.assertEqual(r['data']['Cidades']['total'], 0)
+        r = self.get('/api/projeto/estado/1/get_cidades/')
+        self.assertEqual(r['data'][0]['data']['total'], 0)
 
         # many-to-many (reverse)
         sp = Estado.objects.create(nome='São Paulo', sigla='SP')
         guarulhos = Cidade.objects.create(nome='Guarulhos', estado=sp)
         data = dict(ids=[guarulhos.pk])
-        r = self.post('/api/base/pontoturistico/2/get_cidades/add/', data=data)
+        r = self.post('/api/projeto/pontoturistico/2/get_cidades/add/', data=data)
         self.assertEqual(r, dict(type='message', text='Ação realizada com sucesso'))
-        r = self.get('/api/base/pontoturistico/2/get_cidades/')
-        self.assertEqual(r['data']['Cidades']['total'], 1)
+        r = self.get('/api/projeto/pontoturistico/2/get_cidades/')
+        self.assertEqual(r['data'][0]['data']['total'], 1)
 
     def test_queryset(self):
         estado = Estado(nome='Rio Grande do Norte', sigla='RN')
         estado.add()
         estado.get_cidades().add(Cidade(nome='Macaíba'))
         estado.get_cidades().add(Cidade(nome='Natal'))
-        response = self.get('/api/base/cidade/')
+        response = self.get('/api/projeto/cidade/')
         response['input']['q'] = 'Maca'
         search_response = self.post(
             response['path'],
@@ -202,9 +199,12 @@ class MainTestCase(TestCase):
 
     def test_lookups(self):
         bolsonaro = Presidente.objects.create(nome='Jair Bolsonaro')
-        fatima = Pessoa.objects.create(nome='Fátima', email='fatima@mail.com')
-        alvaro_dias = Pessoa.objects.create(nome='Álvaro Dias', email='alvaro@mail.com')
-        kelps = Pessoa.objects.create(nome='Kelps', email='kelps@mail.com')
+        fatima = Pessoa(nome='Fátima', email='fatima@mail.com')
+        fatima.add()
+        alvaro_dias = Pessoa(nome='Álvaro Dias', email='alvaro@mail.com')
+        alvaro_dias.add()
+        kelps = Pessoa(nome='Kelps', email='kelps@mail.com')
+        kelps.add()
 
         rn = Estado.objects.create(nome='Rio Grande do Norte', sigla='RN')
         sp = Estado.objects.create(nome='São Paulo', sigla='SP')
@@ -218,14 +218,13 @@ class MainTestCase(TestCase):
         Cidade.objects.create(nome='Guarulhos', estado=sp)
 
         endereco = Endereco.objects.create(logradouro='Centro', numero=1, cidade=parnamirim)
-        Pessoa.objects.create(nome='Fulano', email='fulano@mail.com', endereco=endereco)
+        Pessoa(nome='Fulano', email='fulano@mail.com', endereco=endereco).add()
 
         endereco = Endereco.objects.create(logradouro='Centro', numero=1, cidade=natal)
-        Pessoa.objects.create(nome='Beltrano', email='beltrano@mail.com', endereco=endereco)
+        Pessoa(nome='Beltrano', email='beltrano@mail.com', endereco=endereco).add()
 
         endereco = Endereco.objects.create(logradouro='Centro', numero=1, cidade=sao_paulo)
-        Pessoa.objects.create(nome='Cicrano', email='cicrano@mail.com', endereco=endereco)
-
+        Pessoa(nome='Cicrano', email='cicrano@mail.com', endereco=endereco).add()
 
         # states
         self.assertEqual(Estado.objects.all().apply_lookups(bolsonaro).count(), 2)
@@ -260,22 +259,24 @@ class MainTestCase(TestCase):
             dict(ddd=84, numero='')
         ]
         data = dict(nome='Carlos Breno', email='brenokcc@yahoo.com.br', telefones=telefones)
-        r = self.post('/api/base/pessoa/add/', data=data)
+        r = self.post('/api/projeto/pessoa/add/', data=data)
         self.assertIsNone(Pessoa.objects.first())
         error = dict(field='numero', message='Este campo é obrigatório.', one_to_many='telefones', index=1)
         self.assertEqual(r['text'], 'Por favor, corriga os erros abaixo')
         self.assertIn(error, r['errors'])
         telefones[1]['numero'] = '3272-3898'
-        r = self.post('/api/base/pessoa/add/', data=data)
+        r = self.post('/api/projeto/pessoa/add/', data=data)
         self.assertIsNotNone(Pessoa.objects.first())
         self.assertEqual(Telefone.objects.count(), 2)
         self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
 
     def test_many_to_many(self):
         rn = Estado.objects.create(nome='Rio Grande do Norte', sigla='RN')
-        va = Pessoa.objects.create(nome='Vereador A', email='va@mail.com')
-        vb = Pessoa.objects.create(nome='Vereador B', email='vb@mail.com')
+        va = Pessoa(nome='Vereador A', email='va@mail.com')
+        va.add()
+        vb = Pessoa(nome='Vereador B', email='vb@mail.com')
+        vb.add()
         data = dict(nome='Natal', estado=rn.pk, prefeito=None, vereadores=[va.pk, vb.pk])
-        r = self.post('/api/base/cidade/add/', data=data)
+        r = self.post('/api/projeto/cidade/add/', data=data)
         self.assertEqual(r, dict(type='message', text='Cadastro realizado com sucesso'))
         self.assertEqual(Cidade.objects.first().vereadores.count(), 2)
