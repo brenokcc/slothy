@@ -2,28 +2,20 @@
 from slothy.db import models
 from datetime import date
 from slothy.api.models import User
-from slothy.decorators import attr, action, fieldset, dashboard, fieldsets
+from slothy.decorators import attr, action, dashboard, fieldsets
 
 
 class PessoaSet(models.Set):
 
     @attr('Pessoas')
     def all(self):
-        return self.display('foto', 'nome', 'email').search('nome')
-
-    @staticmethod
-    def create_superuser():
-        pessoa = Pessoa.objects.create(
-            nome='Breno', email='brenokcc@yahoo.com.br'
-        )
-        pessoa.alterar_senha('senha')
+        return self.display('nome', 'email').search('nome')
 
 
 class Pessoa(User):
 
     nome = models.CharField(verbose_name='Nome')
     email = models.EmailField(verbose_name='E-mail', unique=True)
-    foto = models.ImageField(verbose_name='Foto', null=True, blank=True, upload_to='fotos')
 
     class Meta:
         verbose_name = 'Pessoa'
@@ -33,12 +25,11 @@ class Pessoa(User):
         return self.nome
 
     @dashboard.public()
-    @fieldsets({'Dados Gerais': ('nome', ('email', 'foto'))})
+    @fieldsets({'Dados Gerais': ('nome', 'email')})
     @action('Cadastrar')
     def add(self):
         self.username = self.email
-        super().add()
-        super().change_password('123')
+        super().change_password('senha')
 
     @action('Editar')
     def edit(self):
@@ -56,18 +47,14 @@ class Pessoa(User):
     def alterar_senha(self, senha):
         super().change_password(senha)
 
-    @fieldset('Dados Gerais')
+    @attr('Dados Gerais')
     def get_dados_gerais(self):
-        return self.values('nome', ('email', 'foto'))
-
-    @fieldset('Dados de Acesso')
-    def get_dados_acesso(self):
-        return self.values('nome', ('last_login', 'password'))
+        return self.values('nome', 'email')
 
 
 class TipoReceitaSet(models.Set):
     @dashboard.card()
-    @attr('Tipos de Receita', icon='attach_money')
+    @attr('Tipos de Receita Padrão', icon='attach_money')
     def all(self):
         return self.actions('add', 'edit', 'delete')
 
@@ -101,9 +88,45 @@ class TipoReceita(models.Model):
         return super().view()
 
 
+class TipoReceitaPessoalSet(models.Set):
+    @dashboard.card()
+    @attr('Tipos de Receita', lookups='pessoa')
+    def all(self):
+        return self.search('descricao').actions('add', 'edit', 'delete')
+
+
+class TipoReceitaPessoal(TipoReceita):
+
+    pessoa = models.ForeignKey(Pessoa, verbose_name='Pessoa', exclude='self')
+
+    class Meta:
+        icon = 'attach_money'
+        verbose_name = 'Tipo de Despesa'
+        verbose_name_plural = 'Tipos de Despesa'
+
+    def __str__(self):
+        return self.descricao
+
+    @action('Cadastrar')
+    def add(self):
+        super().add()
+
+    @action('Editar')
+    def edit(self):
+        super().edit()
+
+    @action('Excluir')
+    def delete(self):
+        super().delete()
+
+    @action('Visualizar')
+    def view(self):
+        return super().view()
+
+
 class TipoDespesaSet(models.Set):
     @dashboard.card()
-    @attr('Tipos de Despesa', icon='attach_money')
+    @attr('Tipos de Despesa Padrão', icon='attach_money')
     def all(self):
         return self.actions('add', 'edit', 'delete')
 
@@ -137,10 +160,46 @@ class TipoDespesa(models.Model):
         return super().view()
 
 
-class ReceitaSet(models.Set):
+class TipoDespesaPessoalSet(models.Set):
     @dashboard.card()
+    @attr('Tipos de Despesa', lookups='pessoa')
+    def all(self):
+        return self.search('descricao').actions('add', 'edit', 'delete')
+
+
+class TipoDespesaPessoal(TipoDespesa):
+
+    pessoa = models.ForeignKey(Pessoa, verbose_name='Pessoa', exclude='self')
+
+    class Meta:
+        icon = 'attach_money'
+        verbose_name = 'Tipo de Despesa'
+        verbose_name_plural = 'Tipos de Despesa'
+
+    def __str__(self):
+        return self.descricao
+
+    @action('Cadastrar')
+    def add(self):
+        super().add()
+
+    @action('Editar')
+    def edit(self):
+        super().edit()
+
+    @action('Excluir')
+    def delete(self):
+        super().delete()
+
+    @action('Visualizar')
+    def view(self):
+        return super().view()
+
+
+class ReceitaSet(models.Set):
+    @dashboard.bottom_bar()
     @dashboard.calendar()
-    @attr('Receitas')
+    @attr('Receitas', lookups='pessoa')
     def all(self):
         return self.display('descricao', 'data_prevista', 'valor_previsto', 'data_recebimento', 'valor_recebido').actions('add', 'edit', 'delete').subsets('recebidas', 'nao_recebidas').lookups('self__pessoa')
 
@@ -148,14 +207,15 @@ class ReceitaSet(models.Set):
     def recebidas(self):
         return self.filter(data_recebimento__isnull=False).lookups('self__pessoa').actions('cancelar_recebimento')
 
-    @attr('Não-Recebidas')
+    @dashboard.center()
+    @attr('Não-Recebidas', lookups='pessoa')
     def nao_recebidas(self):
         return self.filter(data_recebimento__isnull=True).lookups('self__pessoa').actions('registrar_recebimento')
 
 
 class Receita(models.Model):
     pessoa = models.ForeignKey(Pessoa, verbose_name='Pessoa', exclude='self')
-    tipo = models.ForeignKey(TipoReceita, verbose_name='Tipo')
+    tipo = models.ForeignKey(TipoReceita, verbose_name='Tipo', lookup=('self__tiporeceitapessoal__isnull', 'self__tiporeceitapessoal__pessoa'))
     descricao = models.CharField(verbose_name='Descrição')
     data_prevista = models.DateField(verbose_name='Data Prevista')
     valor_previsto = models.DecimalField(verbose_name='Valor Previsto')
@@ -168,7 +228,7 @@ class Receita(models.Model):
         verbose_name_plural = 'Receitas'
 
     def __str__(self):
-        return self.descricao
+        return '{} - {}'.format(self.tipo, self.descricao)
 
     @fieldsets({
         'Dados Gerais': ('pessoa', 'tipo', 'descricao'),
@@ -214,10 +274,10 @@ class Receita(models.Model):
 
 
 class DespesaSet(models.Set):
-    @dashboard.card()
+    @dashboard.bottom_bar()
     @dashboard.calendar()
     @dashboard.public()
-    @attr('Despesas')
+    @attr('Despesas', lookups='pessoa')
     def all(self):
         return self.display('descricao', 'data_prevista', 'valor_previsto', 'data_pagamento', 'valor_pago').actions('add', 'edit', 'delete', 'view', 'registrar_pagamento').subsets('pagas', 'nao_pagas').lookups('self__pessoa')
 
@@ -225,7 +285,8 @@ class DespesaSet(models.Set):
     def pagas(self):
         return self.filter(data_pagamento__isnull=False).lookups('self__pessoa').actions('cancelar_pagamento')
 
-    @attr('Não-Pagas')
+    @dashboard.center()
+    @attr('Não-Pagas', lookups='pessoa')
     def nao_pagas(self):
         return self.filter(data_pagamento__isnull=True).lookups('self__pessoa').actions('registrar_pagamento')
 
@@ -236,7 +297,7 @@ class DespesaSet(models.Set):
 
 
 class Despesa(models.Model):
-    pessoa = models.ForeignKey(Pessoa, verbose_name='Pessoa', readonly='self')
+    pessoa = models.ForeignKey(Pessoa, verbose_name='Pessoa', exclude='self')
     tipo = models.ForeignKey(TipoDespesa, verbose_name='Tipo')
     descricao = models.CharField(verbose_name='Descrição')
     data_prevista = models.DateField(verbose_name='Data Prevista')
@@ -250,7 +311,7 @@ class Despesa(models.Model):
         verbose_name_plural = 'Despesas'
 
     def __str__(self):
-        return self.descricao
+        return '{} - {}'.format(self.tipo, self.descricao)
 
     @fieldsets({
         'Dados Gerais': ('pessoa', 'tipo', 'descricao'),
@@ -270,17 +331,17 @@ class Despesa(models.Model):
 
     @action('Visualizar')
     def view(self):
-        return super().view()
+        return super().view('get_dados_gerais', 'get_previsao_pagamento', 'get_dados_pagamento')
 
-    @fieldset('Dados Gerais')
+    @attr('Dados Gerais')
     def get_dados_gerais(self):
         return self.values(('pessoa', 'tipo'), 'descricao')
 
-    @fieldset('Previsão do Pagamento')
+    @attr('Previsão do Pagamento')
     def get_previsao_pagamento(self):
         return self.values(('data_prevista', 'valor_previsto'),)
 
-    @fieldset('Dados do Pagamento')
+    @attr('Dados do Pagamento')
     def get_dados_pagamento(self):
         return self.values(('data_pagamento', 'valor_pago'),).actions('registrar')
 

@@ -157,8 +157,8 @@ class ModelForm(forms.ModelForm):
 
         for name in list(self.fields.keys()):
             field = self.fields[name]
-            if hasattr(field, 'exclude'):
-                queryset = field.queryset.apply_lookups(self.request.user, field.lookup)
+            if hasattr(field, 'exclude') and field.exclude:
+                queryset = field.queryset.apply_lookups(self.request.user, field.exclude)
                 if queryset.count() == 1:
                     setattr(self.instance, name, queryset.first())
                     del self.fields[name]

@@ -20,7 +20,7 @@ def get_model(func):
         return None
 
 
-def get_link(func_or_class):
+def get_link(func_or_class, user=None):
     if inspect.isclass(func_or_class):
         module_name = None
         if hasattr(func_or_class, 'submit'):
@@ -35,15 +35,16 @@ def get_link(func_or_class):
         func_name = func_or_class.__name__
         metadata = getattr(func_or_class, '_metadata')
         model = get_model(func_or_class)
-        return dict(
-            icon=metadata.get('icon') or model.get_metadata('icon'),
-            url='/api/{}/{}{}'.format(
-                model.get_metadata('app_label'),
-                model.get_metadata('model_name'),
-                '/{}'.format(func_name) if func_name != 'all' else ''
-            ),
-            label=metadata.get('verbose_name'),
-        )
+        if model().check_lookups(func_name, user):
+            return dict(
+                icon=metadata.get('icon') or model.get_metadata('icon'),
+                url='/api/{}/{}{}'.format(
+                    model.get_metadata('app_label'),
+                    model.get_metadata('model_name'),
+                    '/{}'.format(func_name) if func_name != 'all' else ''
+                ),
+                label=metadata.get('verbose_name'),
+            )
 
 
 def getattrr(obj, args, request=None):
@@ -109,7 +110,11 @@ def serialize(obj, detail=False):
         if detail:
             for key in obj:
                 obj[key] = serialize(obj[key], detail=False)
-            return dict(type='valueset', fields=[[{k: v}] for k, v in obj.items()], actions=[])
+            return dict(
+                type='valueset',
+                fields=[[dict(name=k, label=k, value=v, formatter=None)] for k, v in obj.items()],
+                actions=[]
+            )
         else:
             pass
     return obj

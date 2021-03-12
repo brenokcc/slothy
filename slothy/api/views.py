@@ -233,7 +233,6 @@ def api(request, service, path):
                                         def func():
                                             tmp = instance.serialize(tokens[3])
                                             tmp['data'] = tmp['data'][0]['data'][0]['data']
-                                            tmp['input']['tab'] = None
                                             return tmp
                                     setattr(func, '_metadata', metadata)
                             else:  # object relation (add or remove)

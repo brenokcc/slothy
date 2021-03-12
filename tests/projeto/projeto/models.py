@@ -164,7 +164,7 @@ class CidadeSet(models.Set):
         return self.filters(
             'estado', 'prefeito', 'estado__ativo', 'vereadores'
         ).display(
-            'get_dados_gerais'
+            'get_dados_gerais', 'nome'
         ).lookups(
             'self__estado__governador__pessoa', 'self__prefeito', 'presidente'
         ).sort_by('nome', 'estado').actions('add', 'view', 'edit')
@@ -179,6 +179,7 @@ class Cidade(models.Model):
     localizacao = models.GeoLocationField(verbose_name='Localização', null=True, blank=True)
 
     class Meta:
+        icon = 'house'
         verbose_name = 'Cidade'
         verbose_name_plural = 'Cidades'
 

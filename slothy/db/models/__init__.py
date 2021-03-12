@@ -168,6 +168,7 @@ class ValueSet(dict):
         self.nested_keys = []
         self.nested = False
         self.verbose_names = {}
+
         super().__init__()
         _values = []
         for lookup in lookups:
@@ -196,7 +197,7 @@ class ValueSet(dict):
                         setattr(value, '_caller', caller)
                 self[attr_name] = value
                 self.verbose_names[attr_name] = verbose_name
-                keys.append(attr_name)
+                keys.append((attr_name, verbose_name, None))
             self.nested_keys.append(keys)
 
     def thumbnail(self, lookup):
@@ -225,10 +226,10 @@ class ValueSet(dict):
         _values = []
         for key_list in self.nested_keys:
             values = []
-            for key in key_list:
-                value = self[key]
+            for attr_name, verbose_name, formatter in key_list:
+                value = self[attr_name]
                 value = utils.serialize(value, False)
-                values.append({key: value})
+                values.append(dict(name=attr_name, label=verbose_name, value=value, formatter=formatter))
             _values.append(values)
         return _values
 
@@ -490,6 +491,8 @@ class QuerySet(query.QuerySet):
         if lookups is None:
             lookups = self._lookups
 
+        if user is None:
+            return self
         if user.pk is None:
             return self
         elif user.is_superuser:
@@ -505,7 +508,10 @@ class QuerySet(query.QuerySet):
                         lookup_key = 'pk'
                     else:  # self__<attr>
                         lookup_key = lookup_key[6:]
-                    filters.append(Q(**{lookup_key: user.pk}))
+                    if lookup_key.endswith('__isnull'):
+                        filters.append(Q(**{lookup_key: True}))
+                    else:
+                        filters.append(Q(**{lookup_key: user.pk}))
                 else:
                     app_label = self.model.get_metadata('app_label')
                     tokens = lookup_key.split('__')
@@ -660,7 +666,10 @@ class QuerySet(query.QuerySet):
                 value = getattrr(obj, display['name'])
                 if callable(value):
                     value = value()
-                item.append(utils.serialize(value, detail=False))
+                if isinstance(value, ValueSet):
+                    item.append(utils.serialize(value, detail=True))
+                else:
+                    item.append(utils.serialize(value, detail=False))
             actions = []
             for action in self._actions:
                 if action['type'] == 'instance':
@@ -816,7 +825,12 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
                     tab_data = attr().serialize()
                 else:
                     tab_data = []
-                tabs.append(dict(type='tab', name=attr_name, label=metadata['verbose_name'], data=tab_data))
+                url = '/api/{}/{}/{}/{}'.format(
+                    self.get_metadata('app_label'),
+                    self.get_metadata('model_name'),
+                    self.pk, attr_name
+                )
+                tabs.append(dict(type='tab', name=attr_name, label=metadata['verbose_name'], path=url, data=tab_data))
             elif metadata['type'] == 'attr':
                 fieldsets.append(attr_name)
 
@@ -827,7 +841,6 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
             type='object',
             name=str(self),
             icon=self.get_metadata('icon'),
-            input=dict(tab=tab),
             data=data
         )
         return serialized
@@ -902,24 +915,30 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
 
     def check_lookups(self, attr_name, user):
         self._user = user
-        attr = getattr(self, attr_name)
+        if hasattr(self, attr_name):
+            attr = getattr(self, attr_name)
+        else:
+            attr = getattr(getattr(type(self).objects, '_queryset_class'), attr_name)
         metadata = getattr(attr, '_metadata')
         lookups = metadata['lookups']
-
+        if user is None:
+            return True
         if user.pk is None:
             return True
         elif user.is_superuser:
             return True
         elif lookups == ():
+            return False
+        elif lookups is None:
             return True
         else:
             filters = {}
             for lookup_key in lookups:
-                if lookup_key.startswith('self'):  # self or self__<attr>
+                if lookup_key.startswith('self'):
                     model = type(self)
-                    if lookup_key == 'self':  # self
+                    if lookup_key == 'self':
                         lookup_key = 'pk'
-                    else:  # self__<attr>
+                    else:
                         lookup_key = lookup_key[6:]
                 else:  # group
                     app_label = self.get_metadata('app_label')

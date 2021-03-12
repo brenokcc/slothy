@@ -22,7 +22,7 @@ def attr(verbose_name, condition=None, formatter=None, lookups=(), icon=None):
             condition=condition,
             icon=icon,
             formatter=formatter,
-            lookups=lookups,
+            lookups=utils.iterable(lookups),
             order=order,
         )
         setattr(func, '_metadata', metadata)
@@ -155,7 +155,9 @@ class App(dict):
         for key in ('shortcut', 'card', 'top_bar', 'bottom_bar', 'floating'):
             self[key] = []
             for data in dashboard.DATA.get(key, ()):
-                self[key].append(utils.get_link(data['func']))
+                link = utils.get_link(data['func'], user=request.user)
+                if link:
+                    self[key].append(link)
         for key in ('top', 'left', 'center', 'right', 'bottom'):
             self[key] = []
             for data in dashboard.DATA.get(key, ()):
@@ -166,6 +168,10 @@ class App(dict):
                     metadata = getattr(data['func'], '_metadata')
                     model = utils.get_model(data['func'])
                     output = getattr(model.objects, func_name)()
+                    if hasattr(output, 'values_list'):
+                        output = output.apply_lookups(request.user)
+                        if not output.exists():
+                            continue
                     output = format_ouput(output, metadata)
                     formatter = data.get('formatter', metadata.get('formatter'))
                     if formatter:
@@ -180,6 +186,6 @@ class App(dict):
                 verbose_name = metadata['verbose_name']
                 model = utils.get_model(data['func'])
                 qs = getattr(model.objects, func_name)()
-                self[key].append(qs.serialize(verbose_name))
+                self[key].append(qs.apply_lookups(request.user).serialize(verbose_name))
 
         return self
