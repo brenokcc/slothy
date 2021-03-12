@@ -291,7 +291,7 @@ class DespesaSet(models.Set):
         return self.filter(data_pagamento__isnull=True).lookups('self__pessoa').actions('registrar_pagamento')
 
     @dashboard.shortcut()
-    @attr('Total por Tipo', icon='insert_chart_outlined', formatter='bar_chart')
+    @attr('Total por Tipo', icon='insert_chart_outlined', lookups='pessoa', formatter='bar_chart')
     def total_por_tipo(self):
         return self.all().sum('tipo', z='valor_previsto')
 

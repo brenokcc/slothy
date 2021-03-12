@@ -22,4 +22,3 @@ INSTALLED_APPS = DEFAULT_APPS + (
 
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
-COLORS = '#58D68D', '#D35400'

@@ -48,10 +48,16 @@ class Command(runserver.Command):
                 # qr.print_tty()
                 # print(url)
                 # print('\n\n\n')
-            url = 'http://127.0.0.1:9000#{}'.format(
-                base64.b64encode(json.dumps(dict(host='http://127.0.0.1:8080', proxy='1234567890')).encode()).decode()
+            #url = 'http://127.0.0.1:9000#{}'.format(
+            #    base64.b64encode(json.dumps(dict(host='http://127.0.0.1:8080', proxy='1234567890')).encode()).decode()
+            #)
+            #print(url)
+
+            url = 'http://aplicativo.click#{}'.format(
+                base64.b64encode(json.dumps(dict(host='http://127.0.0.1:8000')).encode()).decode()
             )
             print(url)
+
         # Client.start()
         super().inner_run(*args, **options)
 
