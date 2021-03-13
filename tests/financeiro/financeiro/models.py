@@ -2,14 +2,15 @@
 from slothy.db import models
 from datetime import date
 from slothy.api.models import User
-from slothy.decorators import attr, action, dashboard, fieldsets
+from slothy.decorators import attr, attrs, action, dashboard, fieldsets
 
 
 class PessoaSet(models.Set):
 
+    @dashboard.floating()
     @attr('Pessoas')
     def all(self):
-        return self.display('nome', 'email').search('nome')
+        return self.display('nome', 'email').search('nome').actions('view', 'add', 'edit', 'delete')
 
 
 class Pessoa(User):
@@ -18,6 +19,7 @@ class Pessoa(User):
     email = models.EmailField(verbose_name='E-mail', unique=True)
 
     class Meta:
+        icon = 'people_alt'
         verbose_name = 'Pessoa'
         verbose_name_plural = 'Pessoas'
 
@@ -41,7 +43,7 @@ class Pessoa(User):
 
     @action('Visualizar')
     def view(self):
-        return super().view()
+        return super().view('get_dados_gerais', 'get_registros', 'get_estatisticas')
  
     @action('Alterar Senha')
     def alterar_senha(self, senha):
@@ -51,12 +53,36 @@ class Pessoa(User):
     def get_dados_gerais(self):
         return self.values('nome', 'email')
 
+    @attr('Despesas')
+    def get_despesas(self):
+        return self.despesa_set.all()
+
+    @attr('Receitas')
+    def get_receitas(self):
+        return self.receita_set.all()
+
+    @attr('Despesas por Tipo', formatter='donut_chart')
+    def get_total_despesas_por_tipo(self):
+        return self.get_despesas().count('tipo')
+
+    @attr('Receitas por Tipo', formatter='bar_chart')
+    def get_total_receitas_por_tipo(self):
+        return self.get_receitas().count('tipo')
+
+    @attrs('Registros')
+    def get_registros(self):
+        return self.values('get_despesas', 'get_receitas')
+
+    @attrs('Estatística')
+    def get_estatisticas(self):
+        return self.values('get_total_despesas_por_tipo', 'get_total_receitas_por_tipo')
+
 
 class TipoReceitaSet(models.Set):
     @dashboard.card()
     @attr('Tipos de Receita Padrão', icon='attach_money')
-    def all(self):
-        return self.actions('add', 'edit', 'delete')
+    def padrao(self):
+        return self.filter(tiporeceitapessoal__isnull=True).actions('add', 'edit', 'delete')
 
 
 class TipoReceita(models.Model):
@@ -65,8 +91,8 @@ class TipoReceita(models.Model):
 
     class Meta:
         icon = 'attach_money'
-        verbose_name = 'Tipo de Receita'
-        verbose_name_plural = 'Tipos de Receita'
+        verbose_name = 'Tipo de Receita Padrão'
+        verbose_name_plural = 'Tipos de Receita Padrão'
 
     def __str__(self):
         return self.descricao
@@ -101,8 +127,8 @@ class TipoReceitaPessoal(TipoReceita):
 
     class Meta:
         icon = 'attach_money'
-        verbose_name = 'Tipo de Despesa'
-        verbose_name_plural = 'Tipos de Despesa'
+        verbose_name = 'Tipo de Receita'
+        verbose_name_plural = 'Tipos de Receita'
 
     def __str__(self):
         return self.descricao
@@ -127,8 +153,8 @@ class TipoReceitaPessoal(TipoReceita):
 class TipoDespesaSet(models.Set):
     @dashboard.card()
     @attr('Tipos de Despesa Padrão', icon='attach_money')
-    def all(self):
-        return self.actions('add', 'edit', 'delete')
+    def padrao(self):
+        return self.filter(tipodespesapessoal__isnull=True).actions('add', 'edit', 'delete')
 
 
 class TipoDespesa(models.Model):
@@ -137,8 +163,8 @@ class TipoDespesa(models.Model):
 
     class Meta:
         icon = 'attach_money'
-        verbose_name = 'Tipo de Despesa'
-        verbose_name_plural = 'Tipos de Despesa'
+        verbose_name = 'Tipo de Despesa Padrão'
+        verbose_name_plural = 'Tipos de Despesa Padrão'
 
     def __str__(self):
         return self.descricao
@@ -201,13 +227,13 @@ class ReceitaSet(models.Set):
     @dashboard.calendar()
     @attr('Receitas', lookups='pessoa')
     def all(self):
-        return self.display('descricao', 'data_prevista', 'valor_previsto', 'data_recebimento', 'valor_recebido').actions('add', 'edit', 'delete').subsets('recebidas', 'nao_recebidas').lookups('self__pessoa')
+        return self.display('tipo', 'descricao', 'data_prevista', 'valor_previsto', 'data_recebimento', 'valor_recebido').actions('add', 'edit', 'delete').subsets('recebidas', 'nao_recebidas').lookups('self__pessoa')
 
-    @attr('Recebidas')
+    @attr('Recebidas', lookups='pessoa')
     def recebidas(self):
         return self.filter(data_recebimento__isnull=False).lookups('self__pessoa').actions('cancelar_recebimento')
 
-    @dashboard.center()
+    @dashboard.shortcut()
     @attr('Não-Recebidas', lookups='pessoa')
     def nao_recebidas(self):
         return self.filter(data_recebimento__isnull=True).lookups('self__pessoa').actions('registrar_recebimento')
@@ -279,9 +305,9 @@ class DespesaSet(models.Set):
     @dashboard.public()
     @attr('Despesas', lookups='pessoa')
     def all(self):
-        return self.display('descricao', 'data_prevista', 'valor_previsto', 'data_pagamento', 'valor_pago').actions('add', 'edit', 'delete', 'view', 'registrar_pagamento').subsets('pagas', 'nao_pagas').lookups('self__pessoa')
+        return self.display('tipo', 'descricao', 'data_prevista', 'valor_previsto', 'data_pagamento', 'valor_pago').actions('add', 'edit', 'delete', 'view', 'registrar_pagamento').subsets('pagas', 'nao_pagas').lookups('self__pessoa')
 
-    @attr('Pagas')
+    @attr('Pagas', lookups='pessoa')
     def pagas(self):
         return self.filter(data_pagamento__isnull=False).lookups('self__pessoa').actions('cancelar_pagamento')
 

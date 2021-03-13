@@ -6,6 +6,7 @@ DEBUG = True
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 PROJECT_NAME = 'Projeto'
+PROJECT_LOGO = None
 ROOT_URLCONF = 'slothy.api.urls'
 SECRET_KEY = '1eb66f2e7a0311eb9e473c15c2da2c92'
 

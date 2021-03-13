@@ -149,7 +149,7 @@ class QuerySetStatistic(object):
             data = []
             for j, (xk, xv) in enumerate(self._xdict.items()):
                 color = i if len(self._ydict.items()) > 1 else j
-                data.append([formatter.get(xv, str(xv)), self._values_dict.get((xk, yk), 0), settings.COLORS[color]])
+                data.append([formatter.get(xv, str(xv)), self._values_dict.get((xk, yk), 0), settings.THEME['COLORS'][color]])
             series.update(**{formatter.get(yv, str(yv)): data})
 
         return dict(
@@ -692,7 +692,7 @@ class QuerySet(query.QuerySet):
             serialized['type'] = 'queryset'
             serialized['name'] = name
             serialized['icon'] = icon or self.model.get_metadata('icon')
-            serialized['path'] = '/queryset/{}/{}/'.format(
+            serialized['path'] = '/queryset/{}/{}'.format(
                 getattr(self.model, '_meta').app_label.lower(),
                 self.model.__name__.lower()
             )

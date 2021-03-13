@@ -58,19 +58,8 @@ def upload(request):
 def index(request):
     output = dict(
         PROJECT_NAME=settings.PROJECT_NAME,
-        TEXT_COLOR=settings.TEXT_COLOR,
-        DARK_TEXT_COLOR=settings.DARK_TEXT_COLOR,
-        BACKGROUND_COLOR=settings.BACKGROUND_COLOR,
-        PRIMARY_COLOR=settings.PRIMARY_COLOR,
-        BAR_FONT_COLOR=settings.BAR_FONT_COLOR,
-        BAR_BACKGROUND_COLOR=settings.BAR_BACKGROUND_COLOR,
-        BAR_GRADIENT_COLOR=settings.BAR_GRADIENT_COLOR,
-        LOCATION_SHARING_INTERVAL=settings.LOCATION_SHARING_INTERVAL,
-        CARD_BACKGROUND_COLOR=settings.CARD_BACKGROUND_COLOR,
-        CARD_TEXT_COLOR=settings.CARD_TEXT_COLOR,
-        CARD_ICON_COLOR=settings.CARD_ICON_COLOR,
-        SHORTCUT_ICON_COLOR=settings.SHORTCUT_ICON_COLOR,
-        COLORS=settings.COLORS,
+        PROJECT_LOGO=settings.PROJECT_LOGO,
+        THEME=settings.THEME,
     )
     return JsonResponse(output)
 
@@ -319,10 +308,13 @@ def api(request, service, path):
                             if metadata['name'] == 'all':
                                 name = metadata['verbose_name']
                             else:
-                                name = '{} {}'.format(
-                                    model.get_metadata('verbose_name_plural'),
-                                    metadata['verbose_name']
-                                )
+                                if model.get_metadata('verbose_name_plural') == metadata['verbose_name']:
+                                    name = metadata['verbose_name']
+                                else:
+                                    name = '{} {}'.format(
+                                        model.get_metadata('verbose_name_plural'),
+                                        metadata['verbose_name']
+                                    )
                             response = output.serialize(name, icon=metadata['icon'])
                             response['formatter'] = metadata.get('formatter')
                         elif isinstance(output, Model):

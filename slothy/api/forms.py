@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-
+from django.conf import settings
 from django import forms
 from django.contrib.auth import login, authenticate
 from django.core import signing
@@ -13,7 +13,7 @@ class LoginForm(Form):
 
     class Meta:
         title = 'Acesso ao Sistema'
-        # image = '/static/logo.png'
+        image = settings.PROJECT_LOGO
         center = True
         lookups = ()
         fieldsets = {

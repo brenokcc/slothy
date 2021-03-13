@@ -73,6 +73,7 @@ SETTINGS_FILE_CONTENT = '''# -*- coding: utf-8 -*-
 import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PROJECT_NAME = __file__.split(os.sep)[-2]
+PROJECT_LOGO = None
 DEBUG = True
 ROOT_URLCONF = 'slothy.api.urls'
 ALLOWED_HOSTS = '*'
