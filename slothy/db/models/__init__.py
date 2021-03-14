@@ -6,7 +6,6 @@ from django.db.models import query, base, manager, Sum, Count, Avg
 from django.db.models.fields import *
 from django.db.models.fields.related import *
 from django.core.exceptions import FieldDoesNotExist
-from slothy import decorators
 from slothy.db.utils import getattrr
 from slothy.db import utils
 import zlib
@@ -18,6 +17,7 @@ import operator
 from functools import reduce
 from django.core import exceptions
 from django.conf import settings
+from slothy.db import attr
 from slothy.db.models.fields import *
 from django.db.models.functions import TruncDay
 ValidationError = exceptions.ValidationError
@@ -857,7 +857,7 @@ class Model(six.with_metaclass(ModelBase, models.Model)):
     def edit(self):
         self.save()
 
-    @decorators.attr('Dados Gerais')
+    @attr('Dados Gerais')
     def default_viewset(self):
         lookups = self.get_metadata('list_display')
         return self.values(*lookups)

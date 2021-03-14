@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from django.test import TestCase
 from .models import Pessoa, Estado, Cidade, PontoTuristico, Presidente, Governador, Telefone, Endereco
 import json
@@ -116,13 +118,13 @@ class MainTestCase(TestCase):
         self.assertEqual(len(r['data']), 1)
         # view
         r = self.get('/api/projeto/pontoturistico/1/')
-        self.assertIn([{'nome': 'Parque do Povo'}], r['data'][0]['data']['fields'])
+        self.assertIn([{'name': 'nome', 'label': 'Nome', 'value': 'Parque do Povo', 'formatter': None}], r['data'][0]['data']['fields'])
         # edit
         data = dict(nome='Parque da Cidade')
         r = self.post('/api/projeto/pontoturistico/1/edit/', data=data)
         self.assertEqual(r, dict(type='message', text='Edição realizada com sucesso'))
         r = self.get('/api/projeto/pontoturistico/1/')
-        self.assertIn([{'nome': 'Parque da Cidade'}], r['data'][0]['data']['fields'])
+        self.assertIn([{'name': 'nome', 'label': 'Nome', 'value': 'Parque da Cidade', 'formatter': None}], r['data'][0]['data']['fields'])
         self.assertEqual(PontoTuristico.objects.count(), 1)
         # validation error
         data = dict(nome='Parque da Cidade')

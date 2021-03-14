@@ -1,5 +1,6 @@
+
 from slothy.api.ui.views import Markdown
-from slothy.decorators import dashboard
+from slothy.admin.ui import dashboard
 
 
 @dashboard.public()

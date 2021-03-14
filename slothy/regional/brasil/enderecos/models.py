@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from slothy.db import models
-from slothy.decorators import fieldsets, action, attr
+from slothy.db import models, fieldsets, action, attr
 
 
 class RegiaoSet(models.Set):

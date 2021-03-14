@@ -5,36 +5,22 @@ import sys
 import json
 import traceback
 import uuid
-import tempfile
 import slothy
 import requests
-from slothy.decorators import App
+from slothy.admin import Admin
 from django.conf import settings
 from django.apps import apps
 from django.db import transaction
-from django.http import HttpResponse, JsonResponse
+from django.http import JsonResponse
 from django.contrib.auth import logout
 from slothy.db.models import ValidationError, ManyToManyField, ValueSet, QuerySet, Model, QuerySetStatistic
 from slothy.forms import ModelForm, InputValidationError
-from slothy.api.forms import LoginForm
+from slothy.admin.forms import LoginForm
 from slothy.api import export_to_postman
 from django.core import signing
 
 
 slothy.initialize()
-
-
-class PdfResponse(HttpResponse):
-
-    def __init__(self, html=''):
-        import pdfkit
-        file_name = tempfile.mktemp('.pdf')
-        html = html.replace('/media', settings.MEDIA_ROOT)
-        html = html.replace('/static', '{}/{}/static'.format(settings.BASE_DIR, settings.PROJECT_NAME))
-        pdfkit.from_string(html, file_name)
-        content = open(file_name, "rb").read()
-        os.unlink(file_name)
-        super().__init__(content=content, content_type='application/pdf')
 
 
 def upload(request):
@@ -55,7 +41,7 @@ def upload(request):
     return JsonResponse(output)
 
 
-def index(request):
+def settingss(request):
     output = dict(
         PROJECT_NAME=settings.PROJECT_NAME,
         PROJECT_LOGO=settings.PROJECT_LOGO,
@@ -135,7 +121,7 @@ def postman(request):
     return JsonResponse(data)
 
 
-def api(request, service, path):
+def api(request, path):
     auhtorization = request.headers.get('Authorization', '')
     if auhtorization.startswith('Token'):
         token = auhtorization.split(' ')[-1]
@@ -155,9 +141,9 @@ def api(request, service, path):
     try:
         if len(tokens) == 1:
             if path == 'public':
-                response = App().public()
+                response = Admin().public()
             elif path == 'admin':
-                response = App().admin(request)
+                response = Admin().admin(request)
             elif path == 'user':  # authenticated user
                 if request.user.is_authenticated:
                     response = request.user.view()
@@ -341,13 +327,10 @@ def api(request, service, path):
         traceback.print_exc(file=sys.stdout)
         response = dict(type='exception', text=str(e))
 
-    if service == 'pdf':
-        return PdfResponse()
-    else:
-        output = JsonResponse(response)
-        output["Access-Control-Allow-Origin"] = "*"
-        output["Access-Control-Allow-Headers"] = "*"
-        return output
+    output = JsonResponse(response)
+    output["Access-Control-Allow-Origin"] = "*"
+    output["Access-Control-Allow-Headers"] = "*"
+    return output
 
 
 def build_form(_model, func, metadata, exclude_field):

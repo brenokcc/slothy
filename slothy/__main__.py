@@ -71,60 +71,46 @@ exec gunicorn %s.wsgi:application -w 1 -b 127.0.0.1:${1:-8000} --timeout=600 --u
 
 SETTINGS_FILE_CONTENT = '''# -*- coding: utf-8 -*-
 import os
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PROJECT_NAME = __file__.split(os.sep)[-2]
-PROJECT_LOGO = None
+from slothy.conf.settings import *
+
 DEBUG = True
-ROOT_URLCONF = 'slothy.api.urls'
-ALLOWED_HOSTS = '*'
-CORS_ORIGIN_ALLOW_ALL = True
-LANGUAGE_CODE = 'pt-br'
-TIME_ZONE = 'America/Recife'
-USE_I18N = True
-USE_L10N = True
-USE_TZ = False
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+PROJECT_NAME = 'Finanças'
+PROJECT_LOGO = '/static/logo.png'
+SECRET_KEY = '%s'
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     }
 }
-MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'corsheaders.middleware.CorsMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-]
-SECRET_KEY = '%s'
-INSTALLED_APPS = (
-    'django.contrib.sessions',
-    'django.contrib.contenttypes',
-    'django.contrib.auth',
-    'netifaces',
-    'corsheaders',
-    'slothy.core',
-    'slothy.api',
+
+INSTALLED_APPS = DEFAULT_APPS + (
     '%s',
 )
-COLORS = '#f1948a', '#af7ac5', '#f7dc6f', '#73c6b6', '#5dade2', '#82e0aa'
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'APP_DIRS': True,
-    }
-]
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-STATIC_URL = '/static/'
-MEDIA_URL = '/media/'
 
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+ROOT_URLCONF = '%s.urls'
+'''
+
+URLS_FILE_CONTENT = '''# -*- coding: utf-8 -*-
+
+from slothy.admin import views
+from django.conf.urls import url
+from slothy.api.urls import urlpatterns as api_urls
+from slothy.admin.urls import urlpatterns as admin_urls
+
+urlpatterns = api_urls + admin_urls + [
+    url(r"^$", views.index)
+]
 '''
 
 MODEL_FILE_CONTENT = '''# -*- coding: utf-8 -*-
 from slothy.db import models
-from slothy.api.models import User
-from slothy.decorators import attr, action, param, fieldset, dashboard, fieldsets
-from slothy.decorators import user, role, attr, action, fieldset, param
+from slothy.admin.models import User, attr, action, param, fieldsets, 
+from slothy.decorators import dashboard, 
 
 
 class PessoaSet(models.Set):
@@ -210,13 +196,16 @@ if sys.argv[1] == 'startproject':
     os.chmod(os.path.join(project_path, '%s.sh' % project_name), st.st_mode | stat.S_IEXEC)
 
     with open(os.path.join(project_path, project_name, 'settings.py'), 'w') as file:
-        file.write(SETTINGS_FILE_CONTENT % (uuid.uuid1().hex, project_name))
+        file.write(SETTINGS_FILE_CONTENT % (uuid.uuid1().hex, project_name, project_name))
 
     with open(os.path.join(project_path, project_name, '__init__.py'), 'w') as file:
         file.write(INIT_FILE_CONTENT)
 
     with open(os.path.join(project_path, project_name, 'models.py'), 'w') as file:
         file.write(MODEL_FILE_CONTENT)
+
+    with open(os.path.join(project_path, project_name, 'urls.py'), 'w') as file:
+        file.write(URLS_FILE_CONTENT)
 
     print('Project "{}" successfully created!'.format(project_name))
 

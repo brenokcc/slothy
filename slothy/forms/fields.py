@@ -1,5 +1,5 @@
-from decimal import Decimal
-from django.core import validators
+# -*- coding: utf-8 -*-
+
 from django import forms
 from django.conf import settings
 
@@ -9,7 +9,7 @@ class ColorField(forms.ChoiceField):
         kwargs.update(initial='#FFFFFF')
         kwargs.pop('max_length')
         if 'choices' not in kwargs:
-            colors = settings.COLORS
+            colors = settings.THEME['COLORS']
             kwargs.update(choices=[[color, color] for color in colors])
         super().__init__(*args, **kwargs)
 

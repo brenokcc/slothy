@@ -14,9 +14,8 @@ DEFAULT_APPS = (
     'django.contrib.sessions',
     'django.contrib.contenttypes',
     'django.contrib.auth',
-    'netifaces',
     'corsheaders',
-    'slothy.core',
+    'slothy.admin',
     'slothy.api',
 )
 
@@ -57,5 +56,5 @@ THEME = dict(
 
 LOCATION_SHARING_INTERVAL = 0
 
-AUTH_USER_MODEL = 'api.user'
+AUTH_USER_MODEL = 'admin.user'
 

@@ -3,6 +3,5 @@ django
 django-cors-headers
 Pillow
 wheel
-qrcode
-netifaces
 requests
+gunicorn

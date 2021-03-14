@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
+
 import datetime
-from slothy.db import models
+from slothy.db import models, attr, attrs, action, param, fieldsets
 from slothy.regional.brasil.enderecos import models as enderecos
-from slothy.api.models import User
-from slothy.decorators import attr, action, param, dashboard, fieldsets, attrs
+from slothy.admin.models import User
+from slothy.admin.ui import dashboard
 
 
 class Telefone(models.Model):
