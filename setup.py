@@ -18,7 +18,7 @@ setup(
     name='slothy',
     version='0.0.1',
     packages=find_packages(),
-    install_requires=['six', 'django', 'django-cors-headers', 'Pillow', 'wheel', 'qrcode', 'netifaces', 'gunicorn'],
+    install_requires=['six', 'django', 'django-cors-headers', 'Pillow', 'wheel', 'gunicorn'],
     extras_require={
         'frontend': []
     },
